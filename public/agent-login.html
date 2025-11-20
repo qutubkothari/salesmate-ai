@@ -381,10 +381,23 @@
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const phone = document.getElementById('regPhone').value.replace(/[^0-9]/g, ''); // Remove +, spaces, dashes
-            const email = document.getElementById('regEmail').value;
-            const businessName = document.getElementById('regBusinessName').value;
+            const businessName = document.getElementById('regBusinessName').value.trim();
             const password = document.getElementById('regPassword').value;
             const btn = e.target.querySelector('.btn');
+            
+            // Validate required fields
+            if (!phone || phone.length < 10) {
+                showError('Please enter a valid phone number (at least 10 digits)');
+                return;
+            }
+            if (!businessName) {
+                showError('Please enter your business name');
+                return;
+            }
+            if (!password || password.length < 6) {
+                showError('Password must be at least 6 characters');
+                return;
+            }
             
             btn.disabled = true;
             btn.textContent = 'Registering...';
@@ -401,7 +414,9 @@
                 if (response.ok && data.tenantId) {
                     await notifyAgent(data.tenantId, phone);
                 } else {
-                    showError(data.error || 'Registration failed');
+                    const errorMsg = data.error || `Registration failed (${response.status})`;
+                    showError(errorMsg);
+                    console.error('Registration error:', data);
                     btn.disabled = false;
                     btn.textContent = 'Register & Connect';
                 }
