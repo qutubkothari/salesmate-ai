@@ -1992,21 +1992,42 @@
         }
 
         try {
-            // PRIORITY 1: Check if desktop agent is running via cloud server (FREE method)
+            // PRIORITY 1: Check if desktop agent is running (on user's PC, not cloud)
+            // We'll use a simple fetch with try/catch - CORS will cause error if agent offline
+            let desktopAgentOnline = false;
+            
             try {
-                const desktopAgentResponse = await fetch(`/api/desktop-agent/status/${tenantId}`, { 
-                    method: 'GET'
-                });
-                const desktopAgentData = await desktopAgentResponse.json();
+                // Attempt to reach the desktop agent on user's local machine
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000);
                 
-                if (desktopAgentData && desktopAgentData.online === true) {
-                    return {
-                        connected: true,
-                        method: 'desktop_agent',
-                        html: `<div class="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-300 rounded-lg p-4 shadow-lg">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center">
-                                    <i class="fas fa-desktop text-green-600 mr-3 text-2xl"></i>
+                const desktopAgentResponse = await fetch('http://localhost:3001/health', { 
+                    method: 'GET',
+                    mode: 'cors', // Allow CORS
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (desktopAgentResponse.ok) {
+                    const desktopAgentData = await desktopAgentResponse.json();
+                    if (desktopAgentData && desktopAgentData.status === 'running') {
+                        desktopAgentOnline = true;
+                    }
+                }
+            } catch (error) {
+                // Agent not running on user's PC (connection refused, timeout, or CORS error)
+                console.log('[DASHBOARD] Desktop agent not available:', error.message);
+            }
+            
+            if (desktopAgentOnline) {
+                return {
+                    connected: true,
+                    method: 'desktop_agent',
+                    html: `<div class="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-300 rounded-lg p-4 shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <i class="fas fa-desktop text-green-600 mr-3 text-2xl"></i>
                                     <div>
                                         <p class="font-bold text-green-900 flex items-center">
                                             <span class="relative flex h-3 w-3 mr-2">
@@ -2032,12 +2053,9 @@
                                 All broadcasts will be sent through your PC's WhatsApp - NO API COSTS!
                             </div>
                         </div>`
-                    };
-                }
-            } catch (desktopError) {
-                console.log('[DASHBOARD] Desktop agent not available, checking cloud WhatsApp Web...');
+                };
             }
-
+            
             // PRIORITY 2: Check cloud-based WhatsApp Web connection
             const response = await fetch(`/api/whatsapp-web/status/${tenantId}`);
             const result = await response.json();
