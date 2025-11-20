@@ -445,6 +445,55 @@ app.post('/api/agent-get-tenant', async (req, res) => {
   }
 });
 
+// Check if desktop agent is online for a tenant
+app.get('/api/desktop-agent/status/:tenantId', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    
+    console.log(`[DESKTOP_AGENT_STATUS] Checking agent for tenant: ${tenantId}`);
+
+    // Get tenant's desktop agent URL (default to localhost:3001)
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('desktop_agent_url')
+      .eq('id', tenantId)
+      .single();
+
+    const agentUrl = tenant?.desktop_agent_url || 'http://localhost:3001';
+
+    // Try to reach the desktop agent
+    const axios = require('axios');
+    try {
+      const response = await axios.get(`${agentUrl}/health`, {
+        timeout: 3000
+      });
+
+      if (response.data && response.data.status === 'running') {
+        console.log(`[DESKTOP_AGENT_STATUS] ✅ Agent online for tenant ${tenantId}`);
+        return res.json({
+          online: true,
+          status: 'running',
+          tenantId: response.data.tenantId,
+          agentUrl: agentUrl
+        });
+      }
+    } catch (agentError) {
+      console.log(`[DESKTOP_AGENT_STATUS] ⚠️  Agent offline for tenant ${tenantId}`);
+    }
+
+    // Agent not reachable
+    res.json({
+      online: false,
+      status: 'offline',
+      agentUrl: agentUrl
+    });
+
+  } catch (error) {
+    console.error('[DESKTOP_AGENT_STATUS] Error:', error);
+    res.status(500).json({ error: 'Failed to check agent status' });
+  }
+});
+
 // Use the routers for their respective paths
 app.use('/webhook', webhookRouter);
 app.use('/status', statusWebhookRouter);

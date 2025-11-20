@@ -1992,15 +1992,14 @@
         }
 
         try {
-            // PRIORITY 1: Check if desktop agent is running (FREE method)
+            // PRIORITY 1: Check if desktop agent is running via cloud server (FREE method)
             try {
-                const desktopAgentResponse = await fetch('http://localhost:3001/health', { 
-                    method: 'GET',
-                    signal: AbortSignal.timeout(2000) // 2 second timeout
+                const desktopAgentResponse = await fetch(`/api/desktop-agent/status/${tenantId}`, { 
+                    method: 'GET'
                 });
                 const desktopAgentData = await desktopAgentResponse.json();
                 
-                if (desktopAgentData && desktopAgentData.status === 'running') {
+                if (desktopAgentData && desktopAgentData.online === true) {
                     return {
                         connected: true,
                         method: 'desktop_agent',
