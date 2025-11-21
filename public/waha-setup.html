@@ -203,6 +203,10 @@
                 <p id="qrStatus">Loading QR code...</p>
             </div>
             <button onclick="refreshQR()">Refresh QR Code</button>
+            <button onclick="restartSession()" style="margin-left: 10px; background: #f59e0b;">Restart Session (Get New QR)</button>
+            <p style="margin-top: 10px; font-size: 14px; color: #666;">
+                ⏱️ QR codes expire after 20 seconds. If scanning fails, click "Refresh QR Code"
+            </p>
         </div>
 
         <!-- Step 3: Status -->
@@ -231,6 +235,7 @@
     <script>
         const API_URL = window.location.origin;
         let currentSession = '';
+        let qrRefreshInterval = null;
 
         async function startSession() {
             const tenantId = document.getElementById('tenantId').value.trim();
@@ -257,11 +262,31 @@
                     document.getElementById('qrSection').classList.remove('hidden');
                     document.getElementById('statusSection').classList.remove('hidden');
                     setTimeout(getQRCode, 2000); // Wait 2 seconds for QR generation
+                    startQRAutoRefresh(); // Start auto-refreshing QR
                 } else {
                     showStatus('startStatus', `❌ Error: ${data.error}`, 'error');
                 }
             } catch (error) {
                 showStatus('startStatus', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        function startQRAutoRefresh() {
+            // Clear any existing interval
+            if (qrRefreshInterval) {
+                clearInterval(qrRefreshInterval);
+            }
+            // Refresh QR every 15 seconds (QR codes expire after 20 seconds)
+            qrRefreshInterval = setInterval(() => {
+                console.log('Auto-refreshing QR code...');
+                getQRCode();
+            }, 15000);
+        }
+
+        function stopQRAutoRefresh() {
+            if (qrRefreshInterval) {
+                clearInterval(qrRefreshInterval);
+                qrRefreshInterval = null;
             }
         }
 
@@ -276,7 +301,7 @@
                     // Waha returns base64 image
                     document.getElementById('qrCode').src = `data:image/png;base64,${data.qr}`;
                     document.getElementById('qrCode').classList.remove('hidden');
-                    document.getElementById('qrStatus').textContent = 'Scan this QR code with WhatsApp';
+                    document.getElementById('qrStatus').textContent = '✅ Fresh QR code ready! Scan within 20 seconds.';
                     
                     // Auto-check status after scanning
                     setTimeout(checkStatus, 10000);
@@ -292,6 +317,32 @@
             await getQRCode();
         }
 
+        async function restartSession() {
+            showStatus('startStatus', 'Restarting session to get fresh QR...', 'info');
+            document.getElementById('qrStatus').textContent = 'Restarting session...';
+
+            try {
+                const response = await fetch(`${API_URL}/api/waha/session/${currentSession}/restart`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+
+                if (data.ok) {
+                    showStatus('startStatus', '✅ Session restarted successfully!', 'success');
+                    setTimeout(() => {
+                        getQRCode();
+                        startQRAutoRefresh(); // Restart auto-refresh
+                    }, 3000); // Wait 3 seconds for session to initialize
+                } else {
+                    showStatus('startStatus', `❌ Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showStatus('startStatus', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
         async function checkStatus() {
             showStatus('connectionStatus', 'Checking status...', 'info');
 
@@ -304,6 +355,7 @@
                     if (status === 'WORKING' || status === 'AUTHENTICATED') {
                         showStatus('connectionStatus', `✅ Bot is ONLINE and ready! Status: ${status}`, 'success');
                         document.getElementById('testSection').classList.remove('hidden');
+                        stopQRAutoRefresh(); // Stop refreshing QR once connected
                     } else {
                         showStatus('connectionStatus', `⏳ Status: ${status} - Keep trying or scan QR code`, 'warning');
                     }

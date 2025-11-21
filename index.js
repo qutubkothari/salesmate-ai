@@ -652,6 +652,51 @@ app.post('/api/waha/session/:sessionName/stop', async (req, res) => {
   }
 });
 
+// Restart session (stop and start to get fresh QR)
+app.post('/api/waha/session/:sessionName/restart', async (req, res) => {
+  try {
+    const { sessionName } = req.params;
+    
+    console.log(`[WAHA] Restarting session: ${sessionName}`);
+    
+    // Stop the session first
+    try {
+      await wahaRequest('POST', '/api/sessions/stop', { name: sessionName });
+      console.log(`[WAHA] Session stopped, waiting 2 seconds...`);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } catch (stopError) {
+      console.log(`[WAHA] Stop error (might already be stopped): ${stopError.message}`);
+    }
+    
+    // Start the session again
+    const response = await wahaRequest('POST', '/api/sessions/start', {
+      name: sessionName,
+      config: {
+        proxy: null,
+        noweb: {
+          store: {
+            enabled: true,
+            fullSync: false
+          }
+        }
+      }
+    });
+
+    res.json({
+      ok: true,
+      message: 'Session restarted successfully',
+      data: response.data
+    });
+
+  } catch (error) {
+    console.error('[WAHA] Restart session error:', error.response?.data || error.message);
+    res.status(500).json({
+      error: 'Failed to restart session',
+      details: error.response?.data || error.message
+    });
+  }
+});
+
 // Agent Login API (MUST be before app.use('/api', apiRouter))
 app.post('/api/agent-login', async (req, res) => {
   try {
