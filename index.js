@@ -489,9 +489,10 @@ app.get('/api/waha/session/:sessionName/qr', async (req, res) => {
     // Waha API endpoint for QR code (correct format: /api/{session}/auth/qr)
     const response = await wahaRequest('GET', `/api/${sessionName}/auth/qr`);
 
+    // Waha returns raw base64 string directly, not wrapped in an object
     res.json({
       ok: true,
-      qr: response.data
+      qr: response.data  // response.data is already the base64 string
     });
 
   } catch (error) {
