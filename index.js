@@ -509,7 +509,8 @@ app.get('/api/waha/session/:sessionName/status', async (req, res) => {
   try {
     const { sessionName } = req.params;
     
-    const response = await wahaRequest('GET', `/api/${sessionName}/status`);
+    // Correct Waha endpoint: /api/sessions/{session}
+    const response = await wahaRequest('GET', `/api/sessions/${sessionName}`);
 
     res.json({
       ok: true,
