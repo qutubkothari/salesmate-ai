@@ -599,13 +599,16 @@
 
                     document.getElementById('detailsContent').innerHTML = content;
                     
-                    // Set checkbox states based on tenant features (defaulting to all enabled for now)
-                    // TODO: Load actual feature settings from database
+                    // Load saved feature settings from localStorage
+                    const savedFeatures = JSON.parse(localStorage.getItem(`tenant_features_${tenant.id}`)) || {};
+                    
+                    // Set checkbox states - use saved settings or default to all enabled
                     const features = ['bot_enabled', 'bot_product_discovery', 'bot_cart_management', 'bot_order_processing', 'bot_payment_links', 'bot_customer_support', 'tab_products', 'tab_customers', 'tab_orders', 'tab_discounts', 'tab_broadcast', 'tab_analytics'];
                     features.forEach(feature => {
                         const checkbox = document.getElementById(`${feature}_${tenant.id}`);
                         if (checkbox) {
-                            checkbox.checked = true; // Default to enabled
+                            // Use saved value if exists, otherwise default to true
+                            checkbox.checked = savedFeatures.hasOwnProperty(feature) ? savedFeatures[feature] : true;
                         }
                     });
                     
@@ -648,7 +651,10 @@
 
                 console.log('Saving features for tenant', tenantId, features);
                 
-                // TODO: Implement API endpoint to save feature settings
+                // Save to localStorage for persistence
+                localStorage.setItem(`tenant_features_${tenantId}`, JSON.stringify(features));
+                
+                // TODO: Also send to backend API
                 // const response = await fetch(`/api/tenants/${tenantId}/features`, {
                 //     method: 'PUT',
                 //     headers: { 'Content-Type': 'application/json' },
