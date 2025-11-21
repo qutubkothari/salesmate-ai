@@ -4887,6 +4887,9 @@
                     throw new Error('Invalid session data');
                 }
                 
+                // Load and apply feature settings
+                applyFeatureSettings(state.session.tenantId);
+                
                 document.getElementById('loadingScreen').classList.add('hidden');
                 document.getElementById('dashboard').classList.remove('hidden');
                 await loadStats();
@@ -4906,6 +4909,45 @@
         // No session found - redirect to login
         console.log('No session found, redirecting to login');
         window.location.href = '/login.html';
+    }
+
+    // Apply feature settings to show/hide tabs
+    function applyFeatureSettings(tenantId) {
+        // Load saved feature settings from localStorage (set by admin in clients.html)
+        const savedFeatures = JSON.parse(localStorage.getItem(`tenant_features_${tenantId}`)) || {};
+        console.log('Loading feature settings for tenant:', tenantId, savedFeatures);
+        
+        // Map features to tab data attributes
+        const featureTabMap = {
+            'tab_products': 'products',
+            'tab_customers': 'customers',
+            'tab_orders': 'orders',
+            'tab_discounts': 'discounts',
+            'tab_broadcast': 'broadcast',
+            'tab_analytics': 'analytics'
+        };
+        
+        // Show/hide tabs based on feature settings
+        Object.keys(featureTabMap).forEach(feature => {
+            const tabName = featureTabMap[feature];
+            const isEnabled = savedFeatures.hasOwnProperty(feature) ? savedFeatures[feature] : true; // Default to enabled
+            
+            // Find all sidebar items with this tab
+            const tabElements = document.querySelectorAll(`[data-tab="${tabName}"]`);
+            tabElements.forEach(el => {
+                if (isEnabled) {
+                    el.style.display = ''; // Show
+                    console.log(`✅ Enabled tab: ${tabName}`);
+                } else {
+                    el.style.display = 'none'; // Hide
+                    console.log(`❌ Disabled tab: ${tabName}`);
+                }
+            });
+        });
+        
+        // Always show WhatsApp Web tab
+        const whatsappTabs = document.querySelectorAll('[data-tab="whatsapp-web"]');
+        whatsappTabs.forEach(el => el.style.display = '');
     }
 
     // ---------- Event listeners ----------
