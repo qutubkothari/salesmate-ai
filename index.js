@@ -331,6 +331,25 @@ app.post('/api/admin/install-waha', async (req, res) => {
 // Waha WhatsApp Bot Endpoints (24/7 Bot Support)
 const axios = require('axios');
 const WAHA_URL = process.env.WAHA_URL || 'http://localhost:3000';
+const WAHA_API_KEY = process.env.WAHA_API_KEY || 'your-secret-key';
+
+// Helper function to make Waha API calls with auth
+async function wahaRequest(method, url, data = null) {
+  const config = {
+    method,
+    url: `${WAHA_URL}${url}`,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Api-Key': WAHA_API_KEY
+    }
+  };
+  
+  if (data) {
+    config.data = data;
+  }
+  
+  return axios(config);
+}
 
 // Start a new WhatsApp session for a tenant
 app.post('/api/waha/session/start', async (req, res) => {
@@ -345,7 +364,7 @@ app.post('/api/waha/session/start', async (req, res) => {
     
     console.log(`[WAHA] Starting session: ${session}`);
     
-    const response = await axios.post(`${WAHA_URL}/api/sessions/start`, {
+    const response = await wahaRequest('POST', '/api/sessions/start', {
       name: session,
       config: {
         proxy: null,
@@ -380,9 +399,7 @@ app.get('/api/waha/session/:sessionName/qr', async (req, res) => {
     
     console.log(`[WAHA] Getting QR code for: ${sessionName}`);
     
-    const response = await axios.get(`${WAHA_URL}/api/${sessionName}/auth/qr`, {
-      responseType: 'json'
-    });
+    const response = await wahaRequest('GET', `/api/${sessionName}/auth/qr`);
 
     res.json({
       ok: true,
@@ -403,7 +420,7 @@ app.get('/api/waha/session/:sessionName/status', async (req, res) => {
   try {
     const { sessionName } = req.params;
     
-    const response = await axios.get(`${WAHA_URL}/api/${sessionName}/status`);
+    const response = await wahaRequest('GET', `/api/${sessionName}/status`);
 
     res.json({
       ok: true,
@@ -430,7 +447,7 @@ app.post('/api/waha/send-message', async (req, res) => {
 
     console.log(`[WAHA] Sending message via ${sessionName} to ${phone}`);
     
-    const response = await axios.post(`${WAHA_URL}/api/sendText`, {
+    const response = await wahaRequest('POST', '/api/sendText', {
       session: sessionName,
       chatId: `${phone}@c.us`,
       text: message
@@ -500,7 +517,7 @@ app.post('/api/waha/webhook', async (req, res) => {
 
       // Send AI reply back via Waha
       if (aiReply) {
-        await axios.post(`${WAHA_URL}/api/sendText`, {
+        await wahaRequest('POST', '/api/sendText', {
           session: session,
           chatId: payload.from,
           text: aiReply
@@ -524,7 +541,7 @@ app.post('/api/waha/session/:sessionName/stop', async (req, res) => {
     
     console.log(`[WAHA] Stopping session: ${sessionName}`);
     
-    const response = await axios.post(`${WAHA_URL}/api/sessions/stop`, {
+    const response = await wahaRequest('POST', '/api/sessions/stop', {
       name: sessionName
     });
 

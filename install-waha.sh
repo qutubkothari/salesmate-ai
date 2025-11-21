@@ -61,6 +61,7 @@ sudo docker run -d \
   -p 3000:3000 \
   -v ~/waha-data:/app/.sessions \
   -e WHATSAPP_HOOK_URL=http://localhost:8080/api/waha/webhook \
+  -e WAHA_SECURITY_DISABLED=true \
   devlikeapro/waha:latest
 
 # Wait for container to start
