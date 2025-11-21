@@ -239,7 +239,8 @@
                 return;
             }
 
-            currentSession = `tenant_${tenantId}`;
+            // Free Waha version only supports 'default' session
+            currentSession = 'default';
             showStatus('startStatus', 'Starting session...', 'info');
 
             try {

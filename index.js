@@ -404,9 +404,10 @@ app.post('/api/waha/session/start', async (req, res) => {
       return res.status(400).json({ error: 'Missing tenantId' });
     }
 
-    const session = sessionName || `tenant_${tenantId}`;
+    // Free version only supports 'default' session
+    const session = 'default';
     
-    console.log(`[WAHA] Starting session: ${session}`);
+    console.log(`[WAHA] Starting session: ${session} for tenant: ${tenantId}`);
     
     const response = await wahaRequest('POST', '/api/sessions/start', {
       name: session,
