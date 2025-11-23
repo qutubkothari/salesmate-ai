@@ -5,6 +5,7 @@ async function createTenant() {
         id: '45bebb5d-cbab-4338-a3eb-a5b0c4aeea4e',
         business_name: 'SAK Solutions',
         phone_number: '971507055253',
+        owner_whatsapp_number: '919537653927',
         plan: 'premium'
     };
     
