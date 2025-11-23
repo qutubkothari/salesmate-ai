@@ -3024,16 +3024,6 @@
                     `;
                 }
             }
-                        <p><strong>Connected At:</strong> ${connection.connected_at ? new Date(connection.connected_at).toLocaleString() : 'N/A'}</p>
-                        <p><strong>Last Updated:</strong> ${connection.updated_at ? new Date(connection.updated_at).toLocaleString() : 'N/A'}</p>
-                    `;
-                }
-            }
-
-            // If QR is ready, fetch and display it
-            if (status === 'qr_ready') {
-                pollForQRCode();
-            }
 
         } catch (error) {
             console.error('Status refresh error:', error);
