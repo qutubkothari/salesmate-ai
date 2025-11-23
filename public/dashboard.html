@@ -2884,12 +2884,21 @@
 
             const result = await response.json();
             
-            if (result.success) {
-                showNotification('Waha session started! Waiting for QR code...', 'success');
-                // Show QR section and start polling for QR code
-                document.getElementById('qrCodeSection').classList.remove('hidden');
-                // Wait a moment for session to initialize before polling
-                setTimeout(() => pollForQRCode(sessionName), 2000);
+            if (result.ok) {
+                const statusMsg = result.status === 'WORKING' 
+                    ? 'Already connected! Session is working.' 
+                    : result.message || 'Waha session started!';
+                showNotification(statusMsg, 'success');
+                
+                // If already working, hide QR and show as connected
+                if (result.status === 'WORKING') {
+                    document.getElementById('qrCodeSection').classList.add('hidden');
+                    await refreshWhatsAppStatus();
+                } else {
+                    // Show QR section and start polling for QR code
+                    document.getElementById('qrCodeSection').classList.remove('hidden');
+                    setTimeout(() => pollForQRCode('default'), 2000);
+                }
             } else {
                 showNotification('Connection failed: ' + (result.error || 'Unknown error'), 'error');
             }
@@ -2925,7 +2934,7 @@
 
             const result = await response.json();
             
-            if (result.success) {
+            if (result.ok) {
                 showNotification('Waha session stopped successfully', 'success');
                 document.getElementById('qrCodeSection').classList.add('hidden');
                 await refreshWhatsAppStatus();
