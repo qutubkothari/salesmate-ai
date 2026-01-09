@@ -143,6 +143,10 @@
                         <i class="fas fa-clock"></i>
                         <span>Follow-ups</span>
                     </div>
+                    <div class="sidebar-item" onclick="switchTab('triage')" data-tab="triage">
+                        <i class="fas fa-life-ring"></i>
+                        <span>Triage</span>
+                    </div>
                     <div class="sidebar-item" onclick="switchTab('products')" data-tab="products">
                         <i class="fas fa-box"></i>
                         <span>Products</span>
@@ -1587,6 +1591,7 @@
                 case 'broadcast': await loadBroadcast(); break;
                 case 'whatsapp-web': await loadWhatsAppWeb(); break;
                 case 'followups': await loadFollowUps(); break;
+                case 'triage': await loadTriage(); break;
                 case 'customers': 
                     content.classList.add('hidden');
                     if (customersTab) {
@@ -4648,6 +4653,199 @@
                 </div>
             `;
         }
+    }
+
+    // ---------- Triage Functions (SAK-SMS embedded) ----------
+    async function loadTriage() {
+        if (!state.session?.tenantId) throw new Error('No tenant session');
+
+        const statusFilter = document.getElementById('triageStatusFilter')?.value || '';
+        const params = new URLSearchParams();
+        if (statusFilter) params.append('status', statusFilter);
+
+        const url = `/api/triage/${state.session.tenantId}${params.toString() ? `?${params.toString()}` : ''}`;
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${state.session.token}` }
+        });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || 'Failed to load triage');
+
+        const items = data.items || [];
+        state.data.triage = items;
+
+        const countBy = (s) => items.filter(i => String(i.status || '').toUpperCase() === s).length;
+        const countNew = countBy('NEW');
+        const countInProgress = countBy('IN_PROGRESS');
+        const countClosed = countBy('CLOSED');
+
+        const badgeFor = (status) => {
+            const s = String(status || '').toUpperCase();
+            if (s === 'NEW') return 'bg-yellow-100 text-yellow-800';
+            if (s === 'IN_PROGRESS') return 'bg-blue-100 text-blue-800';
+            if (s === 'CLOSED') return 'bg-green-100 text-green-800';
+            return 'bg-gray-100 text-gray-700';
+        };
+
+        document.getElementById('tabContent').innerHTML = `
+            <div class="mb-6">
+                <h2 class="text-white text-2xl font-bold mb-4"><i class="fas fa-life-ring mr-3"></i>Triage</h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="config-card p-6 rounded-xl">
+                        <div class="text-gray-600 text-sm mb-1">New</div>
+                        <div class="text-3xl font-bold text-yellow-700">${countNew}</div>
+                    </div>
+                    <div class="config-card p-6 rounded-xl">
+                        <div class="text-gray-600 text-sm mb-1">In Progress</div>
+                        <div class="text-3xl font-bold text-blue-700">${countInProgress}</div>
+                    </div>
+                    <div class="config-card p-6 rounded-xl">
+                        <div class="text-gray-600 text-sm mb-1">Closed</div>
+                        <div class="text-3xl font-bold text-green-700">${countClosed}</div>
+                    </div>
+                </div>
+
+                <div class="config-card p-4 rounded-xl mb-6">
+                    <div class="flex flex-wrap gap-4 items-center">
+                        <select id="triageStatusFilter" class="search-input px-4 py-2 rounded-xl text-sm" onchange="loadTriage()">
+                            <option value="" ${statusFilter===''?'selected':''}>All Statuses</option>
+                            <option value="NEW" ${statusFilter==='NEW'?'selected':''}>New</option>
+                            <option value="IN_PROGRESS" ${statusFilter==='IN_PROGRESS'?'selected':''}>In Progress</option>
+                            <option value="CLOSED" ${statusFilter==='CLOSED'?'selected':''}>Closed</option>
+                        </select>
+                        <button onclick="loadTriage()" class="glass-effect px-4 py-2 rounded-xl text-white hover:bg-white/20">
+                            <i class="fas fa-rotate mr-2"></i>Refresh
+                        </button>
+                    </div>
+                </div>
+
+                ${items.length === 0 ? `
+                    <div class="config-card p-10 rounded-xl text-center">
+                        <div class="text-gray-700 font-semibold">No triage items</div>
+                        <div class="text-gray-500 text-sm mt-1">Items will appear when the system flags a conversation for human attention.</div>
+                    </div>
+                ` : `
+                    <div class="space-y-3">
+                        ${items.map(item => {
+                            const phone = item.end_user_phone || item.phone_number || item.phone || '';
+                            const preview = item.message_preview || '';
+                            const created = item.created_at ? new Date(item.created_at).toLocaleString() : '';
+                            const assignedTo = item.assigned_to || '';
+
+                            const actions = String(item.status || '').toUpperCase() === 'CLOSED'
+                                ? `<button onclick="reopenTriage('${item.id}')" class="px-4 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-sm"><i class='fas fa-rotate-left mr-2'></i>Reopen</button>`
+                                : `<button onclick="showAssignTriageModal('${item.id}')" class="px-4 py-2 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 text-sm"><i class='fas fa-user-plus mr-2'></i>Assign</button>
+                                   <button onclick="showCloseTriageModal('${item.id}')" class="px-4 py-2 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 text-sm"><i class='fas fa-check mr-2'></i>Close</button>`;
+
+                            return `
+                                <div class="config-card p-5 rounded-xl">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <div class="text-gray-900 font-semibold">${escapeHtml(phone || 'Unknown')}</div>
+                                                <span class="px-2 py-1 rounded-lg text-xs font-medium ${badgeFor(item.status)}">${escapeHtml(String(item.status || ''))}</span>
+                                                <span class="text-xs text-gray-500">${escapeHtml(String(item.type || 'HUMAN_ATTENTION'))}</span>
+                                            </div>
+                                            ${preview ? `<div class="mt-2 text-sm text-gray-700 bg-gray-50 rounded-lg p-3">${escapeHtml(preview)}</div>` : ''}
+                                            <div class="mt-2 text-xs text-gray-500">Created: ${escapeHtml(created)}${assignedTo ? ` • Assigned: ${escapeHtml(assignedTo)}` : ''}</div>
+                                        </div>
+                                        <div class="flex gap-2 flex-wrap justify-end">${actions}</div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `}
+            </div>
+        `;
+    }
+
+    async function assignTriage(itemId, assignedTo) {
+        const path = `/api/triage/${state.session.tenantId}/${itemId}/assign`;
+        const res = await api.postJSON(path, { assigned_to: assignedTo });
+        if (!res.success) throw new Error(res.error || 'Assign failed');
+        showNotification('Triage item assigned', 'success');
+        await loadTriage();
+    }
+
+    async function closeTriage(itemId, reason) {
+        const path = `/api/triage/${state.session.tenantId}/${itemId}/close`;
+        const res = await api.postJSON(path, { reason: reason || null });
+        if (!res.success) throw new Error(res.error || 'Close failed');
+        showNotification('Triage item closed', 'success');
+        await loadTriage();
+    }
+
+    async function reopenTriage(itemId) {
+        const path = `/api/triage/${state.session.tenantId}/${itemId}/reopen`;
+        const res = await api.postJSON(path, {});
+        if (!res.success) throw new Error(res.error || 'Reopen failed');
+        showNotification('Triage item reopened', 'success');
+        await loadTriage();
+    }
+
+    function showAssignTriageModal(itemId) {
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black/60 flex items-center justify-center z-50';
+        modal.innerHTML = `
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4">
+                <div class="p-6 border-b">
+                    <h3 class="text-xl font-bold text-gray-900"><i class="fas fa-user-plus mr-2 text-purple-600"></i>Assign Triage</h3>
+                    <p class="text-sm text-gray-500 mt-1">Assign to a phone/user identifier (simple mode).</p>
+                </div>
+                <div class="p-6 space-y-4">
+                    <input id="triageAssignTo" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent" placeholder="Assigned to (e.g. +9715... or agent id)" />
+                    <div class="flex gap-3">
+                        <button id="triageAssignCancel" class="flex-1 px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium">Cancel</button>
+                        <button id="triageAssignSave" class="flex-1 px-4 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold">Assign</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+        modal.querySelector('#triageAssignCancel').addEventListener('click', () => modal.remove());
+        modal.querySelector('#triageAssignSave').addEventListener('click', async () => {
+            const v = modal.querySelector('#triageAssignTo').value;
+            try {
+                await assignTriage(itemId, v);
+                modal.remove();
+            } catch (err) {
+                showNotification(err.message || String(err), 'error');
+            }
+        });
+    }
+
+    function showCloseTriageModal(itemId) {
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black/60 flex items-center justify-center z-50';
+        modal.innerHTML = `
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4">
+                <div class="p-6 border-b">
+                    <h3 class="text-xl font-bold text-gray-900"><i class="fas fa-check mr-2 text-green-600"></i>Close Triage</h3>
+                    <p class="text-sm text-gray-500 mt-1">Optionally record a closing reason.</p>
+                </div>
+                <div class="p-6 space-y-4">
+                    <input id="triageCloseReason" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent" placeholder="Reason (optional)" />
+                    <div class="flex gap-3">
+                        <button id="triageCloseCancel" class="flex-1 px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium">Cancel</button>
+                        <button id="triageCloseSave" class="flex-1 px-4 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold">Close</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+        modal.querySelector('#triageCloseCancel').addEventListener('click', () => modal.remove());
+        modal.querySelector('#triageCloseSave').addEventListener('click', async () => {
+            const v = modal.querySelector('#triageCloseReason').value;
+            try {
+                await closeTriage(itemId, v);
+                modal.remove();
+            } catch (err) {
+                showNotification(err.message || String(err), 'error');
+            }
+        });
     }
 
     async function addFollowupToCustomers(followupId) {

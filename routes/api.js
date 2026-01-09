@@ -14,6 +14,10 @@ router.use('/ai-learning', aiLearningRouter);
 const followupsRouter = require('./api/followups');
 router.use('/followups', followupsRouter);
 
+// Mount triage API (SAK-SMS embedded module)
+const triageRouter = require('./api/triage');
+router.use('/triage', triageRouter);
+
 // Authentication endpoints
 
 // Backup compatibility endpoint (alias for verify-token)

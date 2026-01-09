@@ -737,6 +737,19 @@ function ensureSqliteSchema(dbInstance) {
     { name: 'metadata', type: 'TEXT' },
     { name: 'last_message_at', type: 'TEXT' },
     { name: 'lead_type', type: 'TEXT' },
+    // Lead + triage (SAK-SMS embedding)
+    { name: 'lead_score', type: 'TEXT' },
+    { name: 'requires_human_attention', type: 'INTEGER DEFAULT 0' },
+    { name: 'triage_status', type: 'TEXT' },
+    { name: 'triage_assigned_to', type: 'TEXT' },
+    { name: 'triage_closed_reason', type: 'TEXT' },
+    { name: 'triage_closed_at', type: 'TEXT' },
+    { name: 'triage_updated_at', type: 'TEXT' },
+    // Some flows store AI context JSON
+    { name: 'context_analysis', type: 'TEXT' },
+    { name: 'follow_up_at', type: 'TEXT' },
+    { name: 'follow_up_count', type: 'INTEGER DEFAULT 0' },
+    { name: 'last_lead_score_update', type: 'TEXT' },
     // Dashboard conversations list expects these
     { name: 'state', type: 'TEXT' },
     { name: 'last_product_discussed', type: 'TEXT' },
@@ -802,6 +815,25 @@ function ensureSqliteSchema(dbInstance) {
       created_at TEXT DEFAULT (DATETIME('now')),
       completed_at TEXT,
       error_message TEXT
+    );
+  `);
+
+  // Triage queue: native SAK-SMS-style triage inside Salesmate (local SQLite)
+  exec(`
+    CREATE TABLE IF NOT EXISTS triage_queue (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+      tenant_id TEXT NOT NULL,
+      conversation_id TEXT,
+      end_user_phone TEXT,
+      type TEXT DEFAULT 'HUMAN_ATTENTION',
+      status TEXT DEFAULT 'NEW',
+      assigned_to TEXT,
+      message_preview TEXT,
+      metadata TEXT,
+      created_at TEXT DEFAULT (DATETIME('now')),
+      updated_at TEXT DEFAULT (DATETIME('now')),
+      closed_at TEXT,
+      closed_reason TEXT
     );
   `);
 
@@ -922,19 +954,25 @@ function ensureSqliteSchema(dbInstance) {
 
 // ---------- OpenAI ----------
 const openaiApiKey = process.env.OPENAI_API_KEY;
-if (!openaiApiKey) {
-  throw new Error('OpenAI API Key must be provided in environment variables.');
-}
 
 // If you use sk-proj-* keys, pass the project id/slug
-const openaiProject =
-  process.env.OPENAI_PROJECT || undefined;
+const openaiProject = process.env.OPENAI_PROJECT || undefined;
 
-const openai = new OpenAI({
-  apiKey: openaiApiKey,
-  ...(openaiProject ? { project: openaiProject } : {})
-});
-dbg('OpenAI: project', openaiProject ? 'set' : 'not set');
+// In production we hard-require OpenAI because core bot flows use it.
+// In local/dev we allow boot without it so non-AI modules (like dashboard + triage) can be tested.
+let openai = null;
+if (!openaiApiKey) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('OpenAI API Key must be provided in environment variables.');
+  }
+  console.warn('[CONFIG] Missing OPENAI_API_KEY; AI features will be disabled in this environment.');
+} else {
+  openai = new OpenAI({
+    apiKey: openaiApiKey,
+    ...(openaiProject ? { project: openaiProject } : {})
+  });
+  dbg('OpenAI: project', openaiProject ? 'set' : 'not set');
+}
 
 // ---------- Google Cloud Storage ----------
 const storage = new Storage();
@@ -945,11 +983,18 @@ const gcsBucketName =
   process.env.GCS_BUCKET ||
   process.env.GOOGLE_CLOUD_STORAGE_BUCKET;
 
+// In production we hard-require a bucket because exports/uploads depend on it.
+// In local/dev we allow boot without it.
+let bucket = null;
 if (!gcsBucketName) {
-  throw new Error('Google Cloud Storage bucket name must be provided in environment variables.');
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Google Cloud Storage bucket name must be provided in environment variables.');
+  }
+  console.warn('[CONFIG] Missing GCS bucket env; export/upload features will be disabled in this environment.');
+} else {
+  bucket = storage.bucket(gcsBucketName);
+  dbg('GCS bucket:', gcsBucketName);
 }
-const bucket = storage.bucket(gcsBucketName);
-dbg('GCS bucket:', gcsBucketName);
 
 module.exports = {
   supabase,
