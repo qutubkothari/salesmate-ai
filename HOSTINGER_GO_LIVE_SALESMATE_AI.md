@@ -35,7 +35,7 @@ From this repo folder on your PC, run:
 
 ```powershell
 $env:HOSTINGER_IP="YOUR_VPS_IP"
-$env:HOSTINGER_USER="root"
+$env:HOSTINGER_USER="qutubk"  # set to "root" if that's what your VPS uses
 $env:HOSTINGER_KEY_PATH="$env:USERPROFILE\.ssh\hostinger_ed25519"
 $env:HOSTINGER_REMOTE_PATH="/var/www/salesmate-ai"
 $env:HOSTINGER_APP_PORT="8081"

@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 
 # ====== CONFIG (Hostinger VPS) ======
 $HOSTINGER_IP = if ($env:HOSTINGER_IP) { $env:HOSTINGER_IP } else { "72.62.192.228" }
-$HOSTINGER_USER = if ($env:HOSTINGER_USER) { $env:HOSTINGER_USER } else { "root" }
+$HOSTINGER_USER = if ($env:HOSTINGER_USER) { $env:HOSTINGER_USER } else { "qutubk" }
 $KEY_PATH = if ($env:HOSTINGER_KEY_PATH) { $env:HOSTINGER_KEY_PATH } else { "$env:USERPROFILE\.ssh\hostinger_ed25519" }
 
 # Remote deployment path
