@@ -41,6 +41,58 @@ function validateTenantId(tenantId) {
 }
 
 /**
+ * Check if error is a missing column error
+ * @private
+ */
+function isMissingColumnError(error, columnName) {
+    const msg = String(error?.message || error || '');
+    return msg.toLowerCase().includes('no such column') && 
+           msg.toLowerCase().includes(String(columnName).toLowerCase());
+}
+
+/**
+ * Find latest conversation by phone number with schema flexibility
+ * Tries multiple phone column names: end_user_phone, phone_number, phone
+ * @private
+ */
+async function findLatestConversationByPhone(tenantId, cleanPhone) {
+    const candidates = ['end_user_phone', 'phone_number', 'phone'];
+    
+    for (const col of candidates) {
+        try {
+            const { data, error } = await dbClient
+                .from('conversations')
+                .select('id, last_intent, metadata, created_at')
+                .eq('tenant_id', tenantId)
+                .eq(col, cleanPhone)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            
+            // If column doesn't exist, try next candidate
+            if (error && isMissingColumnError(error, col)) {
+                continue;
+            }
+            
+            // If other error, skip this candidate
+            if (error) {
+                continue;
+            }
+            
+            // Success - return the data
+            if (data) {
+                return data;
+            }
+        } catch (e) {
+            // Try next candidate
+            continue;
+        }
+    }
+    
+    return null;
+}
+
+/**
  * Get conversation memory (recent context)
  * 
  * @param {string} tenantId - Tenant UUID
@@ -62,15 +114,8 @@ async function getMemory(tenantId, phoneNumber) {
         
         const whatsappPhone = toWhatsAppFormat(phoneNumber);
         
-        // Get conversation ID
-        const { data: conversation } = await dbClient
-            .from('conversations')
-            .select('id, last_intent')
-            .eq('tenant_id', tenantId)
-            .eq('end_user_phone', whatsappPhone)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+        // Get conversation ID using schema-flexible lookup
+        const conversation = await findLatestConversationByPhone(tenantId, whatsappPhone);
         
         if (!conversation) {
             console.log('[Memory] No conversation found, returning empty memory');
@@ -160,15 +205,8 @@ async function saveMessage(tenantId, phoneNumber, content, sender, metadata = {}
         
         const whatsappPhone = toWhatsAppFormat(phoneNumber);
         
-        // Get or create conversation
-        const { data: conversation } = await dbClient
-            .from('conversations')
-            .select('id')
-            .eq('tenant_id', tenantId)
-            .eq('end_user_phone', whatsappPhone)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+        // Get or create conversation using schema-flexible lookup
+        const conversation = await findLatestConversationByPhone(tenantId, whatsappPhone);
         
         if (!conversation) {
             console.log('[Memory] No conversation found, cannot save message');
@@ -214,14 +252,22 @@ async function updateIntent(tenantId, phoneNumber, intent) {
         
         const whatsappPhone = toWhatsAppFormat(phoneNumber);
         
+        // Find conversation using schema-flexible lookup
+        const conversation = await findLatestConversationByPhone(tenantId, whatsappPhone);
+        
+        if (!conversation) {
+            console.log('[Memory] No conversation found, cannot update intent');
+            return false;
+        }
+        
+        // Update by ID to avoid column name issues
         const { error } = await dbClient
             .from('conversations')
             .update({
                 last_intent: intent,
                 updated_at: new Date().toISOString()
             })
-            .eq('tenant_id', tenantId)
-            .eq('end_user_phone', whatsappPhone);
+            .eq('id', conversation.id);
         
         if (error) {
             console.error('[Memory] Error updating intent:', error);

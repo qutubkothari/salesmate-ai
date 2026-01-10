@@ -2,6 +2,46 @@
 const { formatPersonalizedPriceDisplay, createPriceMessage } = require('./pricingDisplayService');
 const { searchWebsiteForQuery, isProductInfoQuery } = require('./websiteContentIntegration');
 
+/**
+ * Auto-learn verified answer by storing it in tenant documents
+ * This creates a knowledge base entry that can be retrieved later
+ */
+async function autoLearnVerifiedAnswer({ tenantId, question, answer, sources = [], createdBy = 'bot_auto' }) {
+    try {
+        const q = String(question || '').trim();
+        const a = String(answer || '').trim();
+        
+        if (!tenantId || !q || !a) return;
+        if (q.length < 5 || a.length < 10) return; // Skip trivial Q&A
+        
+        // Skip context-dependent queries (greetings, cart ops, etc.)
+        const contextDependent = /^(hi|hello|hey|thanks|add|remove|cart|order|buy|checkout|yes|no|ok)\b/i.test(q);
+        if (contextDependent) return;
+        
+        const clippedAnswer = a.length > 1400 ? `${a.slice(0, 1400)}…` : a;
+        const sourcesText = Array.isArray(sources) && sources.length > 0 
+            ? `\n\nSources: ${sources.slice(0, 5).join(', ')}` 
+            : '';
+        
+        const learnedText = `Question: ${q}\n\nAnswer: ${clippedAnswer}${sourcesText}\n\n[Auto-learned by bot from verified response]`;
+        const filename = `auto-learned-${Date.now()}-${Math.random().toString(36).slice(2, 9)}.txt`;
+        
+        await dbClient
+            .from('tenant_documents')
+            .insert({
+                tenant_id: tenantId,
+                original_name: `Bot Auto-Learning: ${q.slice(0, 100)}`,
+                filename: filename,
+                extracted_text: learnedText,
+                created_at: new Date().toISOString()
+            });
+        
+        console.log('[AUTO_LEARN] Stored verified answer for:', q.slice(0, 80));
+    } catch (e) {
+        console.error('[AUTO_LEARN] Failed to store:', e?.message || e);
+    }
+}
+
 async function buildTenantDocumentsContext(tenantId, userQuery, { limit = 2 } = {}) {
     try {
         const q = String(userQuery || '').trim();
@@ -863,12 +903,24 @@ const getSmartResponse = async (userQuery, tenantId, phoneNumber = null) => {
     console.log('[SMART_ROUTER] Customer phone:', phoneNumber || 'Not provided');
 
     // Fast-path: greetings (prevents clarification loop on simple salutations)
+    // Enhanced to handle multi-word greetings like "hi there", "hello salesmate", etc.
     try {
         const q0 = String(userQuery || '').toLowerCase().trim();
-        if (q0 && /^(hi|hello|hey|hii|hiii|good\s*(morning|afternoon|evening))$/.test(q0)) {
+        const words = q0.split(/\s+/).filter(Boolean);
+        const isShort = words.length <= 4;
+        const startsWithGreeting = /^(hi|hello|hey|hii+|good\s*(morning|afternoon|evening))\b/.test(q0);
+        const looksOnlyGreeting = isShort && startsWithGreeting && !/\b(price|rate|cost|order|quote|discount|available|stock|catalog|product)\b/.test(q0);
+        
+        if (q0 && looksOnlyGreeting) {
             console.log('[SMART_ROUTER][FASTPATH] Greeting detected');
+            const greetings = [
+                `Hi! How can I help you today?\n\nYou can say things like:\n1. "Show me your products"\n2. "Price of <product name>"\n3. "Add <product> 2 cartons"\n4. "View my cart"`,
+                `Hello! I'm here to assist you.\n\nTry asking:\n• "What products do you have?"\n• "Price of <product>"\n• "Add <product> to cart"`,
+                `Hey there! How may I assist you?\n\nFeel free to ask about:\n• Product catalog\n• Prices and quotes\n• Cart management`
+            ];
+            const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
             return {
-                response: `Hi! How can I help you today?\n\nYou can say things like:\n1. "Show me your products"\n2. "Price of <product name>"\n3. "Add <product> 2 cartons"\n4. "View my cart"`,
+                response: randomGreeting,
                 source: 'greeting'
             };
         }
@@ -1431,6 +1483,19 @@ Do not invent details.`
 
             const answer = kbResponse?.choices?.[0]?.message?.content?.trim();
             if (answer) {
+                // Auto-learn verified document/website answer
+                const learningSources = [];
+                if (docsContext) learningSources.push('tenant_documents');
+                if (websiteContextBlock) learningSources.push('website_crawl');
+                
+                autoLearnVerifiedAnswer({
+                    tenantId,
+                    question: userQuery,
+                    answer: answer,
+                    sources: learningSources,
+                    createdBy: 'bot_auto_docs'
+                }).catch(() => {}); // Fire and forget
+                
                 return {
                     response: answer,
                     source: 'ai_knowledge_fallback',

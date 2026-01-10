@@ -15,7 +15,7 @@ $REMOTE_PATH = if ($env:HOSTINGER_REMOTE_PATH) { $env:HOSTINGER_REMOTE_PATH } el
 
 # App config
 $PM2_NAME = if ($env:HOSTINGER_PM2_NAME) { $env:HOSTINGER_PM2_NAME } else { "salesmate-ai" }
-$APP_PORT = if ($env:HOSTINGER_APP_PORT) { [int]$env:HOSTINGER_APP_PORT } else { 8081 }
+$APP_PORT = if ($env:HOSTINGER_APP_PORT) { [int]$env:HOSTINGER_APP_PORT } else { 8054 }
 
 # ====== Helpers ======
 function Assert-CommandExists($name) {
@@ -73,6 +73,7 @@ Run "Create artifact archive ($archive)" {
 
   $required = @(
     'index.js',
+    'scheduler.js',
     'package.json',
     'package-lock.json'
   )
