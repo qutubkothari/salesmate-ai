@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { dbClient } = require('../../services/config');
+const { dbClient, db } = require('../../services/config');
 const { requireTenantAuth } = require('../../services/tenantAuth');
 const {
   getOAuth2Client,
@@ -60,7 +60,7 @@ router.get('/list', async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
     const offset = parseInt(req.query.offset) || 0;
 
-    const emails = dbClient.prepare(`
+    const emails = db.prepare(`
       SELECT id, sender_email, subject, snippet, created_at, is_read
       FROM email_enquiries
       WHERE tenant_id = ?
@@ -68,7 +68,7 @@ router.get('/list', async (req, res) => {
       LIMIT ? OFFSET ?
     `).all(tenantId, limit, offset);
 
-    const total = dbClient.prepare(`
+    const total = db.prepare(`
       SELECT COUNT(*) as count
       FROM email_enquiries
       WHERE tenant_id = ?
