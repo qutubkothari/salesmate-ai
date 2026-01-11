@@ -45,6 +45,42 @@ router.post('/inbound', requireTenantAuth({ requireMatchParamTenantId: false }),
   }
 });
 
+// List email enquiries for a tenant
+router.get('/list', requireTenantAuth({ requireMatchParamTenantId: false }), async (req, res) => {
+  try {
+    const tenantId = String(req.auth?.tenantId || '');
+    if (!tenantId) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const offset = parseInt(req.query.offset) || 0;
+
+    const emails = dbClient.prepare(`
+      SELECT id, sender_email, subject, snippet, created_at, is_read
+      FROM email_enquiries
+      WHERE tenant_id = ?
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(tenantId, limit, offset);
+
+    const total = dbClient.prepare(`
+      SELECT COUNT(*) as count
+      FROM email_enquiries
+      WHERE tenant_id = ?
+    `).get(tenantId);
+
+    res.json({
+      success: true,
+      emails,
+      total: total.count,
+      limit,
+      offset,
+    });
+  } catch (e) {
+    console.error('[EMAIL_LIST] error:', e?.message || e);
+    res.status(500).json({ success: false, error: 'Failed to list emails' });
+  }
+});
+
 // ---- Gmail OAuth + Pub/Sub integration (optional)
 
 // Start OAuth flow (redirects to Google)
