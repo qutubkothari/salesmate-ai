@@ -171,6 +171,18 @@
                         <i class="fas fa-life-ring"></i>
                         <span>Triage</span>
                     </div>
+                    <div class="sidebar-item" onclick="switchTab('team')" data-tab="team">
+                        <i class="fas fa-user-friends"></i>
+                        <span>Team</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('tasks')" data-tab="tasks">
+                        <i class="fas fa-tasks"></i>
+                        <span>Tasks</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('calls')" data-tab="calls">
+                        <i class="fas fa-phone"></i>
+                        <span>Calls</span>
+                    </div>
                     <div class="sidebar-item" onclick="switchTab('products')" data-tab="products">
                         <i class="fas fa-box"></i>
                         <span>Products</span>
@@ -182,6 +194,10 @@
                     <div class="sidebar-item" onclick="switchTab('customers')" data-tab="customers">
                         <i class="fas fa-users"></i>
                         <span>Customers</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('emails')" data-tab="emails">
+                        <i class="fas fa-envelope"></i>
+                        <span>Email Enquiries</span>
                     </div>
                     <div class="sidebar-item" onclick="switchTab('settings')" data-tab="settings">
                         <i class="fas fa-cog"></i>
@@ -337,6 +353,66 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- Email Enquiries Tab -->
+                <div id="emailsTab" class="hidden">
+                    <div class="mb-6 flex items-center justify-between">
+                        <div>
+                            <h2 class="text-2xl font-bold text-white mb-2">Email Enquiries</h2>
+                            <p class="text-white/70">Manage incoming emails from Gmail</p>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <button onclick="syncGmailEmails()" class="glass-effect px-4 py-2 rounded-xl text-white hover:bg-white/20 transition-colors">
+                                <i class="fas fa-sync-alt mr-2"></i>Sync Now
+                            </button>
+                            <button onclick="window.open('/api/email/gmail/auth?key=' + localStorage.getItem('apiKey'), '_blank')" class="glass-effect px-4 py-2 rounded-xl text-white hover:bg-white/20 transition-colors">
+                                <i class="fas fa-plug mr-2"></i>Connect Gmail
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search and Filters -->
+                    <div class="mb-4 glass-effect p-4 rounded-xl">
+                        <div class="flex flex-col md:flex-row md:items-center gap-4">
+                            <div class="flex-1 relative">
+                                <input id="emailSearchInput" type="text" placeholder="Search by sender, subject..." class="search-input px-4 py-2 pl-10 rounded-xl border w-full" />
+                                <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                            </div>
+                            <select id="emailFilterRead" class="search-input px-4 py-2 rounded-xl border">
+                                <option value="">All Emails</option>
+                                <option value="unread">Unread Only</option>
+                                <option value="read">Read Only</option>
+                            </select>
+                            <button id="emailSearchBtn" class="bg-indigo-600 text-white px-6 py-2 rounded-xl hover:bg-indigo-700">
+                                <i class="fas fa-search mr-2"></i>Search
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Email List -->
+                    <div class="space-y-3" id="emailListContainer">
+                        <!-- Loading State -->
+                        <div class="glass-effect p-8 rounded-xl text-center">
+                            <i class="fas fa-spinner fa-spin text-4xl text-white/50 mb-3"></i>
+                            <p class="text-white/70">Loading emails...</p>
+                        </div>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div id="emailPagination" class="mt-6 flex items-center justify-between glass-effect p-4 rounded-xl">
+                        <div class="text-white/70 text-sm">
+                            Showing <span id="emailShowingStart">0</span>-<span id="emailShowingEnd">0</span> of <span id="emailTotalCount">0</span> emails
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button id="emailPrevBtn" class="glass-effect px-4 py-2 rounded-xl text-white hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <button id="emailNextBtn" class="glass-effect px-4 py-2 rounded-xl text-white hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1487,6 +1563,9 @@
         conversationCard(conv) {
             const lastMessage = conv.lastMessage || 'No messages yet';
             const messagePreview = lastMessage.length > 80 ? lastMessage.substring(0, 80) + '...' : lastMessage;
+            const heatEmojis = { 'COLD': '🔵', 'WARM': '🟡', 'HOT': '🟠', 'VERY_HOT': '🔴', 'ON_FIRE': '🔥' };
+            const heatColors = { 'COLD': 'bg-blue-100 text-blue-800', 'WARM': 'bg-yellow-100 text-yellow-800', 'HOT': 'bg-orange-100 text-orange-800', 'VERY_HOT': 'bg-red-100 text-red-800', 'ON_FIRE': 'bg-red-500 text-white' };
+            const heat = conv.heat || 'WARM';
             return `
                 <div class="conversation-card p-6 rounded-2xl mb-4 border border-white/20">
                     <div class="flex items-start justify-between mb-4">
@@ -1495,8 +1574,12 @@
                                 <i class="fas fa-user text-white"></i>
                             </div>
                             <div>
-                                <h4 class="font-semibold text-gray-900">${escapeHtml(conv.end_user_phone || 'Unknown')}</h4>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <h4 class="font-semibold text-gray-900">${escapeHtml(conv.end_user_phone || 'Unknown')}</h4>
+                                    <span class="px-2 py-1 ${heatColors[heat]} text-xs rounded-full font-medium">${heatEmojis[heat]} ${heat.replace('_', ' ')}</span>
+                                </div>
                                 <p class="text-sm text-gray-500">State: ${escapeHtml(conv.state || 'Active')}</p>
+                                ${conv.assigned_to ? `<p class="text-xs text-purple-600"><i class="fas fa-user-check mr-1"></i>Assigned to: Salesman #${conv.assigned_to}</p>` : ''}
                                 ${conv.last_product_discussed ? `<p class="text-xs text-blue-600">Product: ${escapeHtml(conv.last_product_discussed)}</p>` : ''}
                             </div>
                         </div>
@@ -1682,6 +1765,8 @@
         content.classList.remove('hidden');
         if (customersTab) customersTab.classList.add('hidden');
         if (websiteTab) websiteTab.classList.add('hidden');
+        const emailsTab = document.getElementById('emailsTab');
+        if (emailsTab) emailsTab.classList.add('hidden');
         
         content.innerHTML = '<div class="flex justify-center py-20"><div class="loading-spinner"></div></div>';
         
@@ -1703,6 +1788,9 @@
                 case 'followups': await loadFollowUps(); break;
                 case 'leads': await loadLeads(); break;
                 case 'triage': await loadTriage(); break;
+                case 'team': await loadTeam(); break;
+                case 'tasks': await loadTasks(); break;
+                case 'calls': await loadCalls(); break;
                 case 'customers': 
                     content.classList.add('hidden');
                     if (customersTab) {
@@ -1711,6 +1799,17 @@
                     } else {
                         content.classList.remove('hidden');
                         content.innerHTML = '<div class="p-8 text-red-500">Customers tab element not found.</div>';
+                    }
+                    break;
+                case 'emails':
+                    content.classList.add('hidden');
+                    const emailsTab = document.getElementById('emailsTab');
+                    if (emailsTab) {
+                        emailsTab.classList.remove('hidden');
+                        await loadEmails();
+                    } else {
+                        content.classList.remove('hidden');
+                        content.innerHTML = '<div class="p-8 text-red-500">Emails tab element not found.</div>';
                     }
                     break;
                 case 'documents':
@@ -1787,6 +1886,316 @@
         setTimeout(initCharts, 80);
     }
 
+    // ---------- Email Functions ----------
+    let emailState = {
+        currentPage: 0,
+        limit: 20,
+        total: 0,
+        emails: [],
+        searchQuery: '',
+        filterRead: ''
+    };
+
+    async function loadEmails() {
+        try {
+            await fetchEmails();
+            setupEmailEventListeners();
+        } catch (err) {
+            console.error('[EMAILS] Error loading emails:', err);
+            showEmailError(err.message);
+        }
+    }
+
+    async function fetchEmails() {
+        const container = document.getElementById('emailListContainer');
+        if (!container) return;
+
+        const offset = emailState.currentPage * emailState.limit;
+        let url = `api/email/list?limit=${emailState.limit}&offset=${offset}`;
+        
+        if (emailState.searchQuery) {
+            url += `&search=${encodeURIComponent(emailState.searchQuery)}`;
+        }
+        if (emailState.filterRead) {
+            url += `&read=${emailState.filterRead}`;
+        }
+
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    'x-api-key': localStorage.getItem('apiKey') || ''
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch emails: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to load emails');
+            }
+
+            emailState.emails = data.emails || [];
+            emailState.total = data.total || 0;
+
+            renderEmails();
+            updateEmailPagination();
+        } catch (err) {
+            console.error('[EMAILS] Fetch error:', err);
+            showEmailError(err.message);
+        }
+    }
+
+    function renderEmails() {
+        const container = document.getElementById('emailListContainer');
+        if (!container) return;
+
+        if (emailState.emails.length === 0) {
+            container.innerHTML = `
+                <div class="glass-effect p-12 rounded-xl text-center">
+                    <i class="fas fa-inbox text-6xl text-white/30 mb-4"></i>
+                    <h3 class="text-white text-xl font-semibold mb-2">No Emails Found</h3>
+                    <p class="text-white/70 mb-4">Connect your Gmail account to start receiving emails</p>
+                    <button onclick="window.open('/api/email/gmail/auth?key=' + localStorage.getItem('apiKey'), '_blank')" 
+                            class="bg-indigo-600 text-white px-6 py-3 rounded-xl hover:bg-indigo-700">
+                        <i class="fas fa-plug mr-2"></i>Connect Gmail
+                    </button>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = emailState.emails.map(email => {
+            const date = new Date(email.received_at || email.created_at);
+            const dateStr = date.toLocaleString();
+            const preview = extractTextFromHTML(email.body).substring(0, 150) + '...';
+            
+            return `
+                <div class="glass-effect p-4 rounded-xl hover:bg-white/10 transition-all cursor-pointer" 
+                     onclick="viewEmailDetail('${email.id}')">
+                    <div class="flex items-start justify-between mb-2">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center space-x-2 mb-1">
+                                <i class="fas fa-envelope text-indigo-400"></i>
+                                <span class="text-white font-semibold truncate">${escapeHtml(email.from_email || 'Unknown')}</span>
+                            </div>
+                            <h3 class="text-white text-lg font-semibold mb-1 truncate">${escapeHtml(email.subject || '(No Subject)')}</h3>
+                        </div>
+                        <div class="text-white/50 text-sm ml-4 whitespace-nowrap">
+                            <i class="fas fa-clock mr-1"></i>${dateStr}
+                        </div>
+                    </div>
+                    <p class="text-white/70 text-sm line-clamp-2">${escapeHtml(preview)}</p>
+                    <div class="mt-3 flex items-center justify-between">
+                        <div class="text-white/50 text-xs">
+                            <i class="fas fa-calendar mr-1"></i>${date.toLocaleDateString()}
+                        </div>
+                        <button onclick="event.stopPropagation(); createLeadFromEmail('${email.id}')" 
+                                class="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg transition-colors">
+                            <i class="fas fa-user-plus mr-1"></i>Create Lead
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function extractTextFromHTML(html) {
+        const div = document.createElement('div');
+        div.innerHTML = html || '';
+        return div.textContent || div.innerText || '';
+    }
+
+    function updateEmailPagination() {
+        const start = emailState.currentPage * emailState.limit + 1;
+        const end = Math.min((emailState.currentPage + 1) * emailState.limit, emailState.total);
+        
+        document.getElementById('emailShowingStart').textContent = emailState.total > 0 ? start : 0;
+        document.getElementById('emailShowingEnd').textContent = end;
+        document.getElementById('emailTotalCount').textContent = emailState.total;
+        
+        const prevBtn = document.getElementById('emailPrevBtn');
+        const nextBtn = document.getElementById('emailNextBtn');
+        
+        if (prevBtn) prevBtn.disabled = emailState.currentPage === 0;
+        if (nextBtn) nextBtn.disabled = end >= emailState.total;
+    }
+
+    function setupEmailEventListeners() {
+        const searchBtn = document.getElementById('emailSearchBtn');
+        const searchInput = document.getElementById('emailSearchInput');
+        const filterRead = document.getElementById('emailFilterRead');
+        const prevBtn = document.getElementById('emailPrevBtn');
+        const nextBtn = document.getElementById('emailNextBtn');
+
+        if (searchBtn) {
+            searchBtn.onclick = () => {
+                emailState.searchQuery = searchInput?.value || '';
+                emailState.filterRead = filterRead?.value || '';
+                emailState.currentPage = 0;
+                fetchEmails();
+            };
+        }
+
+        if (searchInput) {
+            searchInput.onkeypress = (e) => {
+                if (e.key === 'Enter') {
+                    emailState.searchQuery = searchInput.value || '';
+                    emailState.filterRead = filterRead?.value || '';
+                    emailState.currentPage = 0;
+                    fetchEmails();
+                }
+            };
+        }
+
+        if (prevBtn) {
+            prevBtn.onclick = () => {
+                if (emailState.currentPage > 0) {
+                    emailState.currentPage--;
+                    fetchEmails();
+                }
+            };
+        }
+
+        if (nextBtn) {
+            nextBtn.onclick = () => {
+                const maxPage = Math.ceil(emailState.total / emailState.limit) - 1;
+                if (emailState.currentPage < maxPage) {
+                    emailState.currentPage++;
+                    fetchEmails();
+                }
+            };
+        }
+    }
+
+    function showEmailError(message) {
+        const container = document.getElementById('emailListContainer');
+        if (!container) return;
+        
+        container.innerHTML = `
+            <div class="glass-effect p-8 rounded-xl text-center">
+                <i class="fas fa-exclamation-triangle text-red-400 text-4xl mb-4"></i>
+                <h3 class="text-white text-xl font-semibold mb-2">Error Loading Emails</h3>
+                <p class="text-white/70 mb-4">${escapeHtml(message)}</p>
+                <button onclick="fetchEmails()" class="bg-indigo-600 text-white px-6 py-3 rounded-xl hover:bg-indigo-700">
+                    <i class="fas fa-redo mr-2"></i>Try Again
+                </button>
+            </div>
+        `;
+    }
+
+    async function viewEmailDetail(emailId) {
+        const email = emailState.emails.find(e => e.id === emailId);
+        if (!email) return;
+
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4';
+        modal.innerHTML = `
+            <div class="bg-slate-900 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <div class="sticky top-0 bg-slate-900 border-b border-white/10 p-6 flex items-center justify-between z-10">
+                    <h3 class="text-xl font-bold text-white">Email Details</h3>
+                    <button onclick="this.closest('div.fixed').remove()" class="text-white/70 hover:text-white">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <div class="p-6">
+                    <div class="mb-4 pb-4 border-b border-white/10">
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="flex-1">
+                                <div class="text-white/50 text-sm mb-1">From:</div>
+                                <div class="text-white font-semibold">${escapeHtml(email.from_email || 'Unknown')}</div>
+                            </div>
+                            <div class="text-white/50 text-sm">
+                                ${new Date(email.received_at || email.created_at).toLocaleString()}
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="text-white/50 text-sm mb-1">Subject:</div>
+                            <div class="text-white font-semibold text-lg">${escapeHtml(email.subject || '(No Subject)')}</div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="createLeadFromEmail('${email.id}'); this.closest('div.fixed').remove();" 
+                                    class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors">
+                                <i class="fas fa-user-plus mr-2"></i>Create Lead from Email
+                            </button>
+                        </div>
+                    </div>
+                    <div class="bg-white/5 p-6 rounded-xl">
+                        <div class="text-white/90 leading-relaxed">
+                            ${email.body || '<p class="text-white/50">No content</p>'}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    async function syncGmailEmails() {
+        try {
+            const response = await fetch('api/email/gmail/sync', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': localStorage.getItem('apiKey') || ''
+                },
+                body: JSON.stringify({ maxResults: 50 })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                alert(`Successfully synced ${data.ingested || 0} new emails!`);
+                await fetchEmails();
+            } else {
+                alert('Error syncing emails: ' + (data.error || 'Unknown error'));
+            }
+        } catch (err) {
+            console.error('[EMAILS] Sync error:', err);
+            alert('Error syncing emails: ' + err.message);
+        }
+    }
+
+    async function createLeadFromEmail(emailId) {
+        const email = emailState.emails.find(e => e.id === emailId);
+        if (!email) {
+            alert('Email not found');
+            return;
+        }
+
+        // TODO: Integrate with SAK-SMS to create lead
+        // For now, just show a confirmation
+        const confirmed = confirm(`Create lead from email?\n\nFrom: ${email.from_email}\nSubject: ${email.subject}\n\nThis will send the email to SAK-SMS for smart assignment.`);
+        
+        if (confirmed) {
+            try {
+                // This would call SAK-SMS API
+                // const response = await fetch('https://sms.saksolution.com/api/integrations/salesmate/message', {
+                //     method: 'POST',
+                //     headers: {
+                //         'Content-Type': 'application/json',
+                //         'x-salesmate-secret': 'YOUR_SECRET'
+                //     },
+                //     body: JSON.stringify({
+                //         email: email.from_email,
+                //         fullName: email.from_email.split('@')[0],
+                //         message: email.subject + '\n\n' + extractTextFromHTML(email.body),
+                //         channel: 'EMAIL',
+                //         externalId: email.id,
+                //         metadata: { gmailMessageId: email.id, subject: email.subject }
+                //     })
+                // });
+                
+                alert('Lead creation will be implemented when SAK-SMS integration is connected.\n\nFor now, this email has been marked for lead creation.');
+            } catch (err) {
+                console.error('[EMAILS] Create lead error:', err);
+                alert('Error creating lead: ' + err.message);
+            }
+        }
+    }
+
     async function loadConversations() {
         try {
             console.log('[DASHBOARD] Loading conversations...');
@@ -1800,19 +2209,37 @@
             console.log('[DASHBOARD] Processed conversations:', conversations.length);
             
             state.data.conversations = conversations;
-            const filtered = conversations.filter(conv =>
-                !state.searchQuery ||
-                (conv.end_user_phone || '').includes(state.searchQuery) ||
-                (conv.lastMessage || '').toLowerCase().includes(state.searchQuery.toLowerCase())
-            );
+            
+            // Get filter values
+            const heatFilter = document.getElementById('heatFilter')?.value || '';
+            
+            const filtered = conversations.filter(conv => {
+                // Search filter
+                const matchesSearch = !state.searchQuery ||
+                    (conv.end_user_phone || '').includes(state.searchQuery) ||
+                    (conv.lastMessage || '').toLowerCase().includes(state.searchQuery.toLowerCase());
+                
+                // Heat filter
+                const matchesHeat = !heatFilter || conv.heat === heatFilter;
+                
+                return matchesSearch && matchesHeat;
+            });
             console.log('[DASHBOARD] Filtered conversations:', filtered.length);
             
             document.getElementById('tabContent').innerHTML = `
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-white text-2xl font-bold"><i class="fas fa-comments mr-3"></i>Recent Conversations</h2>
                     <div class="flex space-x-3">
+                        <select id="heatFilter" class="search-input px-4 py-2 rounded-xl text-sm" onchange="loadConversations()">
+                            <option value="">All Heat Levels</option>
+                            <option value="ON_FIRE">🔥 On Fire</option>
+                            <option value="VERY_HOT">🔴 Very Hot</option>
+                            <option value="HOT">🟠 Hot</option>
+                            <option value="WARM">🟡 Warm</option>
+                            <option value="COLD">🔵 Cold</option>
+                        </select>
                         <input type="text" id="conversationSearch" placeholder="Search conversations..." class="search-input px-4 py-2 rounded-xl text-sm" oninput="handleSearch(event)">
-                        <button class="glass-effect px-4 py-2 rounded-xl text-white hover:bg-white/20 transition-colors"><i class="fas fa-filter mr-2"></i>Filter</button>
+                        <button class="glass-effect px-4 py-2 rounded-xl text-white hover:bg-white/20 transition-colors"><i class="fas fa-filter mr-2"></i>More Filters</button>
                     </div>
                 </div>
                 <div class="space-y-4">
@@ -7000,6 +7427,331 @@
         }, 500);
     }
 
+    // ========== SAK-SMS INTELLIGENCE: TEAM MANAGEMENT ==========
+    async function loadTeam() {
+        const tenantId = state.session?.tenantId;
+        if (!tenantId) return;
+
+        try {
+            const res = await fetch(`/api/salesmen/${tenantId}`);
+            const data = await res.json();
+            const team = data.salesmen || [];
+
+            document.getElementById('tabContent').innerHTML = `
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-white text-2xl font-bold"><i class="fas fa-user-friends mr-3"></i>Sales Team</h2>
+                        <p class="text-white/70 text-sm mt-1">Manage your sales team and workload distribution</p>
+                    </div>
+                    <button onclick="showAddSalesmanModal()" class="glass-effect px-6 py-3 rounded-xl text-white hover:bg-white/20 transition-colors">
+                        <i class="fas fa-user-plus mr-2"></i>Add Salesman
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    ${team.length ? team.map(s => `
+                        <div class="config-card p-6 rounded-xl">
+                            <div class="flex items-start justify-between mb-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
+                                        <i class="fas fa-user text-white text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-semibold text-gray-900">${escapeHtml(s.name)}</h4>
+                                        ${s.email ? `<p class="text-sm text-gray-500">${escapeHtml(s.email)}</p>` : ''}
+                                        ${s.phone ? `<p class="text-sm text-gray-500">${escapeHtml(s.phone)}</p>` : ''}
+                                    </div>
+                                </div>
+                                <span class="px-3 py-1 ${s.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'} text-xs rounded-full font-medium">
+                                    ${s.active ? 'Active' : 'Inactive'}
+                                </span>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3 mb-4">
+                                <div class="bg-blue-50 p-3 rounded-lg">
+                                    <p class="text-xs text-blue-600 mb-1">Active Leads</p>
+                                    <p class="text-2xl font-bold text-blue-900">${s.active_leads || 0}</p>
+                                </div>
+                                <div class="bg-purple-50 p-3 rounded-lg">
+                                    <p class="text-xs text-purple-600 mb-1">Monthly Cap</p>
+                                    <p class="text-2xl font-bold text-purple-900">${s.max_leads_per_month || '∞'}</p>
+                                </div>
+                            </div>
+
+                            ${s.product_skills || s.language_skills || s.geographic_zone ? `
+                                <div class="bg-gray-50 p-3 rounded-lg mb-4 text-sm">
+                                    ${s.product_skills ? `<p class="text-gray-700"><i class="fas fa-box mr-2 text-blue-500"></i>${escapeHtml(s.product_skills)}</p>` : ''}
+                                    ${s.language_skills ? `<p class="text-gray-700"><i class="fas fa-language mr-2 text-green-500"></i>${escapeHtml(s.language_skills)}</p>` : ''}
+                                    ${s.geographic_zone ? `<p class="text-gray-700"><i class="fas fa-map-marker-alt mr-2 text-red-500"></i>${escapeHtml(s.geographic_zone)}</p>` : ''}
+                                </div>
+                            ` : ''}
+
+                            <div class="flex gap-2">
+                                <button onclick="editSalesman('${s.id}')" class="flex-1 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 text-sm font-medium">
+                                    <i class="fas fa-edit mr-2"></i>Edit
+                                </button>
+                                <button onclick="deleteSalesman('${s.id}')" class="flex-1 px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 text-sm font-medium">
+                                    <i class="fas fa-trash mr-2"></i>Remove
+                                </button>
+                            </div>
+                        </div>
+                    `).join('') : `
+                        <div class="col-span-2 config-card p-12 rounded-xl text-center">
+                            <i class="fas fa-user-friends text-gray-400 text-5xl mb-4"></i>
+                            <p class="text-gray-700 text-lg font-semibold">No sales team members yet</p>
+                            <p class="text-gray-500 text-sm mt-2">Add your first salesman to start using smart assignment</p>
+                        </div>
+                    `}
+                </div>
+            `;
+        } catch (error) {
+            console.error('Error loading team:', error);
+            showNotification('Error loading team: ' + error.message, 'error');
+        }
+    }
+
+    // ========== SAK-SMS INTELLIGENCE: TASKS MANAGEMENT ==========
+    async function loadTasks() {
+        const tenantId = state.session?.tenantId;
+        if (!tenantId) return;
+
+        try {
+            const res = await fetch(`/api/tasks/${tenantId}`);
+            const data = await res.json();
+            const tasks = data.tasks || [];
+            const now = new Date();
+
+            const overdue = tasks.filter(t => t.status !== 'COMPLETED' && t.due_date && new Date(t.due_date) < now);
+            const upcoming = tasks.filter(t => t.status !== 'COMPLETED' && t.due_date && new Date(t.due_date) >= now);
+            const completed = tasks.filter(t => t.status === 'COMPLETED');
+
+            document.getElementById('tabContent').innerHTML = `
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-white text-2xl font-bold"><i class="fas fa-tasks mr-3"></i>Tasks</h2>
+                        <p class="text-white/70 text-sm mt-1">Manage follow-ups and action items</p>
+                    </div>
+                    <button onclick="showAddTaskModal()" class="glass-effect px-6 py-3 rounded-xl text-white hover:bg-white/20 transition-colors">
+                        <i class="fas fa-plus mr-2"></i>Add Task
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="stat-card p-6 rounded-xl">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-exclamation-triangle text-white"></i>
+                            </div>
+                            <div>
+                                <p class="text-white/70 text-sm">Overdue</p>
+                                <p class="text-white text-3xl font-bold">${overdue.length}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card p-6 rounded-xl">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-clock text-white"></i>
+                            </div>
+                            <div>
+                                <p class="text-white/70 text-sm">Upcoming</p>
+                                <p class="text-white text-3xl font-bold">${upcoming.length}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card p-6 rounded-xl">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-check text-white"></i>
+                            </div>
+                            <div>
+                                <p class="text-white/70 text-sm">Completed</p>
+                                <p class="text-white text-3xl font-bold">${completed.length}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    ${overdue.length > 0 ? `
+                        <div>
+                            <h3 class="text-white text-lg font-semibold mb-3"><i class="fas fa-exclamation-circle mr-2 text-red-400"></i>Overdue Tasks</h3>
+                            <div class="space-y-3">
+                                ${overdue.map(t => renderTaskCard(t, 'overdue')).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    ${upcoming.length > 0 ? `
+                        <div>
+                            <h3 class="text-white text-lg font-semibold mb-3"><i class="fas fa-calendar mr-2 text-blue-400"></i>Upcoming Tasks</h3>
+                            <div class="space-y-3">
+                                ${upcoming.map(t => renderTaskCard(t, 'upcoming')).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    ${overdue.length === 0 && upcoming.length === 0 ? `
+                        <div class="config-card p-12 rounded-xl text-center">
+                            <i class="fas fa-check-circle text-green-500 text-5xl mb-4"></i>
+                            <p class="text-gray-700 text-lg font-semibold">All caught up!</p>
+                            <p class="text-gray-500 text-sm mt-2">No pending tasks</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        } catch (error) {
+            console.error('Error loading tasks:', error);
+            showNotification('Error loading tasks: ' + error.message, 'error');
+        }
+    }
+
+    function renderTaskCard(task, type) {
+        const priorityColors = { 
+            'LOW': 'bg-gray-100 text-gray-800', 
+            'MEDIUM': 'bg-blue-100 text-blue-800', 
+            'HIGH': 'bg-orange-100 text-orange-800', 
+            'URGENT': 'bg-red-100 text-red-800' 
+        };
+        const borderColor = type === 'overdue' ? 'border-l-4 border-red-500' : 'border-l-4 border-blue-500';
+        
+        return `
+            <div class="config-card p-5 rounded-xl ${borderColor}">
+                <div class="flex items-start justify-between mb-3">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-2">
+                            <h4 class="font-semibold text-gray-900">${escapeHtml(task.title)}</h4>
+                            <span class="px-2 py-1 ${priorityColors[task.priority || 'MEDIUM']} text-xs rounded-full font-medium">
+                                ${task.priority || 'MEDIUM'}
+                            </span>
+                        </div>
+                        ${task.description ? `<p class="text-sm text-gray-600 mb-2">${escapeHtml(task.description)}</p>` : ''}
+                        <div class="flex items-center gap-4 text-xs text-gray-500">
+                            ${task.due_date ? `<span><i class="far fa-clock mr-1"></i>${new Date(task.due_date).toLocaleString()}</span>` : ''}
+                            ${task.assigned_to ? `<span><i class="fas fa-user mr-1"></i>Assigned to: ${task.assigned_to}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="flex gap-2 ml-4">
+                        <button onclick="completeTask('${task.id}')" class="px-3 py-1 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 text-sm">
+                            <i class="fas fa-check"></i>
+                        </button>
+                        <button onclick="deleteTask('${task.id}')" class="px-3 py-1 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 text-sm">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // ========== SAK-SMS INTELLIGENCE: CALLS MANAGEMENT ==========
+    async function loadCalls() {
+        const tenantId = state.session?.tenantId;
+        if (!tenantId) return;
+
+        try {
+            const res = await fetch(`/api/calls/${tenantId}`);
+            const data = await res.json();
+            const calls = data.calls || [];
+
+            const inbound = calls.filter(c => c.direction === 'INBOUND').length;
+            const outbound = calls.filter(c => c.direction === 'OUTBOUND').length;
+            const totalDuration = calls.reduce((sum, c) => sum + (c.duration_seconds || 0), 0);
+
+            document.getElementById('tabContent').innerHTML = `
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-white text-2xl font-bold"><i class="fas fa-phone mr-3"></i>Call Logs</h2>
+                        <p class="text-white/70 text-sm mt-1">Track all customer phone interactions</p>
+                    </div>
+                    <button onclick="showLogCallModal()" class="glass-effect px-6 py-3 rounded-xl text-white hover:bg-white/20 transition-colors">
+                        <i class="fas fa-phone-alt mr-2"></i>Log Call
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="stat-card p-6 rounded-xl">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-phone-volume text-white"></i>
+                            </div>
+                            <div>
+                                <p class="text-white/70 text-sm">Inbound</p>
+                                <p class="text-white text-3xl font-bold">${inbound}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card p-6 rounded-xl">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-phone text-white"></i>
+                            </div>
+                            <div>
+                                <p class="text-white/70 text-sm">Outbound</p>
+                                <p class="text-white text-3xl font-bold">${outbound}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card p-6 rounded-xl">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-clock text-white"></i>
+                            </div>
+                            <div>
+                                <p class="text-white/70 text-sm">Total Duration</p>
+                                <p class="text-white text-2xl font-bold">${Math.floor(totalDuration / 60)}m</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="config-card rounded-xl overflow-hidden">
+                    ${calls.length ? `
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Direction</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Outcome</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    ${calls.map(c => `
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${escapeHtml(c.phone_number || 'N/A')}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <span class="px-2 py-1 ${c.direction === 'INBOUND' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'} text-xs rounded-full">
+                                                    ${c.direction === 'INBOUND' ? '📥' : '📤'} ${c.direction}
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${escapeHtml(c.outcome || '-')}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${c.duration_seconds ? Math.floor(c.duration_seconds / 60) + 'm ' + (c.duration_seconds % 60) + 's' : '-'}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${c.created_at ? new Date(c.created_at).toLocaleString() : '-'}</td>
+                                            <td class="px-6 py-4 text-sm text-gray-600">${escapeHtml(c.notes || '-')}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : `
+                        <div class="p-12 text-center">
+                            <i class="fas fa-phone-slash text-gray-400 text-5xl mb-4"></i>
+                            <p class="text-gray-700 text-lg font-semibold">No calls logged yet</p>
+                            <p class="text-gray-500 text-sm mt-2">Start logging calls to track customer interactions</p>
+                        </div>
+                    `}
+                </div>
+            `;
+        } catch (error) {
+            console.error('Error loading calls:', error);
+            showNotification('Error loading calls: ' + error.message, 'error');
+        }
+    }
+
     async function init() {
         // Check if we already have a valid session
         const existingSession = localStorage.getItem('dashboardSession');
@@ -7617,6 +8369,293 @@
         } catch (error) {
             console.error('Error deleting website content:', error);
             showNotification('Failed to delete content', 'error');
+        }
+    }
+
+    // ========== SAK-SMS INTELLIGENCE: HELPER FUNCTIONS ==========
+    
+    function showAddSalesmanModal() {
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black/60 flex items-center justify-center z-50';
+        modal.innerHTML = `
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+                <div class="p-6 border-b sticky top-0 bg-white">
+                    <h3 class="text-xl font-bold text-gray-900"><i class="fas fa-user-plus mr-2 text-purple-600"></i>Add Salesman</h3>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                        <input id="salesmanName" type="text" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500" placeholder="John Doe" required />
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                            <input id="salesmanEmail" type="email" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500" placeholder="john@company.com" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                            <input id="salesmanPhone" type="text" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500" placeholder="+919876543210" />
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Max Leads Per Month</label>
+                        <input id="salesmanMaxLeads" type="number" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500" placeholder="100" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Product Skills (comma separated)</label>
+                        <input id="salesmanProductSkills" type="text" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500" placeholder="Electronics, Furniture, Appliances" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Language Skills (comma separated)</label>
+                        <input id="salesmanLanguageSkills" type="text" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500" placeholder="English, Hindi, Tamil" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Geographic Zone</label>
+                        <input id="salesmanGeographicZone" type="text" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500" placeholder="North India, Mumbai, Delhi NCR" />
+                    </div>
+                    <div class="flex gap-3 pt-4">
+                        <button onclick="this.closest('.fixed').remove()" class="flex-1 px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium">Cancel</button>
+                        <button onclick="saveSalesman()" class="flex-1 px-4 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold">Add Salesman</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    async function saveSalesman() {
+        const name = document.getElementById('salesmanName').value.trim();
+        if (!name) return showNotification('Name is required', 'error');
+
+        const data = {
+            name,
+            email: document.getElementById('salesmanEmail').value.trim() || null,
+            phone: document.getElementById('salesmanPhone').value.trim() || null,
+            max_leads_per_month: parseInt(document.getElementById('salesmanMaxLeads').value) || null,
+            product_skills: document.getElementById('salesmanProductSkills').value.trim() || null,
+            language_skills: document.getElementById('salesmanLanguageSkills').value.trim() || null,
+            geographic_zone: document.getElementById('salesmanGeographicZone').value.trim() || null
+        };
+
+        try {
+            const res = await fetch(`/api/salesmen/${state.session.tenantId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (!result.success) throw new Error(result.error || 'Failed to add salesman');
+            
+            showNotification('Salesman added successfully!', 'success');
+            document.querySelector('.fixed.inset-0').remove();
+            await loadTeam();
+        } catch (error) {
+            showNotification('Error: ' + error.message, 'error');
+        }
+    }
+
+    async function deleteSalesman(salesmanId) {
+        if (!confirm('Remove this salesman? They will be deactivated but data will be preserved.')) return;
+
+        try {
+            const res = await fetch(`/api/salesmen/${state.session.tenantId}/${salesmanId}`, {
+                method: 'DELETE'
+            });
+            const result = await res.json();
+            if (!result.success) throw new Error(result.error || 'Failed to remove salesman');
+            
+            showNotification('Salesman removed', 'success');
+            await loadTeam();
+        } catch (error) {
+            showNotification('Error: ' + error.message, 'error');
+        }
+    }
+
+    function showAddTaskModal() {
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black/60 flex items-center justify-center z-50';
+        modal.innerHTML = `
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+                <div class="p-6 border-b sticky top-0 bg-white">
+                    <h3 class="text-xl font-bold text-gray-900"><i class="fas fa-plus mr-2 text-blue-600"></i>Add Task</h3>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Title *</label>
+                        <input id="taskTitle" type="text" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500" placeholder="Follow up with customer" required />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <textarea id="taskDescription" rows="3" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500" placeholder="Additional details..."></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                            <select id="taskPriority" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500">
+                                <option value="LOW">Low</option>
+                                <option value="MEDIUM" selected>Medium</option>
+                                <option value="HIGH">High</option>
+                                <option value="URGENT">Urgent</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
+                            <input id="taskDueDate" type="datetime-local" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                    </div>
+                    <div class="flex gap-3 pt-4">
+                        <button onclick="this.closest('.fixed').remove()" class="flex-1 px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium">Cancel</button>
+                        <button onclick="saveTask()" class="flex-1 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold">Add Task</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    async function saveTask() {
+        const title = document.getElementById('taskTitle').value.trim();
+        if (!title) return showNotification('Title is required', 'error');
+
+        const data = {
+            title,
+            description: document.getElementById('taskDescription').value.trim() || null,
+            priority: document.getElementById('taskPriority').value,
+            due_date: document.getElementById('taskDueDate').value || null
+        };
+
+        try {
+            const res = await fetch(`/api/tasks/${state.session.tenantId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (!result.success) throw new Error(result.error || 'Failed to add task');
+            
+            showNotification('Task added successfully!', 'success');
+            document.querySelector('.fixed.inset-0').remove();
+            await loadTasks();
+        } catch (error) {
+            showNotification('Error: ' + error.message, 'error');
+        }
+    }
+
+    async function completeTask(taskId) {
+        try {
+            const res = await fetch(`/api/tasks/${state.session.tenantId}/${taskId}/complete`, {
+                method: 'POST'
+            });
+            const result = await res.json();
+            if (!result.success) throw new Error(result.error || 'Failed to complete task');
+            
+            showNotification('Task completed!', 'success');
+            await loadTasks();
+        } catch (error) {
+            showNotification('Error: ' + error.message, 'error');
+        }
+    }
+
+    async function deleteTask(taskId) {
+        if (!confirm('Delete this task?')) return;
+
+        try {
+            const res = await fetch(`/api/tasks/${state.session.tenantId}/${taskId}`, {
+                method: 'DELETE'
+            });
+            const result = await res.json();
+            if (!result.success) throw new Error(result.error || 'Failed to delete task');
+            
+            showNotification('Task deleted', 'success');
+            await loadTasks();
+        } catch (error) {
+            showNotification('Error: ' + error.message, 'error');
+        }
+    }
+
+    function showLogCallModal() {
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black/60 flex items-center justify-center z-50';
+        modal.innerHTML = `
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+                <div class="p-6 border-b sticky top-0 bg-white">
+                    <h3 class="text-xl font-bold text-gray-900"><i class="fas fa-phone mr-2 text-green-600"></i>Log Call</h3>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Phone Number *</label>
+                            <input id="callPhone" type="text" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500" placeholder="+919876543210" required />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Direction *</label>
+                            <select id="callDirection" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500">
+                                <option value="INBOUND">Inbound (Received)</option>
+                                <option value="OUTBOUND">Outbound (Made)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Outcome</label>
+                            <select id="callOutcome" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500">
+                                <option value="">Select outcome...</option>
+                                <option value="ANSWERED">Answered</option>
+                                <option value="NO_ANSWER">No Answer</option>
+                                <option value="BUSY">Busy</option>
+                                <option value="VOICEMAIL">Voicemail</option>
+                                <option value="CALLBACK_SCHEDULED">Callback Scheduled</option>
+                                <option value="INTERESTED">Interested</option>
+                                <option value="NOT_INTERESTED">Not Interested</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Duration (seconds)</label>
+                            <input id="callDuration" type="number" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500" placeholder="120" />
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                        <textarea id="callNotes" rows="3" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500" placeholder="Call summary, next steps..."></textarea>
+                    </div>
+                    <div class="flex gap-3 pt-4">
+                        <button onclick="this.closest('.fixed').remove()" class="flex-1 px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium">Cancel</button>
+                        <button onclick="saveCall()" class="flex-1 px-4 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold">Log Call</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    async function saveCall() {
+        const phone_number = document.getElementById('callPhone').value.trim();
+        const direction = document.getElementById('callDirection').value;
+        
+        if (!phone_number) return showNotification('Phone number is required', 'error');
+
+        const data = {
+            phone_number,
+            direction,
+            outcome: document.getElementById('callOutcome').value || null,
+            duration_seconds: parseInt(document.getElementById('callDuration').value) || null,
+            notes: document.getElementById('callNotes').value.trim() || null
+        };
+
+        try {
+            const res = await fetch(`/api/calls/${state.session.tenantId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (!result.success) throw new Error(result.error || 'Failed to log call');
+            
+            showNotification('Call logged successfully!', 'success');
+            document.querySelector('.fixed.inset-0').remove();
+            await loadCalls();
+        } catch (error) {
+            showNotification('Error: ' + error.message, 'error');
         }
     }
 
