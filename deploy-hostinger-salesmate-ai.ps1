@@ -15,7 +15,7 @@ $REMOTE_PATH = if ($env:HOSTINGER_REMOTE_PATH) { $env:HOSTINGER_REMOTE_PATH } el
 
 # App config
 $PM2_NAME = if ($env:HOSTINGER_PM2_NAME) { $env:HOSTINGER_PM2_NAME } else { "salesmate-ai" }
-$APP_PORT = if ($env:HOSTINGER_APP_PORT) { [int]$env:HOSTINGER_APP_PORT } else { 8054 }
+$APP_PORT = if ($env:HOSTINGER_APP_PORT) { [int]$env:HOSTINGER_APP_PORT } else { 8055 }
 
 # ====== Helpers ======
 function Assert-CommandExists($name) {
@@ -130,7 +130,7 @@ Run "Deploy on Hostinger (extract, npm ci --omit=dev, restart PM2)" {
      'if ! command -v node >/dev/null 2>&1; then echo "Node.js missing"; exit 2; fi; ' +
      'if ! command -v npm >/dev/null 2>&1; then echo "npm missing"; exit 2; fi; ' +
      'if ! command -v pm2 >/dev/null 2>&1; then npm i -g pm2; fi; ' +
-     'npm ci --omit=dev; ' +
+     'npm install --production; ' +
      'export NODE_ENV=production; export PORT=' + $APP_PORT + '; ' +
      'pm2 delete ' + $PM2_NAME + ' 2>/dev/null || true; ' +
      'pm2 start index.js --name ' + $PM2_NAME + ' --time --update-env; ' +

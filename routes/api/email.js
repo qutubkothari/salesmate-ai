@@ -48,9 +48,21 @@ router.post('/inbound', requireTenantAuth({ requireMatchParamTenantId: false }),
 // ---- Gmail OAuth + Pub/Sub integration (optional)
 
 // Start OAuth flow (redirects to Google)
-router.get('/gmail/auth', requireTenantAuth({ requireMatchParamTenantId: false }), async (req, res) => {
+// Accepts API key via header (X-API-Key) or query param (key) for browser convenience
+router.get('/gmail/auth', async (req, res) => {
   try {
-    const tenantId = String(req.auth?.tenantId || '');
+    // Allow API key from query param for browser-friendly URLs
+    const queryKey = req.query.key;
+    if (queryKey && !req.get('x-api-key')) {
+      req.headers['x-api-key'] = queryKey;
+    }
+    
+    // Authenticate
+    const { authenticateRequest } = require('../../services/tenantAuth');
+    const auth = await authenticateRequest(req);
+    if (!auth?.tenantId) return res.status(401).send('Unauthorized - provide API key via X-API-Key header or ?key= param');
+    
+    const tenantId = String(auth.tenantId);
     if (!tenantId) return res.status(401).send('Unauthorized');
 
     const state = makeOAuthState();
