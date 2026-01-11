@@ -2165,30 +2165,13 @@
             return;
         }
 
-        // TODO: Integrate with SAK-SMS to create lead
+        // TODO: Implement lead creation inside Salesmate
         // For now, just show a confirmation
-        const confirmed = confirm(`Create lead from email?\n\nFrom: ${email.from_email}\nSubject: ${email.subject}\n\nThis will send the email to SAK-SMS for smart assignment.`);
+        const confirmed = confirm(`Create lead from email?\n\nFrom: ${email.from_email}\nSubject: ${email.subject}\n\nThis will create a lead inside Salesmate for smart assignment.`);
         
         if (confirmed) {
             try {
-                // This would call SAK-SMS API
-                // const response = await fetch('https://sms.saksolution.com/api/integrations/salesmate/message', {
-                //     method: 'POST',
-                //     headers: {
-                //         'Content-Type': 'application/json',
-                //         'x-salesmate-secret': 'YOUR_SECRET'
-                //     },
-                //     body: JSON.stringify({
-                //         email: email.from_email,
-                //         fullName: email.from_email.split('@')[0],
-                //         message: email.subject + '\n\n' + extractTextFromHTML(email.body),
-                //         channel: 'EMAIL',
-                //         externalId: email.id,
-                //         metadata: { gmailMessageId: email.id, subject: email.subject }
-                //     })
-                // });
-                
-                alert('Lead creation will be implemented when SAK-SMS integration is connected.\n\nFor now, this email has been marked for lead creation.');
+                alert('Lead creation from email is not implemented yet.\n\nFor now, this email has been marked for lead creation.');
             } catch (err) {
                 console.error('[EMAILS] Create lead error:', err);
                 alert('Error creating lead: ' + err.message);
@@ -7427,7 +7410,7 @@
         }, 500);
     }
 
-    // ========== SAK-SMS INTELLIGENCE: TEAM MANAGEMENT ==========
+    // ========== SALESMATE INTELLIGENCE: TEAM MANAGEMENT ==========
     async function loadTeam() {
         const tenantId = state.session?.tenantId;
         if (!tenantId) return;
@@ -7510,7 +7493,7 @@
         }
     }
 
-    // ========== SAK-SMS INTELLIGENCE: TASKS MANAGEMENT ==========
+    // ========== SALESMATE INTELLIGENCE: TASKS MANAGEMENT ==========
     async function loadTasks() {
         const tenantId = state.session?.tenantId;
         if (!tenantId) return;
@@ -7644,7 +7627,7 @@
         `;
     }
 
-    // ========== SAK-SMS INTELLIGENCE: CALLS MANAGEMENT ==========
+    // ========== SALESMATE INTELLIGENCE: CALLS MANAGEMENT ==========
     async function loadCalls() {
         const tenantId = state.session?.tenantId;
         if (!tenantId) return;
@@ -8372,7 +8355,7 @@
         }
     }
 
-    // ========== SAK-SMS INTELLIGENCE: HELPER FUNCTIONS ==========
+    // ========== SALESMATE INTELLIGENCE: HELPER FUNCTIONS ==========
     
     function showAddSalesmanModal() {
         const modal = document.createElement('div');

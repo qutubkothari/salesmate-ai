@@ -1,6 +1,6 @@
 # Automated Salesmate Deployment to Hostinger VPS
 param(
-    [string]$Message = "Deploy Salesmate with SAK-SMS intelligence"
+    [string]$Message = "Deploy Salesmate"
 )
 
 $ErrorActionPreference = "Stop"

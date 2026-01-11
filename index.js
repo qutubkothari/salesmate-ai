@@ -1150,7 +1150,7 @@ app.use('/api/broadcast', broadcastRouter);
 const whatsappWebRouter = require('./routes/api/whatsappWeb');
 app.use('/api/whatsapp-web', whatsappWebRouter);
 
-// SAK-SMS Intelligence Features
+// Salesmate Intelligence Features
 const salesmenRouter = require('./routes/api/salesmen');
 app.use('/api/salesmen', salesmenRouter);
 

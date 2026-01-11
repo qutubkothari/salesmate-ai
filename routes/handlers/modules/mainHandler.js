@@ -105,7 +105,7 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
                     
                 console.log('[MAIN_HANDLER] User message saved to database');
                 
-                // ===== SAK-SMS INTELLIGENCE: AUTO HEAT SCORING =====
+                // ===== SALESMATE INTELLIGENCE: AUTO HEAT SCORING =====
                 try {
                     const { analyzeAndUpdateHeat, escalateHighHeatLead } = require('../../../services/heatScoringService');
                     
@@ -126,7 +126,7 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
                     // Continue processing even if heat scoring fails
                 }
                 
-                // ===== SAK-SMS INTELLIGENCE: AUTO ASSIGNMENT =====
+                // ===== SALESMATE INTELLIGENCE: AUTO ASSIGNMENT =====
                 try {
                     const { assignConversation } = require('../../../services/assignmentService');
                     

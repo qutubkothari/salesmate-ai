@@ -6,7 +6,7 @@
 const { db } = require('./config');
 const openaiService = require('./openaiService');
 
-// Heat levels (matches SAK-SMS enum)
+// Heat levels
 const HEAT_LEVELS = {
   COLD: 'COLD',
   WARM: 'WARM',
