@@ -938,6 +938,12 @@
         searchQuery: '',
         isLoading: false
     };
+
+    const analyticsUIState = {
+        days: 30,
+        sortKey: 'revenue',
+        sortDir: 'desc'
+    };
     // ---------- API Helpers ----------
     const api = {
         authHeaders() {
@@ -1055,187 +1061,30 @@
                 showNotification('Error: Order modal not available', 'error');
                 return;
             }
-            
+
             modal.classList.remove('hidden');
             modal.classList.add('flex');
-            
+
             const orderIdElement = document.getElementById('orderId');
-            const analyticsUIState = {
-                days: 30,
-                sortKey: 'revenue',
-                sortDir: 'desc'
-            };
-
-            function normalizePerfRow(row) {
-                const heat = row?.heat || {};
-                return {
-                    id: row?.id ?? null,
-                    name: row?.name ?? 'Salesman',
-                    phone: row?.phone ?? null,
-                    leads: Number(row?.leads || 0) || 0,
-                    openLeads: Number(row?.openLeads || 0) || 0,
-                    closedLeads: Number(row?.closedLeads || 0) || 0,
-                    orders: Number(row?.orders || 0) || 0,
-                    revenue: Number(row?.revenue || 0) || 0,
-                    conversionRate: Number(row?.conversionRate || 0) || 0,
-                    heat: {
-                        ON_FIRE: Number(heat.ON_FIRE || 0) || 0,
-                        VERY_HOT: Number(heat.VERY_HOT || 0) || 0,
-                        HOT: Number(heat.HOT || 0) || 0,
-                        WARM: Number(heat.WARM || 0) || 0,
-                        COLD: Number(heat.COLD || 0) || 0
-                    },
-                    _isUnassigned: String(row?.id || '') === 'unassigned'
-                };
+            if (orderIdElement) {
+                orderIdElement.textContent = 'Loading...';
             }
 
-            function sortPerfRows(rows, sortKey, sortDir) {
-                const dir = String(sortDir || 'desc').toLowerCase() === 'asc' ? 1 : -1;
-                const key = String(sortKey || 'revenue');
-                const list = (rows || []).slice();
-
-                list.sort((a, b) => {
-                    // Always keep Unassigned at bottom
-                    if (a._isUnassigned && !b._isUnassigned) return 1;
-                    if (!a._isUnassigned && b._isUnassigned) return -1;
-
-                    if (key === 'name') return dir * String(a.name || '').localeCompare(String(b.name || ''));
-                    const av = Number(a[key] || 0) || 0;
-                    const bv = Number(b[key] || 0) || 0;
-                    if (bv !== av) return dir * (av - bv);
-                    // stable-ish tie-breakers
-                    return String(a.name || '').localeCompare(String(b.name || ''));
-                });
-                return list;
-            }
-
-            function renderSalesTeamPerformanceTable(perfRows, sortKey, sortDir) {
-                const perf = sortPerfRows(perfRows, sortKey, sortDir);
-                if (!perf.length) {
-                    return `
-                        <div class="p-6 rounded-xl bg-gray-50 border border-gray-200 text-gray-600">
-                            No salesmen performance data available yet. Add salesmen and ensure leads are assigned.
-                        </div>
-                    `;
-                }
-
-                return `
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full text-sm">
-                            <thead>
-                                <tr class="text-left text-gray-600">
-                                    <th class="py-2 pr-4">Salesman</th>
-                                    <th class="py-2 pr-4">Leads</th>
-                                    <th class="py-2 pr-4">Open</th>
-                                    <th class="py-2 pr-4">Orders</th>
-                                    <th class="py-2 pr-4">Revenue</th>
-                                    <th class="py-2 pr-4">Conv%</th>
-                                    <th class="py-2 pr-4">Heat (🔥/VH/H/W/C)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${perf.map(s => {
-                                    const heat = s.heat || {};
-                                    const heatText = `${Number(heat.ON_FIRE||0)}/${Number(heat.VERY_HOT||0)}/${Number(heat.HOT||0)}/${Number(heat.WARM||0)}/${Number(heat.COLD||0)}`;
-                                    const rowClass = s._isUnassigned ? 'bg-yellow-50' : '';
-                                    return `
-                                        <tr class="border-t border-gray-200 ${rowClass}">
-                                            <td class="py-3 pr-4">
-                                                <div class="font-semibold text-gray-900">${escapeHtml(String(s.name || 'Salesman'))}</div>
-                                                ${s.phone ? `<div class="text-xs text-gray-500">${escapeHtml(String(s.phone))}</div>` : ''}
-                                            </td>
-                                            <td class="py-3 pr-4 text-gray-900 font-medium">${Number(s.leads)||0}</td>
-                                            <td class="py-3 pr-4 text-gray-900">${Number(s.openLeads)||0}</td>
-                                            <td class="py-3 pr-4 text-gray-900">${Number(s.orders)||0}</td>
-                                            <td class="py-3 pr-4 text-gray-900 font-semibold">${fmtINR(s.revenue||0)}</td>
-                                            <td class="py-3 pr-4 text-gray-900">${Number(s.conversionRate)||0}%</td>
-                                            <td class="py-3 pr-4 text-gray-700 font-mono">${heatText}</td>
-                                        </tr>
-                                    `;
-                                }).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-            }
-
-            function downloadCsv(filename, csvText) {
-                const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = filename;
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-                URL.revokeObjectURL(url);
-            }
-
-            function perfRowsToCsv(rows) {
-                const header = [
-                    'Salesman', 'Phone', 'Leads', 'Open Leads', 'Closed Leads',
-                    'Orders', 'Revenue', 'Conversion %',
-                    'Heat ON_FIRE', 'Heat VERY_HOT', 'Heat HOT', 'Heat WARM', 'Heat COLD'
-                ];
-                const lines = [header.join(',')];
-
-                (rows || []).forEach(r => {
-                    const s = normalizePerfRow(r);
-                    const cols = [
-                        String(s.name || '').replace(/\"/g, '"'),
-                        String(s.phone || ''),
-                        s.leads,
-                        s.openLeads,
-                        s.closedLeads,
-                        s.orders,
-                        (Math.round((s.revenue || 0) * 100) / 100),
-                        s.conversionRate,
-                        s.heat.ON_FIRE,
-                        s.heat.VERY_HOT,
-                        s.heat.HOT,
-                        s.heat.WARM,
-                        s.heat.COLD
-                    ].map(v => {
-                        const str = String(v ?? '');
-                        // CSV escaping
-                        if (/[",\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
-                        return str;
-                    });
-                    lines.push(cols.join(','));
-                });
-                return lines.join('\n');
-            }
-
-            async function loadAnalytics(options = {}) {
-                if (options.days) analyticsUIState.days = Number(options.days) || analyticsUIState.days;
-                if (options.sortKey) analyticsUIState.sortKey = String(options.sortKey);
-                if (options.sortDir) analyticsUIState.sortDir = String(options.sortDir);
-
-                const data = await api.fetchData('analytics', { days: analyticsUIState.days });
-                const analytics = data.analytics || {};
-
-                const rawPerf = Array.isArray(analytics.salesmenPerformance) ? analytics.salesmenPerformance : [];
-                const perfRows = rawPerf.map(normalizePerfRow);
-                const unassigned = analytics.unassignedPerformance ? normalizePerfRow(analytics.unassignedPerformance) : null;
-                if (unassigned && (unassigned.leads > 0 || unassigned.orders > 0 || unassigned.revenue > 0)) {
-                    perfRows.push(unassigned);
-                }
-
-                document.getElementById('tabContent').innerHTML = `
+            const response = await fetch(`/api/dashboard/orders/${encodeURIComponent(tenantId)}?limit=100&offset=0`);
             if (!response.ok) {
                 throw new Error(`Failed to fetch orders: ${response.status}`);
             }
-            
+
             const data = await response.json();
             if (!data.success || !data.orders) {
                 throw new Error('Invalid response format');
             }
-            
+
             let order = data.orders.find(o => String(o.id) === String(orderId));
             if (!order) {
                 throw new Error('Order not found');
             }
-            
+
             if (order.conversation_id && (!order.customerName || order.customerName === order.conversation?.end_user_phone)) {
                 try {
                     const convResponse = await fetch(`/api/dashboard/conversation/${tenantId}/${order.conversation_id}`);
@@ -1244,85 +1093,52 @@
                         if (convData.success && convData.conversation) {
                             const messages = convData.conversation.messages || [];
                             const customerMessages = messages.filter(m => m.sender === 'user' || m.sender === 'customer');
-                            <div class="text-sm text-gray-500">Last ${analytics.period || analyticsUIState.days} days</div>
+                            for (const msg of customerMessages.slice(0, 5)) {
                                 const text = msg.message_body || '';
-
-                        <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-4">
-                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                <div>
-                                    <label class="block text-xs font-semibold text-gray-600 mb-1">Period</label>
-                                    <select id="analyticsPeriodSelect" class="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white">
-                                        <option value="7" ${Number(analyticsUIState.days) === 7 ? 'selected' : ''}>Last 7 days</option>
-                                        <option value="30" ${Number(analyticsUIState.days) === 30 ? 'selected' : ''}>Last 30 days</option>
-                                        <option value="90" ${Number(analyticsUIState.days) === 90 ? 'selected' : ''}>Last 90 days</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-semibold text-gray-600 mb-1">Sort By</label>
-                                    <select id="analyticsSortSelect" class="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white">
-                                        <option value="revenue" ${analyticsUIState.sortKey === 'revenue' ? 'selected' : ''}>Revenue</option>
-                                        <option value="leads" ${analyticsUIState.sortKey === 'leads' ? 'selected' : ''}>Leads</option>
-                                        <option value="orders" ${analyticsUIState.sortKey === 'orders' ? 'selected' : ''}>Orders</option>
-                                        <option value="conversionRate" ${analyticsUIState.sortKey === 'conversionRate' ? 'selected' : ''}>Conversion %</option>
-                                        <option value="name" ${analyticsUIState.sortKey === 'name' ? 'selected' : ''}>Name</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-semibold text-gray-600 mb-1">Direction</label>
-                                    <button id="analyticsSortDirBtn" class="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white hover:bg-gray-50">
-                                        ${String(analyticsUIState.sortDir).toLowerCase() === 'asc' ? 'Ascending' : 'Descending'}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="flex items-center gap-3">
-                                <button id="analyticsExportCsvBtn" class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-black">
-                                    <i class="fas fa-download mr-2"></i>Export CSV
-                                </button>
-                            </div>
-                        </div>
                                 const nameMatch = text.match(/(?:my name is|i am|i'm)\s+([a-zA-Z\s]{2,20})/i);
-                        <div id="salesmenPerfTable">
-                            ${renderSalesTeamPerformanceTable(perfRows, analyticsUIState.sortKey, analyticsUIState.sortDir)}
-                        </div>
+                                if (nameMatch && nameMatch[1].trim().length > 1) {
+                                    order.customerName = nameMatch[1].trim();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } catch (convError) {
+                    console.warn('Could not enhance customer name:', convError);
+                }
+            }
+
+            renderOrderDetails(order);
+
+        } catch (error) {
+            console.error('Error loading order modal:', error);
+            showNotification(`Failed to load order: ${error.message}`, 'error');
+
+            const modal = document.getElementById('orderModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+    }
+
+    function renderOrderDetails(order) {
+        console.log('Rendering order details:', order);
+
+        function safeSetText(elementId, text) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = text;
+            } else {
+                console.warn(`Element not found: ${elementId}`);
+            }
+        }
+
+        safeSetText('orderId', '#' + (order.id || '').substring(0, 8));
+        safeSetText('orderPlacedAt', order.created_at ?
+            'Placed: ' + new Date(order.created_at).toLocaleString() : '');
         safeSetText('orderStatusLabel', order.order_status || 'N/A');
-        
 
-                const periodSelect = document.getElementById('analyticsPeriodSelect');
-                if (periodSelect) {
-                    periodSelect.value = String(analyticsUIState.days);
-                    periodSelect.onchange = () => loadAnalytics({ days: Number(periodSelect.value) || 30 });
-                }
-
-                const sortSelect = document.getElementById('analyticsSortSelect');
-                if (sortSelect) {
-                    sortSelect.value = String(analyticsUIState.sortKey);
-                    sortSelect.onchange = () => {
-                        analyticsUIState.sortKey = String(sortSelect.value);
-                        const container = document.getElementById('salesmenPerfTable');
-                        if (container) container.innerHTML = renderSalesTeamPerformanceTable(perfRows, analyticsUIState.sortKey, analyticsUIState.sortDir);
-                    };
-                }
-
-                const sortDirBtn = document.getElementById('analyticsSortDirBtn');
-                if (sortDirBtn) {
-                    sortDirBtn.onclick = () => {
-                        analyticsUIState.sortDir = (String(analyticsUIState.sortDir).toLowerCase() === 'asc') ? 'desc' : 'asc';
-                        sortDirBtn.textContent = (String(analyticsUIState.sortDir).toLowerCase() === 'asc') ? 'Ascending' : 'Descending';
-                        const container = document.getElementById('salesmenPerfTable');
-                        if (container) container.innerHTML = renderSalesTeamPerformanceTable(perfRows, analyticsUIState.sortKey, analyticsUIState.sortDir);
-                    };
-                }
-
-                const exportBtn = document.getElementById('analyticsExportCsvBtn');
-                if (exportBtn) {
-                    exportBtn.onclick = () => {
-                        const sorted = sortPerfRows(perfRows, analyticsUIState.sortKey, analyticsUIState.sortDir);
-                        const csv = perfRowsToCsv(sorted);
-                        const filename = `sales-team-performance-${state.session?.tenantId || 'tenant'}-${analytics.period || analyticsUIState.days}d.csv`;
-                        downloadCsv(filename, csv);
-                    };
-                }
         let customerPhone = order.conversation?.end_user_phone || order.customer_phone || 'N/A';
         if (typeof customerPhone === 'string' && customerPhone.endsWith('@c.us')) {
             customerPhone = customerPhone.replace(/@c\.us$/, '');
@@ -1343,21 +1159,92 @@
         let shippingAddress = order.shippingAddress || order.shipping_address || '';
         if (!shippingAddress || shippingAddress.trim() === '') shippingAddress = 'N/A';
         safeSetText('orderShippingAddress', shippingAddress);
-        
+
         const subtotal = Number(order.subtotal_amount || order.subtotal || 0);
         const shipping = Number(order.shipping_charges || order.shipping || 0);
         const gst = Number(order.gst_amount || order.gst || 0);
         const total = Number(order.total_amount || order.total || 0);
-        
+
         safeSetText('orderSubtotal', fmtINR(subtotal));
         safeSetText('orderShipping', fmtINR(shipping));
         safeSetText('orderGST', fmtINR(gst));
         safeSetText('orderTotal', fmtINR(total));
-        
+
         const tbody = document.getElementById('orderItemsTableBody');
         const noItemsNotice = document.getElementById('noItemsNotice');
-        
+
         if (tbody) {
+            tbody.innerHTML = '';
+            const items = order.items || [];
+
+            if (items.length === 0) {
+                if (noItemsNotice) noItemsNotice.classList.remove('hidden');
+            } else {
+                if (noItemsNotice) noItemsNotice.classList.add('hidden');
+
+                let totalCartons = 0;
+                let totalPieces = 0;
+
+                items.forEach(item => {
+                    const quantity = Number(item.quantity || 0);
+                    const unitsPerCarton = Number(item.unitsPerCarton || item.units_per_carton || 1000);
+                    const pieces = quantity * unitsPerCarton;
+                    totalCartons += quantity;
+                    totalPieces += pieces;
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="py-2">
+                            <div class="font-medium">${escapeHtml(item.productName || item.product_name || 'Unknown Product')}</div>
+                            <div class="text-xs text-gray-500">${pieces.toLocaleString()} pieces total</div>
+                        </td>
+                        <td class="py-2">${escapeHtml(item.sku || 'N/A')}</td>
+                        <td class="py-2 text-right">
+                            <div class="font-medium">${quantity} cartons</div>
+                            <div class="text-xs text-gray-500">${unitsPerCarton.toLocaleString()}/carton</div>
+                        </td>
+                        <td class="py-2 text-right">${fmtINR(item.unitPrice || item.unit_price || item.price_at_time_of_purchase || 0)}</td>
+                        <td class="py-2 text-right">${fmtINR(item.lineTotal || item.line_total || (quantity * (item.unitPrice || item.unit_price || 0)))}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                const summaryRow = document.createElement('tr');
+                summaryRow.className = 'border-t-2 border-gray-300 bg-gray-50 font-semibold';
+                summaryRow.innerHTML = `
+                    <td class="py-3 font-bold">ORDER TOTALS</td>
+                    <td class="py-3"></td>
+                    <td class="py-3 text-right">
+                        <div class="font-bold text-blue-600">${totalCartons} cartons</div>
+                        <div class="text-sm text-blue-500">${totalPieces.toLocaleString()} pieces</div>
+                    </td>
+                    <td class="py-3"></td>
+                    <td class="py-3 text-right font-bold text-lg">${fmtINR(total)}</td>
+                `;
+                tbody.appendChild(summaryRow);
+            }
+        }
+
+        populateStatusDropdown(order.order_status || 'new');
+        window.currentOrderId = order.id;
+    }
+
+    function populateStatusDropdown(currentStatus) {
+        const statusSelect = document.getElementById('orderStatusSelect');
+        if (!statusSelect) return;
+        const statuses = [
+            'new', 'pending_payment', 'pending', 'confirmed',
+            'shipped', 'delivered', 'cancelled', 'refunded'
+        ];
+        statusSelect.innerHTML = '';
+        statuses.forEach(status => {
+            const option = document.createElement('option');
+            option.value = status;
+            option.textContent = status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            if (status === currentStatus) option.selected = true;
+            statusSelect.appendChild(option);
+        });
+    }
             tbody.innerHTML = '';
             const items = order.items || [];
             
@@ -3116,10 +3003,163 @@
         attachSettingsHandlers();
     }
 
-    async function loadAnalytics() {
-        const data = await api.fetchData('analytics');
+    async function loadAnalytics(options = {}) {
+        if (options.days !== undefined) {
+            const days = Number(options.days);
+            if ([7, 30, 90].includes(days)) analyticsUIState.days = days;
+        }
+        if (options.sortKey !== undefined) analyticsUIState.sortKey = String(options.sortKey || analyticsUIState.sortKey);
+        if (options.sortDir !== undefined) {
+            analyticsUIState.sortDir = String(options.sortDir).toLowerCase() === 'asc' ? 'asc' : 'desc';
+        }
+
+        function normalizePerfRow(row) {
+            const heat = row?.heat || {};
+            return {
+                id: row?.id ?? null,
+                name: row?.name ?? 'Salesman',
+                phone: row?.phone ?? null,
+                leads: Number(row?.leads || 0) || 0,
+                openLeads: Number(row?.openLeads || 0) || 0,
+                closedLeads: Number(row?.closedLeads || 0) || 0,
+                orders: Number(row?.orders || 0) || 0,
+                revenue: Number(row?.revenue || 0) || 0,
+                conversionRate: Number(row?.conversionRate || 0) || 0,
+                heat: {
+                    ON_FIRE: Number(heat.ON_FIRE || 0) || 0,
+                    VERY_HOT: Number(heat.VERY_HOT || 0) || 0,
+                    HOT: Number(heat.HOT || 0) || 0,
+                    WARM: Number(heat.WARM || 0) || 0,
+                    COLD: Number(heat.COLD || 0) || 0
+                },
+                _isUnassigned: String(row?.id || '') === 'unassigned'
+            };
+        }
+
+        function sortPerfRows(rows, sortKey, sortDir) {
+            const dir = String(sortDir || 'desc').toLowerCase() === 'asc' ? 1 : -1;
+            const key = String(sortKey || 'revenue');
+            const list = (rows || []).slice();
+
+            list.sort((a, b) => {
+                if (a._isUnassigned && !b._isUnassigned) return 1;
+                if (!a._isUnassigned && b._isUnassigned) return -1;
+
+                if (key === 'name') return dir * String(a.name || '').localeCompare(String(b.name || ''));
+                const av = Number(a[key] || 0) || 0;
+                const bv = Number(b[key] || 0) || 0;
+                if (bv !== av) return dir * (av - bv);
+                return String(a.name || '').localeCompare(String(b.name || ''));
+            });
+            return list;
+        }
+
+        function renderSalesTeamPerformanceTable(perfRows, sortKey, sortDir) {
+            const perf = sortPerfRows(perfRows, sortKey, sortDir);
+            if (!perf.length) {
+                return `
+                    <div class="p-6 rounded-xl bg-gray-50 border border-gray-200 text-gray-600">
+                        No salesmen performance data available yet. Add salesmen and ensure leads are assigned.
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead>
+                            <tr class="text-left text-gray-600">
+                                <th class="py-2 pr-4">Salesman</th>
+                                <th class="py-2 pr-4">Leads</th>
+                                <th class="py-2 pr-4">Open</th>
+                                <th class="py-2 pr-4">Orders</th>
+                                <th class="py-2 pr-4">Revenue</th>
+                                <th class="py-2 pr-4">Conv%</th>
+                                <th class="py-2 pr-4">Heat (🔥/VH/H/W/C)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${perf.map(s => {
+                                const heat = s.heat || {};
+                                const heatText = `${Number(heat.ON_FIRE||0)}/${Number(heat.VERY_HOT||0)}/${Number(heat.HOT||0)}/${Number(heat.WARM||0)}/${Number(heat.COLD||0)}`;
+                                const rowClass = s._isUnassigned ? 'bg-yellow-50' : '';
+                                return `
+                                    <tr class="border-t border-gray-200 ${rowClass}">
+                                        <td class="py-3 pr-4">
+                                            <div class="font-semibold text-gray-900">${escapeHtml(String(s.name || 'Salesman'))}</div>
+                                            ${s.phone ? `<div class="text-xs text-gray-500">${escapeHtml(String(s.phone))}</div>` : ''}
+                                        </td>
+                                        <td class="py-3 pr-4 text-gray-900 font-medium">${Number(s.leads)||0}</td>
+                                        <td class="py-3 pr-4 text-gray-900">${Number(s.openLeads)||0}</td>
+                                        <td class="py-3 pr-4 text-gray-900">${Number(s.orders)||0}</td>
+                                        <td class="py-3 pr-4 text-gray-900 font-semibold">${fmtINR(s.revenue||0)}</td>
+                                        <td class="py-3 pr-4 text-gray-900">${Number(s.conversionRate)||0}%</td>
+                                        <td class="py-3 pr-4 text-gray-700 font-mono">${heatText}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function downloadCsv(filename, csvText) {
+            const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function perfRowsToCsv(rows) {
+            const header = [
+                'Salesman', 'Phone', 'Leads', 'Open Leads', 'Closed Leads',
+                'Orders', 'Revenue', 'Conversion %',
+                'Heat ON_FIRE', 'Heat VERY_HOT', 'Heat HOT', 'Heat WARM', 'Heat COLD'
+            ];
+            const lines = [header.join(',')];
+
+            (rows || []).forEach(r => {
+                const s = normalizePerfRow(r);
+                const cols = [
+                    String(s.name || '').replace(/\"/g, '"'),
+                    String(s.phone || ''),
+                    s.leads,
+                    s.openLeads,
+                    s.closedLeads,
+                    s.orders,
+                    (Math.round((s.revenue || 0) * 100) / 100),
+                    s.conversionRate,
+                    s.heat.ON_FIRE,
+                    s.heat.VERY_HOT,
+                    s.heat.HOT,
+                    s.heat.WARM,
+                    s.heat.COLD
+                ].map(v => {
+                    const str = String(v ?? '');
+                    if (/[",\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
+                    return str;
+                });
+                lines.push(cols.join(','));
+            });
+            return lines.join('\n');
+        }
+
+        const data = await api.fetchData('analytics', { days: analyticsUIState.days });
         const analytics = data.analytics || {};
-        const perf = Array.isArray(analytics.salesmenPerformance) ? analytics.salesmenPerformance : [];
+
+        const rawPerf = Array.isArray(analytics.salesmenPerformance) ? analytics.salesmenPerformance : [];
+        const perfRows = rawPerf.map(normalizePerfRow);
+        const unassigned = analytics.unassignedPerformance ? normalizePerfRow(analytics.unassignedPerformance) : null;
+        if (unassigned && (unassigned.leads > 0 || unassigned.orders > 0 || unassigned.revenue > 0)) {
+            perfRows.push(unassigned);
+        }
+
         document.getElementById('tabContent').innerHTML = `
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
                 <div class="config-card p-6 rounded-2xl"><h3 class="text-gray-900 text-xl font-semibold mb-6">Revenue Breakdown</h3>
@@ -3143,52 +3183,84 @@
             <div class="config-card p-6 rounded-2xl">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-gray-900 text-xl font-semibold">Sales Team Performance (All Salesmen)</h3>
-                    <div class="text-sm text-gray-500">Last ${analytics.period || 30} days</div>
+                    <div class="text-sm text-gray-500">Last ${analytics.period || analyticsUIState.days} days</div>
                 </div>
 
-                ${perf.length ? `
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full text-sm">
-                            <thead>
-                                <tr class="text-left text-gray-600">
-                                    <th class="py-2 pr-4">Salesman</th>
-                                    <th class="py-2 pr-4">Leads</th>
-                                    <th class="py-2 pr-4">Open</th>
-                                    <th class="py-2 pr-4">Orders</th>
-                                    <th class="py-2 pr-4">Revenue</th>
-                                    <th class="py-2 pr-4">Conv%</th>
-                                    <th class="py-2 pr-4">Heat (🔥/VH/H/W/C)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${perf.map(s => {
-                                    const heat = s.heat || {};
-                                    const heatText = `${Number(heat.ON_FIRE||0)}/${Number(heat.VERY_HOT||0)}/${Number(heat.HOT||0)}/${Number(heat.WARM||0)}/${Number(heat.COLD||0)}`;
-                                    return `
-                                        <tr class="border-t border-gray-200">
-                                            <td class="py-3 pr-4">
-                                                <div class="font-semibold text-gray-900">${escapeHtml(String(s.name || 'Salesman'))}</div>
-                                                ${s.phone ? `<div class="text-xs text-gray-500">${escapeHtml(String(s.phone))}</div>` : ''}
-                                            </td>
-                                            <td class="py-3 pr-4 text-gray-900 font-medium">${Number(s.leads)||0}</td>
-                                            <td class="py-3 pr-4 text-gray-900">${Number(s.openLeads)||0}</td>
-                                            <td class="py-3 pr-4 text-gray-900">${Number(s.orders)||0}</td>
-                                            <td class="py-3 pr-4 text-gray-900 font-semibold">${fmtINR(s.revenue||0)}</td>
-                                            <td class="py-3 pr-4 text-gray-900">${Number(s.conversionRate)||0}%</td>
-                                            <td class="py-3 pr-4 text-gray-700 font-mono">${heatText}</td>
-                                        </tr>
-                                    `;
-                                }).join('')}
-                            </tbody>
-                        </table>
+                <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Period</label>
+                            <select id="analyticsPeriodSelect" class="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white">
+                                <option value="7" ${Number(analyticsUIState.days) === 7 ? 'selected' : ''}>Last 7 days</option>
+                                <option value="30" ${Number(analyticsUIState.days) === 30 ? 'selected' : ''}>Last 30 days</option>
+                                <option value="90" ${Number(analyticsUIState.days) === 90 ? 'selected' : ''}>Last 90 days</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Sort By</label>
+                            <select id="analyticsSortSelect" class="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white">
+                                <option value="revenue" ${analyticsUIState.sortKey === 'revenue' ? 'selected' : ''}>Revenue</option>
+                                <option value="leads" ${analyticsUIState.sortKey === 'leads' ? 'selected' : ''}>Leads</option>
+                                <option value="orders" ${analyticsUIState.sortKey === 'orders' ? 'selected' : ''}>Orders</option>
+                                <option value="conversionRate" ${analyticsUIState.sortKey === 'conversionRate' ? 'selected' : ''}>Conversion %</option>
+                                <option value="name" ${analyticsUIState.sortKey === 'name' ? 'selected' : ''}>Name</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Direction</label>
+                            <button id="analyticsSortDirBtn" class="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white hover:bg-gray-50">
+                                ${String(analyticsUIState.sortDir).toLowerCase() === 'asc' ? 'Ascending' : 'Descending'}
+                            </button>
+                        </div>
                     </div>
-                ` : `
-                    <div class="p-6 rounded-xl bg-gray-50 border border-gray-200 text-gray-600">
-                        No salesmen performance data available yet. Add salesmen and ensure leads are assigned.
+
+                    <div class="flex items-center gap-3">
+                        <button id="analyticsExportCsvBtn" class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-black">
+                            <i class="fas fa-download mr-2"></i>Export CSV
+                        </button>
                     </div>
-                `}
+                </div>
+                <div id="salesmenPerfTable">
+                    ${renderSalesTeamPerformanceTable(perfRows, analyticsUIState.sortKey, analyticsUIState.sortDir)}
+                </div>
             </div>
         `;
+
+        const periodSelect = document.getElementById('analyticsPeriodSelect');
+        if (periodSelect) {
+            periodSelect.value = String(analyticsUIState.days);
+            periodSelect.onchange = () => loadAnalytics({ days: Number(periodSelect.value) || 30 });
+        }
+
+        const sortSelect = document.getElementById('analyticsSortSelect');
+        if (sortSelect) {
+            sortSelect.value = String(analyticsUIState.sortKey);
+            sortSelect.onchange = () => {
+                analyticsUIState.sortKey = String(sortSelect.value);
+                const container = document.getElementById('salesmenPerfTable');
+                if (container) container.innerHTML = renderSalesTeamPerformanceTable(perfRows, analyticsUIState.sortKey, analyticsUIState.sortDir);
+            };
+        }
+
+        const sortDirBtn = document.getElementById('analyticsSortDirBtn');
+        if (sortDirBtn) {
+            sortDirBtn.onclick = () => {
+                analyticsUIState.sortDir = (String(analyticsUIState.sortDir).toLowerCase() === 'asc') ? 'desc' : 'asc';
+                sortDirBtn.textContent = (String(analyticsUIState.sortDir).toLowerCase() === 'asc') ? 'Ascending' : 'Descending';
+                const container = document.getElementById('salesmenPerfTable');
+                if (container) container.innerHTML = renderSalesTeamPerformanceTable(perfRows, analyticsUIState.sortKey, analyticsUIState.sortDir);
+            };
+        }
+
+        const exportBtn = document.getElementById('analyticsExportCsvBtn');
+        if (exportBtn) {
+            exportBtn.onclick = () => {
+                const sorted = sortPerfRows(perfRows, analyticsUIState.sortKey, analyticsUIState.sortDir);
+                const csv = perfRowsToCsv(sorted);
+                const filename = `sales-team-performance-${state.session?.tenantId || 'tenant'}-${analytics.period || analyticsUIState.days}d.csv`;
+                downloadCsv(filename, csv);
+            };
+        }
     }
 
     async function loadReports() {
