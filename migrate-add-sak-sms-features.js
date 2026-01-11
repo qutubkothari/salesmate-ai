@@ -385,7 +385,8 @@ const alterations = [
   { table: 'conversations', column: 'qualification_level', sql: `ALTER TABLE conversations ADD COLUMN qualification_level TEXT` },
   { table: 'conversations', column: 'status', sql: `ALTER TABLE conversations ADD COLUMN status TEXT DEFAULT 'OPEN'` },
   { table: 'conversations', column: 'assigned_to', sql: `ALTER TABLE conversations ADD COLUMN assigned_to TEXT` },
-  { table: 'conversations', column: 'last_activity_at', sql: `ALTER TABLE conversations ADD COLUMN last_activity_at DATETIME DEFAULT CURRENT_TIMESTAMP` },
+  // SQLite doesn't allow adding a column with a non-constant default via ALTER TABLE.
+  { table: 'conversations', column: 'last_activity_at', sql: `ALTER TABLE conversations ADD COLUMN last_activity_at DATETIME` },
   { table: 'conversations', column: 'ai_confidence', sql: `ALTER TABLE conversations ADD COLUMN ai_confidence REAL` },
   { table: 'conversations', column: 'ai_suggested_assignment', sql: `ALTER TABLE conversations ADD COLUMN ai_suggested_assignment TEXT` },
   
@@ -417,6 +418,18 @@ alterations.forEach((alteration) => {
 });
 
 console.log(`\n📊 Columns added: ${columnsAdded}/${alterations.length}\n`);
+
+// Best-effort backfill for last_activity_at so ordering/assignment works.
+try {
+  db.exec(`
+    UPDATE conversations
+    SET last_activity_at = COALESCE(last_activity_at, CURRENT_TIMESTAMP)
+    WHERE last_activity_at IS NULL OR last_activity_at = '';
+  `);
+  console.log('  ✅ Backfilled conversations.last_activity_at\n');
+} catch (err) {
+  console.warn(`  ⚠️  Backfill skipped: ${err.message}`);
+}
 
 // ==========================================
 // PHASE 4: SEED DEFAULT DATA
