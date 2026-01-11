@@ -747,6 +747,27 @@ function ensureSqliteSchema(dbInstance) {
     );
   `);
 
+  // WhatsApp Web connections (standalone) - persisted sessions per tenant + session_name.
+  // This table may be absent on older installs; create it here so the WA Web feature works out-of-the-box.
+  exec(`
+    CREATE TABLE IF NOT EXISTS whatsapp_connections (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+      tenant_id TEXT NOT NULL,
+      session_name TEXT DEFAULT 'default',
+      provider TEXT DEFAULT 'whatsapp_web',
+      salesman_id TEXT,
+      is_primary INTEGER DEFAULT 0,
+      status TEXT,
+      qr_code TEXT,
+      phone_number TEXT,
+      last_error TEXT,
+      connected_at TEXT,
+      created_at TEXT DEFAULT (DATETIME('now')),
+      updated_at TEXT DEFAULT (DATETIME('now')),
+      UNIQUE(tenant_id, session_name)
+    );
+  `);
+
   const tableInfo = (table) => {
     try {
       return dbInstance.prepare(`PRAGMA table_info(${table})`).all();
@@ -969,8 +990,24 @@ function ensureSqliteSchema(dbInstance) {
 
   // WhatsApp Web connections: whatsappWebService updates connected_at on successful login
   ensureColumns('whatsapp_connections', [
-    { name: 'connected_at', type: 'TEXT' }
+    { name: 'tenant_id', type: 'TEXT' },
+    { name: 'session_name', type: "TEXT DEFAULT 'default'" },
+    { name: 'status', type: 'TEXT' },
+    { name: 'qr_code', type: 'TEXT' },
+    { name: 'phone_number', type: 'TEXT' },
+    { name: 'last_error', type: 'TEXT' },
+    { name: 'connected_at', type: 'TEXT' },
+    // Multi-session / multi-user WhatsApp connections (premium/enterprise)
+    { name: 'salesman_id', type: 'TEXT' },
+    { name: 'provider', type: "TEXT DEFAULT 'whatsapp_web'" },
+    { name: 'is_primary', type: 'INTEGER DEFAULT 0' },
+    { name: 'created_at', type: "TEXT DEFAULT (DATETIME('now'))" },
+    { name: 'updated_at', type: "TEXT DEFAULT (DATETIME('now'))" }
   ]);
+
+  // Helpful indexes (best-effort)
+  tryExec(`CREATE INDEX IF NOT EXISTS idx_whatsapp_connections_tenant_session ON whatsapp_connections(tenant_id, session_name);`);
+  tryExec(`CREATE INDEX IF NOT EXISTS idx_whatsapp_connections_tenant_salesman ON whatsapp_connections(tenant_id, salesman_id);`);
 
   // Ensure templates have a usage counter for "use" events.
   ensureColumns('message_templates', [

@@ -6,6 +6,8 @@ const express = require('express');
 const router = express.Router();
 const { db } = require('../../services/config');
 const { getActiveSalesmen, getSalesmanWorkload } = require('../../services/assignmentService');
+const { sendMessage } = require('../../services/whatsappService');
+const { getClientStatus, sendWebMessage } = require('../../services/whatsappWebService');
 
 /**
  * GET /api/salesmen/:tenantId
@@ -155,6 +157,89 @@ router.delete('/:tenantId/:salesmanId', (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting salesman:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/salesmen/:tenantId/broadcast
+ * Admin: message all active salesmen (practical "call all salesman together" alternative).
+ * Body: { text, fromSessionName? }
+ */
+router.post('/:tenantId/broadcast', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const text = String(req.body?.text || '').trim();
+    const fromSessionName = String(req.body?.fromSessionName || 'default');
+
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'Tenant ID is required' });
+    }
+    if (!text) {
+      return res.status(400).json({ success: false, error: 'text is required' });
+    }
+
+    const salesmen = db.prepare(`
+      SELECT id, name, phone, active
+      FROM salesman
+      WHERE tenant_id = ?
+        AND active = 1
+        AND phone IS NOT NULL
+        AND TRIM(phone) <> ''
+      ORDER BY name ASC
+    `).all(tenantId);
+
+    if (!salesmen || salesmen.length === 0) {
+      return res.json({ success: true, sent: 0, failed: 0, results: [], message: 'No active salesmen with phone numbers' });
+    }
+
+    // Prefer sending via tenant's default/admin WA Web session if ready.
+    let preferWeb = false;
+    try {
+      const status = getClientStatus(String(tenantId), fromSessionName);
+      preferWeb = !!status && status.status === 'ready';
+    } catch (_) {
+      preferWeb = false;
+    }
+
+    const results = [];
+    let sent = 0;
+    let failed = 0;
+
+    for (const s of salesmen) {
+      const phone = String(s.phone || '').trim();
+      if (!phone) continue;
+
+      try {
+        let messageId = null;
+        if (preferWeb) {
+          const r = await sendWebMessage(String(tenantId), phone, text, fromSessionName);
+          messageId = r?.messageId || r?.message_id || null;
+        }
+
+        if (!messageId) {
+          messageId = await sendMessage(phone, text, String(tenantId));
+        }
+
+        if (messageId) {
+          sent += 1;
+          results.push({ salesmanId: s.id, name: s.name, phone, success: true, messageId });
+        } else {
+          failed += 1;
+          results.push({ salesmanId: s.id, name: s.name, phone, success: false, error: 'send_failed' });
+        }
+      } catch (e) {
+        failed += 1;
+        results.push({ salesmanId: s.id, name: s.name, phone, success: false, error: e?.message || String(e) });
+      }
+
+      // Small delay to reduce risk of rate limiting / spiky load.
+      await new Promise(r => setTimeout(r, 120));
+    }
+
+    return res.json({ success: true, sent, failed, results });
+  } catch (error) {
+    console.error('Error broadcasting to salesmen:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

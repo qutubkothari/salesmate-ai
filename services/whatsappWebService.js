@@ -11,11 +11,28 @@ const puppeteer18 = require('puppeteer18');
 const fs = require('fs');
 const path = require('path');
 
-// Store active WhatsApp clients per tenant
+// Store active WhatsApp clients per tenant + session
+// key format: `${tenantId}:${sessionName}`
 const clients = new Map();
 const qrCodes = new Map();
 const clientStatus = new Map();
+const clientMeta = new Map();
 const tenantCache = new Map();
+
+function normalizeSessionName(sessionName) {
+    const raw = (sessionName == null || sessionName === '') ? 'default' : String(sessionName);
+    const cleaned = raw.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    return cleaned || 'default';
+}
+
+function makeClientKey(tenantId, sessionName) {
+    return `${String(tenantId)}:${normalizeSessionName(sessionName)}`;
+}
+
+function makeLocalAuthClientId(tenantId, sessionName) {
+    // LocalAuth uses this as a folder name; keep it filesystem-safe.
+    return makeClientKey(tenantId, sessionName).replace(/[:]/g, '_');
+}
 
 function safeToString(val) {
     try {
@@ -27,37 +44,51 @@ function safeToString(val) {
     }
 }
 
-async function destroyAndCleanupClient(tenantId, reason) {
+async function destroyAndCleanupClient(tenantId, sessionName = 'default', reason) {
+    // Backward-compat: older call sites used (tenantId, reason)
+    // If reason is missing and sessionName looks like a reason, shift args.
+    if (reason == null && typeof sessionName === 'string') {
+        const maybeReason = sessionName;
+        if (['timeout', 'error', 'auth_failed', 'disconnected'].includes(maybeReason)) {
+            reason = maybeReason;
+            sessionName = 'default';
+        }
+    }
+
+    const key = makeClientKey(tenantId, sessionName);
     try {
-        const existingClient = clients.get(tenantId);
+        const existingClient = clients.get(key);
         if (existingClient) {
             try {
                 await existingClient.destroy();
             } catch (e) {
-                console.warn(`[WA_WEB] Non-critical destroy error for tenant ${tenantId}:`, e?.message || e);
+                console.warn(`[WA_WEB] Non-critical destroy error for tenant ${tenantId} (${normalizeSessionName(sessionName)}):`, e?.message || e);
             }
         }
     } finally {
-        clients.delete(tenantId);
-        qrCodes.delete(tenantId);
+        clients.delete(key);
+        qrCodes.delete(key);
+        clientStatus.delete(key);
+        clientMeta.delete(key);
         tenantCache.delete(tenantId);
 
         // If initialization failed, wipe LocalAuth session so the next connect attempt can generate a fresh QR.
         // (Corrupted sessions can cause whatsapp-web.js to hang without emitting a QR.)
         if (reason === 'timeout' || reason === 'error' || reason === 'auth_failed') {
             try {
-                const sessionPath = path.join(process.cwd(), '.wwebjs_auth', `session-${tenantId}`);
+                const clientId = makeLocalAuthClientId(tenantId, sessionName);
+                const sessionPath = path.join(process.cwd(), '.wwebjs_auth', `session-${clientId}`);
                 if (fs.existsSync(sessionPath)) {
                     fs.rmSync(sessionPath, { recursive: true, force: true });
-                    console.log(`[WA_WEB] Removed LocalAuth session folder for tenant ${tenantId} due to ${reason}`);
+                    console.log(`[WA_WEB] Removed LocalAuth session folder for tenant ${tenantId} (${normalizeSessionName(sessionName)}) due to ${reason}`);
                 }
             } catch (e) {
-                console.warn(`[WA_WEB] Non-critical failed to remove LocalAuth session for tenant ${tenantId}:`, e?.message || e);
+                console.warn(`[WA_WEB] Non-critical failed to remove LocalAuth session for tenant ${tenantId} (${normalizeSessionName(sessionName)}):`, e?.message || e);
             }
         }
 
         if (reason) {
-            clientStatus.set(tenantId, reason);
+            clientStatus.set(key, reason);
         }
     }
 }
@@ -65,28 +96,30 @@ async function destroyAndCleanupClient(tenantId, reason) {
 /**
  * Initialize WhatsApp Web client for a tenant
  */
-async function initializeClient(tenantId) {
-    console.log(`[WA_WEB] Initializing client for tenant: ${tenantId}`);
+async function initializeClient(tenantId, sessionName = 'default', options = {}) {
+    const sn = normalizeSessionName(sessionName);
+    const key = makeClientKey(tenantId, sn);
+    console.log(`[WA_WEB] Initializing client for tenant: ${tenantId} session: ${sn}`);
     
     // Avoid creating duplicate clients for the same tenant.
-    if (clients.has(tenantId)) {
-        const status = clientStatus.get(tenantId) || 'not_initialized';
+    if (clients.has(key)) {
+        const status = clientStatus.get(key) || 'not_initialized';
 
         if (status === 'ready') {
-            console.log(`[WA_WEB] Client already initialized and ready for tenant: ${tenantId}`);
+            console.log(`[WA_WEB] Client already initialized and ready for tenant: ${tenantId} (${sn})`);
             return { success: true, status: 'ready' };
         }
 
         // If a client is already in-flight, return current status and let it continue.
         if (status === 'initializing' || status === 'qr_ready' || status === 'authenticated') {
-            console.log(`[WA_WEB] Client already exists for tenant ${tenantId} (status=${status}); reusing`);
+            console.log(`[WA_WEB] Client already exists for tenant ${tenantId} (${sn}) (status=${status}); reusing`);
             return { success: true, status };
         }
 
         // For terminal/error states, destroy old client before retrying.
         if (status === 'timeout' || status === 'error' || status === 'auth_failed' || status === 'disconnected') {
-            console.log(`[WA_WEB] Cleaning up previous client for tenant ${tenantId} (status=${status}) before re-init`);
-            await destroyAndCleanupClient(tenantId, 'disconnected');
+            console.log(`[WA_WEB] Cleaning up previous client for tenant ${tenantId} (${sn}) (status=${status}) before re-init`);
+            await destroyAndCleanupClient(tenantId, sn, 'disconnected');
         }
     }
 
@@ -107,9 +140,13 @@ async function initializeClient(tenantId) {
             console.warn(`[WA_WEB] Failed to preload tenant ${tenantId}:`, e?.message || e);
         }
 
+        clientMeta.set(key, {
+            salesmanId: options?.salesmanId != null ? String(options.salesmanId) : null
+        });
+
         const client = new Client({
             authStrategy: new LocalAuth({
-                clientId: tenantId,
+                clientId: makeLocalAuthClientId(tenantId, sn),
                 dataPath: path.join(process.cwd(), '.wwebjs_auth')
             }),
             puppeteer: {
@@ -138,22 +175,23 @@ async function initializeClient(tenantId) {
 
         // QR Code event
         client.on('qr', async (qr) => {
-            console.log(`[WA_WEB] QR Code generated for tenant: ${tenantId}`);
+            console.log(`[WA_WEB] QR Code generated for tenant: ${tenantId} session: ${sn}`);
             try {
                 const qrDataUrl = await qrcode.toDataURL(qr);
-                qrCodes.set(tenantId, qrDataUrl);
-                clientStatus.set(tenantId, 'qr_ready');
+                qrCodes.set(key, qrDataUrl);
+                clientStatus.set(key, 'qr_ready');
                 
                 // Save QR code to database
                 try {
-                    const sessionName = 'default';
+                    const meta = clientMeta.get(key) || {};
+                    const salesmanId = meta.salesmanId;
                     let existing = null;
                     try {
                         const r = await dbClient
                             .from('whatsapp_connections')
                             .select('*')
                             .eq('tenant_id', tenantId)
-                            .eq('session_name', sessionName)
+                            .eq('session_name', sn)
                             .single();
                         existing = r?.data || null;
                     } catch (e) {
@@ -167,6 +205,8 @@ async function initializeClient(tenantId) {
                             .update({
                                 qr_code: qrDataUrl,
                                 status: 'awaiting_scan',
+                                salesman_id: salesmanId || existing.salesman_id || null,
+                                provider: existing.provider || 'whatsapp_web',
                                 updated_at: new Date().toISOString()
                             })
                             .eq('id', existing.id);
@@ -175,9 +215,11 @@ async function initializeClient(tenantId) {
                             .from('whatsapp_connections')
                             .insert({
                                 tenant_id: tenantId,
-                                session_name: sessionName,
+                                session_name: sn,
                                 qr_code: qrDataUrl,
                                 status: 'awaiting_scan',
+                                salesman_id: salesmanId || null,
+                                provider: 'whatsapp_web',
                                 updated_at: new Date().toISOString()
                             });
                     }
@@ -191,9 +233,9 @@ async function initializeClient(tenantId) {
 
         // Ready event
         client.on('ready', async () => {
-            console.log(`[WA_WEB] Client ready for tenant: ${tenantId}`);
-            clientStatus.set(tenantId, 'ready');
-            qrCodes.delete(tenantId);
+            console.log(`[WA_WEB] Client ready for tenant: ${tenantId} session: ${sn}`);
+            clientStatus.set(key, 'ready');
+            qrCodes.delete(key);
             
             try {
                 // Get connected phone number
@@ -210,7 +252,8 @@ async function initializeClient(tenantId) {
                         connected_at: new Date().toISOString(),
                         updated_at: new Date().toISOString()
                     })
-                    .eq('tenant_id', tenantId);
+                    .eq('tenant_id', tenantId)
+                    .eq('session_name', sn);
                 
                 if (error) {
                     console.error(`[WA_WEB] Database update error for tenant ${tenantId}:`, error);
@@ -226,7 +269,7 @@ async function initializeClient(tenantId) {
         client.on('message', async (msg) => {
             try {
                 if (!msg || msg.fromMe) return;
-                if (clientStatus.get(tenantId) !== 'ready') return;
+                if (clientStatus.get(key) !== 'ready') return;
 
                 const body = typeof msg.body === 'string' ? msg.body.trim() : '';
                 if (!body) return;
@@ -343,15 +386,15 @@ async function initializeClient(tenantId) {
 
         // Authenticated event
         client.on('authenticated', () => {
-            console.log(`[WA_WEB] Client authenticated for tenant: ${tenantId}`);
-            clientStatus.set(tenantId, 'authenticated');
+            console.log(`[WA_WEB] Client authenticated for tenant: ${tenantId} session: ${sn}`);
+            clientStatus.set(key, 'authenticated');
         });
 
         // Disconnected event
         client.on('disconnected', async (reason) => {
-            console.log(`[WA_WEB] Client disconnected for tenant ${tenantId}:`, reason);
-            clientStatus.set(tenantId, 'disconnected');
-            await destroyAndCleanupClient(tenantId, 'disconnected');
+            console.log(`[WA_WEB] Client disconnected for tenant ${tenantId} session ${sn}:`, reason);
+            clientStatus.set(key, 'disconnected');
+            await destroyAndCleanupClient(tenantId, sn, 'disconnected');
             
             // Update database
             try {
@@ -361,19 +404,20 @@ async function initializeClient(tenantId) {
                         status: 'disconnected',
                         updated_at: new Date().toISOString()
                     })
-                    .eq('tenant_id', tenantId);
+                    .eq('tenant_id', tenantId)
+                    .eq('session_name', sn);
             } catch (dbErr) {
-                console.warn(`[WA_WEB] Non-critical DB update disconnected failed for ${tenantId}:`, dbErr?.message || dbErr);
+                console.warn(`[WA_WEB] Non-critical DB update disconnected failed for ${tenantId} (${sn}):`, dbErr?.message || dbErr);
             }
         });
 
         // Authentication failure event
         client.on('auth_failure', async (msg) => {
-            console.error(`[WA_WEB] Authentication failure for tenant ${tenantId}:`, msg);
-            clientStatus.set(tenantId, 'auth_failed');
+            console.error(`[WA_WEB] Authentication failure for tenant ${tenantId} session ${sn}:`, msg);
+            clientStatus.set(key, 'auth_failed');
 
             // Destroy the client so the next connect attempt can generate a fresh QR/session.
-            await destroyAndCleanupClient(tenantId, 'auth_failed');
+            await destroyAndCleanupClient(tenantId, sn, 'auth_failed');
             
             // Update database
             await dbClient
@@ -382,20 +426,21 @@ async function initializeClient(tenantId) {
                     status: 'auth_failed',
                     updated_at: new Date().toISOString()
                 })
-                .eq('tenant_id', tenantId);
+                .eq('tenant_id', tenantId)
+                .eq('session_name', sn);
         });
 
         // Store client
-        clients.set(tenantId, client);
-        clientStatus.set(tenantId, 'initializing');
+        clients.set(key, client);
+        clientStatus.set(key, 'initializing');
 
         // Initialize client with timeout to prevent hanging.
         // WA Web can legitimately take >30s (first load, slow network, or session restore).
         const initTimeoutMs = 120000; // 2 minutes
         const initTimeout = setTimeout(async () => {
-            console.error(`[WA_WEB] Initialization timeout for tenant ${tenantId} after ${initTimeoutMs}ms`);
-            clientStatus.set(tenantId, 'timeout');
-            await destroyAndCleanupClient(tenantId, 'timeout');
+            console.error(`[WA_WEB] Initialization timeout for tenant ${tenantId} (${sn}) after ${initTimeoutMs}ms`);
+            clientStatus.set(key, 'timeout');
+            await destroyAndCleanupClient(tenantId, sn, 'timeout');
 
             // Best-effort update DB so UI reflects reality.
             try {
@@ -405,9 +450,10 @@ async function initializeClient(tenantId) {
                         status: 'timeout',
                         updated_at: new Date().toISOString()
                     })
-                    .eq('tenant_id', tenantId);
+                    .eq('tenant_id', tenantId)
+                    .eq('session_name', sn);
             } catch (dbErr) {
-                console.warn(`[WA_WEB] Non-critical DB update timeout failed for ${tenantId}:`, dbErr?.message || dbErr);
+                console.warn(`[WA_WEB] Non-critical DB update timeout failed for ${tenantId} (${sn}):`, dbErr?.message || dbErr);
             }
         }, initTimeoutMs);
 
@@ -415,14 +461,14 @@ async function initializeClient(tenantId) {
             // Initialize in background - don't await to prevent API timeout
             client.initialize().then(() => {
                 clearTimeout(initTimeout);
-                console.log(`[WA_WEB] Client initialization complete for tenant ${tenantId}`);
+                console.log(`[WA_WEB] Client initialization complete for tenant ${tenantId} (${sn})`);
             }).catch((err) => {
                 clearTimeout(initTimeout);
-                console.error(`[WA_WEB] Client initialization failed for tenant ${tenantId}:`, err && err.stack ? err.stack : err);
-                clientStatus.set(tenantId, 'error');
+                console.error(`[WA_WEB] Client initialization failed for tenant ${tenantId} (${sn}):`, err && err.stack ? err.stack : err);
+                clientStatus.set(key, 'error');
 
                 // Destroy the client so future attempts can retry cleanly.
-                destroyAndCleanupClient(tenantId, 'error').catch(() => null);
+                destroyAndCleanupClient(tenantId, sn, 'error').catch(() => null);
             });
         } catch (err) {
             clearTimeout(initTimeout);
@@ -433,7 +479,7 @@ async function initializeClient(tenantId) {
 
     } catch (error) {
         console.error(`[WA_WEB] Error initializing client for tenant ${tenantId}:`, error);
-        clientStatus.set(tenantId, 'error');
+        clientStatus.set(key, 'error');
         return { success: false, error: error.message };
     }
 }
@@ -441,9 +487,11 @@ async function initializeClient(tenantId) {
 /**
  * Get QR code for tenant
  */
-function getQRCode(tenantId) {
-    const qr = qrCodes.get(tenantId);
-    const status = clientStatus.get(tenantId) || 'not_initialized';
+function getQRCode(tenantId, sessionName = 'default') {
+    const sn = normalizeSessionName(sessionName);
+    const key = makeClientKey(tenantId, sn);
+    const qr = qrCodes.get(key);
+    const status = clientStatus.get(key) || 'not_initialized';
     
     return {
         qrCode: qr || null,
@@ -454,27 +502,25 @@ function getQRCode(tenantId) {
 /**
  * Get client status
  */
-function getClientStatus(tenantId) {
+function getClientStatus(tenantId, sessionName = 'default') {
+    const sn = normalizeSessionName(sessionName);
+    const key = makeClientKey(tenantId, sn);
     return {
-        status: clientStatus.get(tenantId) || 'not_initialized',
-        hasClient: clients.has(tenantId)
+        status: clientStatus.get(key) || 'not_initialized',
+        hasClient: clients.has(key)
     };
 }
 
 /**
  * Disconnect client
  */
-async function disconnectClient(tenantId) {
-    console.log(`[WA_WEB] Disconnecting client for tenant: ${tenantId}`);
+async function disconnectClient(tenantId, sessionName = 'default') {
+    const sn = normalizeSessionName(sessionName);
+    const key = makeClientKey(tenantId, sn);
+    console.log(`[WA_WEB] Disconnecting client for tenant: ${tenantId} session: ${sn}`);
     
     try {
-        const client = clients.get(tenantId);
-        if (client) {
-            await client.destroy();
-            clients.delete(tenantId);
-            clientStatus.delete(tenantId);
-            qrCodes.delete(tenantId);
-        }
+        await destroyAndCleanupClient(tenantId, sn, 'disconnected');
 
         // Update database
         await dbClient
@@ -483,7 +529,8 @@ async function disconnectClient(tenantId) {
                 status: 'disconnected',
                 updated_at: new Date().toISOString()
             })
-            .eq('tenant_id', tenantId);
+            .eq('tenant_id', tenantId)
+            .eq('session_name', sn);
 
         return { success: true };
     } catch (error) {
@@ -495,14 +542,16 @@ async function disconnectClient(tenantId) {
 /**
  * Send text message via WhatsApp Web
  */
-async function sendWebMessage(tenantId, phoneNumber, message) {
-    const client = clients.get(tenantId);
+async function sendWebMessage(tenantId, phoneNumber, message, sessionName = 'default') {
+    const sn = normalizeSessionName(sessionName);
+    const key = makeClientKey(tenantId, sn);
+    const client = clients.get(key);
     
     if (!client) {
         throw new Error('WhatsApp client not initialized. Please connect via QR code first.');
     }
 
-    const status = clientStatus.get(tenantId);
+    const status = clientStatus.get(key);
     if (status !== 'ready') {
         throw new Error(`WhatsApp client not ready. Current status: ${status}`);
     }
@@ -539,7 +588,7 @@ async function sendWebMessage(tenantId, phoneNumber, message) {
         // Send message
         const sentMessage = await client.sendMessage(chatId, message);
         
-        console.log(`[WA_WEB] Message sent to ${phoneNumber} via tenant ${tenantId}`);
+        console.log(`[WA_WEB] Message sent to ${phoneNumber} via tenant ${tenantId} (${sn})`);
         
         return {
             success: true,
@@ -552,13 +601,15 @@ async function sendWebMessage(tenantId, phoneNumber, message) {
     }
 }
 
-async function ensureWebReadyAndRecipient(tenantId, phoneNumber) {
-    const client = clients.get(tenantId);
+async function ensureWebReadyAndRecipient(tenantId, phoneNumber, sessionName = 'default') {
+    const sn = normalizeSessionName(sessionName);
+    const key = makeClientKey(tenantId, sn);
+    const client = clients.get(key);
     if (!client) {
         throw new Error('WhatsApp client not initialized. Please connect via QR code first.');
     }
 
-    const status = clientStatus.get(tenantId);
+    const status = clientStatus.get(key);
     if (status !== 'ready') {
         throw new Error(`WhatsApp client not ready. Current status: ${status}`);
     }
@@ -633,12 +684,12 @@ function normalizeListPayload(payload) {
     return { body, buttonText, sections, title, footer };
 }
 
-async function sendWebButtonsMessage(tenantId, phoneNumber, payload) {
+async function sendWebButtonsMessage(tenantId, phoneNumber, payload, sessionName = 'default') {
     if (typeof Buttons !== 'function') {
         throw new Error('Buttons are not supported by this whatsapp-web.js build');
     }
 
-    const { client, chatId } = await ensureWebReadyAndRecipient(tenantId, phoneNumber);
+    const { client, chatId } = await ensureWebReadyAndRecipient(tenantId, phoneNumber, sessionName);
     const { body, buttons, title, footer } = normalizeButtonsPayload(payload);
 
     if (!body) throw new Error('buttons body/text is required');
@@ -650,12 +701,12 @@ async function sendWebButtonsMessage(tenantId, phoneNumber, payload) {
     return { success: true, messageId: sentMessage.id.id };
 }
 
-async function sendWebListMessage(tenantId, phoneNumber, payload) {
+async function sendWebListMessage(tenantId, phoneNumber, payload, sessionName = 'default') {
     if (typeof List !== 'function') {
         throw new Error('Lists are not supported by this whatsapp-web.js build');
     }
 
-    const { client, chatId } = await ensureWebReadyAndRecipient(tenantId, phoneNumber);
+    const { client, chatId } = await ensureWebReadyAndRecipient(tenantId, phoneNumber, sessionName);
     const { body, buttonText, sections, title, footer } = normalizeListPayload(payload);
 
     if (!body) throw new Error('list body/text is required');
@@ -672,44 +723,11 @@ async function sendWebListMessage(tenantId, phoneNumber, payload) {
 /**
  * Send image message via WhatsApp Web
  */
-async function sendWebImageMessage(tenantId, phoneNumber, caption, imageBase64OrUrl) {
-    const client = clients.get(tenantId);
-    
-    if (!client) {
-        throw new Error('WhatsApp client not initialized. Please connect via QR code first.');
-    }
-
-    const status = clientStatus.get(tenantId);
-    if (status !== 'ready') {
-        throw new Error(`WhatsApp client not ready. Current status: ${status}`);
-    }
-
-    // Global opt-out enforcement
-    try {
-        const { isUnsubscribed, toDigits } = require('./unsubscribeService');
-        const { isBypassNumber } = require('./outboundPolicy');
-        const digits = toDigits(phoneNumber);
-        if (digits) {
-            const bypass = await isBypassNumber(digits);
-            if (!bypass && (await isUnsubscribed(digits))) {
-                throw new Error('User unsubscribed');
-            }
-        }
-    } catch (e) {
-        if (String(e?.message || e).includes('User unsubscribed')) throw e;
-    }
+async function sendWebImageMessage(tenantId, phoneNumber, caption, imageBase64OrUrl, sessionName = 'default') {
+    const sn = normalizeSessionName(sessionName);
+    const { client, chatId } = await ensureWebReadyAndRecipient(tenantId, phoneNumber, sn);
 
     try {
-        const chatId = toWhatsAppFormat(phoneNumber);
-        if (!chatId) {
-            throw new Error('Invalid recipient phone number');
-        }
-
-        const isRegistered = await client.isRegisteredUser(chatId);
-        if (!isRegistered) {
-            throw new Error('Recipient is not registered on WhatsApp');
-        }
-        
         // Create media from base64 or URL
         let media;
         if (imageBase64OrUrl.startsWith('data:')) {
@@ -730,7 +748,7 @@ async function sendWebImageMessage(tenantId, phoneNumber, caption, imageBase64Or
         // Send message with media
         const sentMessage = await client.sendMessage(chatId, media, { caption: caption });
         
-        console.log(`[WA_WEB] Image message sent to ${phoneNumber} via tenant ${tenantId}`);
+        console.log(`[WA_WEB] Image message sent to ${phoneNumber} via tenant ${tenantId} (${sn})`);
         
         return {
             success: true,
@@ -746,44 +764,11 @@ async function sendWebImageMessage(tenantId, phoneNumber, caption, imageBase64Or
 /**
  * Send document message via WhatsApp Web
  */
-async function sendWebDocumentMessage(tenantId, phoneNumber, documentBase64OrBuffer, filename, caption = '') {
-    const client = clients.get(tenantId);
-
-    if (!client) {
-        throw new Error('WhatsApp client not initialized. Please connect via QR code first.');
-    }
-
-    const status = clientStatus.get(tenantId);
-    if (status !== 'ready') {
-        throw new Error(`WhatsApp client not ready. Current status: ${status}`);
-    }
-
-    // Global opt-out enforcement
-    try {
-        const { isUnsubscribed, toDigits } = require('./unsubscribeService');
-        const { isBypassNumber } = require('./outboundPolicy');
-        const digits = toDigits(phoneNumber);
-        if (digits) {
-            const bypass = await isBypassNumber(digits);
-            if (!bypass && (await isUnsubscribed(digits))) {
-                throw new Error('User unsubscribed');
-            }
-        }
-    } catch (e) {
-        if (String(e?.message || e).includes('User unsubscribed')) throw e;
-    }
+async function sendWebDocumentMessage(tenantId, phoneNumber, documentBase64OrBuffer, filename, caption = '', sessionName = 'default') {
+    const sn = normalizeSessionName(sessionName);
+    const { client, chatId } = await ensureWebReadyAndRecipient(tenantId, phoneNumber, sn);
 
     try {
-        const chatId = toWhatsAppFormat(phoneNumber);
-        if (!chatId) {
-            throw new Error('Invalid recipient phone number');
-        }
-
-        const isRegistered = await client.isRegisteredUser(chatId);
-        if (!isRegistered) {
-            throw new Error('Recipient is not registered on WhatsApp');
-        }
-
         const base64 = Buffer.isBuffer(documentBase64OrBuffer)
             ? documentBase64OrBuffer.toString('base64')
             : String(documentBase64OrBuffer || '');
@@ -795,7 +780,7 @@ async function sendWebDocumentMessage(tenantId, phoneNumber, documentBase64OrBuf
 
         const sentMessage = await client.sendMessage(chatId, media, caption ? { caption } : undefined);
 
-        console.log(`[WA_WEB] Document sent to ${phoneNumber} via tenant ${tenantId}`);
+        console.log(`[WA_WEB] Document sent to ${phoneNumber} via tenant ${tenantId} (${sn})`);
 
         return {
             success: true,
@@ -810,10 +795,12 @@ async function sendWebDocumentMessage(tenantId, phoneNumber, documentBase64OrBuf
 /**
  * Check if number is registered on WhatsApp
  */
-async function isRegisteredUser(tenantId, phoneNumber) {
-    const client = clients.get(tenantId);
+async function isRegisteredUser(tenantId, phoneNumber, sessionName = 'default') {
+    const sn = normalizeSessionName(sessionName);
+    const key = makeClientKey(tenantId, sn);
+    const client = clients.get(key);
     
-    if (!client || clientStatus.get(tenantId) !== 'ready') {
+    if (!client || clientStatus.get(key) !== 'ready') {
         return false;
     }
 
@@ -832,11 +819,13 @@ async function isRegisteredUser(tenantId, phoneNumber) {
  */
 function getAllConnections() {
     const connections = [];
-    for (const [tenantId, client] of clients.entries()) {
+    for (const [key, client] of clients.entries()) {
+        const [tenantId, sessionName] = String(key).split(':');
         connections.push({
             tenantId,
-            status: clientStatus.get(tenantId),
-            hasQR: qrCodes.has(tenantId)
+            sessionName: sessionName || 'default',
+            status: clientStatus.get(key),
+            hasQR: qrCodes.has(key)
         });
     }
     return connections;
@@ -851,7 +840,7 @@ async function autoInitializeConnectedClients() {
         
         const { data: connections, error } = await dbClient
             .from('whatsapp_connections')
-            .select('tenant_id, status')
+            .select('tenant_id, session_name, salesman_id, provider, status')
             .eq('status', 'connected');
         
         if (error) {
@@ -866,13 +855,14 @@ async function autoInitializeConnectedClients() {
         
         console.log(`[WA_WEB] Found ${connections.length} connected client(s), initializing...`);
         
-        // Initialize each connected tenant's client
+        // Initialize each connected session
         for (const conn of connections) {
-            console.log(`[WA_WEB] Auto-initializing client for tenant: ${conn.tenant_id}`);
+            const sn = normalizeSessionName(conn.session_name || 'default');
+            console.log(`[WA_WEB] Auto-initializing client for tenant: ${conn.tenant_id} session: ${sn}`);
             try {
-                await initializeClient(conn.tenant_id);
+                await initializeClient(conn.tenant_id, sn, { salesmanId: conn.salesman_id || null });
             } catch (error) {
-                console.error(`[WA_WEB] Failed to auto-initialize tenant ${conn.tenant_id}:`, error.message);
+                console.error(`[WA_WEB] Failed to auto-initialize tenant ${conn.tenant_id} (${sn}):`, error.message);
             }
         }
         

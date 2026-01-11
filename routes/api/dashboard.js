@@ -2,7 +2,7 @@
 // It must only query the 'conversations' table and never construct objects from customer_profiles or merge in a way that overwrites the id.
 const express = require('express');
 const router = express.Router();
-const { dbClient, USE_LOCAL_DB } = require('../../services/config');
+const { dbClient, USE_LOCAL_DB, db } = require('../../services/config');
 const { sendMessage } = require('../../services/whatsappService');
 const multer = require('multer');
 const DocumentIngestionService = require('../../services/documentIngestionService');
@@ -2300,14 +2300,16 @@ router.get('/products/:tenantId/performance', async (req, res) => {
 router.get('/analytics/:tenantId', async (req, res) => {
     try {
         const { tenantId } = req.params;
-        const { period = '30' } = req.query;
+        const rawPeriod = (req.query.days ?? req.query.period ?? '30');
+        const parsedPeriod = parseInt(String(rawPeriod), 10);
+        const period = [7, 30, 90].includes(parsedPeriod) ? parsedPeriod : 30;
 
         const startDate = new Date();
-        startDate.setDate(startDate.getDate() - parseInt(period));
+        startDate.setDate(startDate.getDate() - period);
 
         const { data: dailySales, error: salesError } = await dbClient
             .from('orders')
-            .select('total_amount, created_at')
+            .select('total_amount, subtotal_amount, gst_amount, shipping_charges, created_at, status, order_status, conversation_id')
             .eq('tenant_id', tenantId)
             .gte('created_at', startDate.toISOString())
             .order('created_at');
@@ -2315,9 +2317,24 @@ router.get('/analytics/:tenantId', async (req, res) => {
         if (salesError) throw salesError;
 
         const salesByDate = {};
+        let totalRevenue = 0;
+        let productRevenue = 0;
+        let shippingRevenue = 0;
+        let gstCollected = 0;
+        const orderCount = Array.isArray(dailySales) ? dailySales.length : 0;
+
         dailySales?.forEach(order => {
             const date = new Date(order.created_at).toDateString();
-            salesByDate[date] = (salesByDate[date] || 0) + order.total_amount;
+            const total = Number(order.total_amount || 0) || 0;
+            const sub = Number(order.subtotal_amount || 0) || 0;
+            const ship = Number(order.shipping_charges || 0) || 0;
+            const gst = Number(order.gst_amount || 0) || 0;
+
+            salesByDate[date] = (salesByDate[date] || 0) + total;
+            totalRevenue += total;
+            productRevenue += sub || Math.max(0, total - ship - gst);
+            shippingRevenue += ship;
+            gstCollected += gst;
         });
 
         const { data: customerActivity, error: activityError } = await dbClient
@@ -2338,14 +2355,138 @@ router.get('/analytics/:tenantId', async (req, res) => {
             activityByDate[date][msg.sender === 'user' ? 'customer' : 'bot']++;
         });
 
+        // Conversations for conversion rate (period)
+        const { data: convsPeriod } = await dbClient
+            .from('conversations')
+            .select('id, created_at, assigned_to, status, heat')
+            .eq('tenant_id', tenantId)
+            .gte('created_at', startDate.toISOString());
+
+        const conversationsCount = Array.isArray(convsPeriod) ? convsPeriod.length : 0;
+        const conversionRate = conversationsCount > 0 ? Math.round((orderCount / conversationsCount) * 1000) / 10 : 0;
+        const avgOrderValue = orderCount > 0 ? Math.round((totalRevenue / orderCount) * 100) / 100 : 0;
+
+        // Unassigned bucket (works in both local + hosted modes)
+        const convsArr = Array.isArray(convsPeriod) ? convsPeriod : [];
+        const isUnassigned = (v) => {
+            if (v === null || v === undefined) return true;
+            const s = String(v).trim();
+            return s === '' || s === '0' || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined';
+        };
+
+        const unassignedConvs = convsArr.filter(c => isUnassigned(c.assigned_to));
+        const unassignedConvIds = new Set(unassignedConvs.map(c => c.id));
+        const unassignedLeads = unassignedConvs.length;
+        const unassignedOpenLeads = unassignedConvs.reduce((sum, c) => sum + (String(c.status || '').toUpperCase() === 'OPEN' ? 1 : 0), 0);
+        const unassignedClosedLeads = unassignedLeads - unassignedOpenLeads;
+        const unassignedHeat = unassignedConvs.reduce((acc, c) => {
+            const h = String(c.heat || '').toUpperCase();
+            if (h && acc[h] !== undefined) acc[h] += 1;
+            return acc;
+        }, { ON_FIRE: 0, VERY_HOT: 0, HOT: 0, WARM: 0, COLD: 0 });
+
+        let unassignedOrders = 0;
+        let unassignedRevenue = 0;
+        (dailySales || []).forEach(o => {
+            if (!o || !o.conversation_id) return;
+            if (!unassignedConvIds.has(o.conversation_id)) return;
+            unassignedOrders += 1;
+            unassignedRevenue += Number(o.total_amount || 0) || 0;
+        });
+
+        const unassignedPerformance = {
+            id: 'unassigned',
+            name: 'Unassigned',
+            phone: null,
+            leads: unassignedLeads,
+            openLeads: unassignedOpenLeads,
+            closedLeads: unassignedClosedLeads,
+            orders: unassignedOrders,
+            revenue: Math.round(unassignedRevenue * 100) / 100,
+            conversionRate: unassignedLeads > 0 ? Math.round((unassignedOrders / unassignedLeads) * 1000) / 10 : 0,
+            heat: unassignedHeat
+        };
+
+        // Salesmen performance (best-effort; local SQLite only)
+        let salesmenPerformance = [];
+        if (USE_LOCAL_DB && db) {
+            try {
+                const startIso = startDate.toISOString();
+                const rows = db.prepare(`
+                    SELECT
+                        s.id AS salesman_id,
+                        s.name AS name,
+                        s.phone AS phone,
+                        COUNT(DISTINCT c.id) AS leads,
+                        SUM(CASE WHEN c.status = 'OPEN' THEN 1 ELSE 0 END) AS open_leads,
+                        SUM(CASE WHEN c.status IS NOT NULL AND c.status <> 'OPEN' THEN 1 ELSE 0 END) AS closed_leads,
+                        SUM(CASE WHEN c.heat = 'ON_FIRE' THEN 1 ELSE 0 END) AS heat_on_fire,
+                        SUM(CASE WHEN c.heat = 'VERY_HOT' THEN 1 ELSE 0 END) AS heat_very_hot,
+                        SUM(CASE WHEN c.heat = 'HOT' THEN 1 ELSE 0 END) AS heat_hot,
+                        SUM(CASE WHEN c.heat = 'WARM' THEN 1 ELSE 0 END) AS heat_warm,
+                        SUM(CASE WHEN c.heat = 'COLD' THEN 1 ELSE 0 END) AS heat_cold,
+                        COUNT(DISTINCT o.id) AS orders,
+                        COALESCE(SUM(COALESCE(o.total_amount, 0)), 0) AS revenue
+                    FROM salesman s
+                    LEFT JOIN conversations c
+                        ON c.tenant_id = s.tenant_id
+                        AND CAST(c.assigned_to AS TEXT) = CAST(s.id AS TEXT)
+                        AND COALESCE(c.created_at, c.last_activity_at, c.updated_at, '') >= ?
+                    LEFT JOIN orders o
+                        ON o.tenant_id = s.tenant_id
+                        AND o.conversation_id = c.id
+                        AND COALESCE(o.created_at, '') >= ?
+                    WHERE s.tenant_id = ?
+                        AND s.active = 1
+                    GROUP BY s.id
+                    ORDER BY revenue DESC, leads DESC, name ASC
+                `).all(startIso, startIso, tenantId);
+
+                salesmenPerformance = (rows || []).map(r => {
+                    const leads = Number(r.leads || 0) || 0;
+                    const orders = Number(r.orders || 0) || 0;
+                    const revenue = Number(r.revenue || 0) || 0;
+                    return {
+                        id: r.salesman_id,
+                        name: r.name || `Salesman #${r.salesman_id}`,
+                        phone: r.phone || null,
+                        leads,
+                        openLeads: Number(r.open_leads || 0) || 0,
+                        closedLeads: Number(r.closed_leads || 0) || 0,
+                        orders,
+                        revenue,
+                        conversionRate: leads > 0 ? Math.round((orders / leads) * 1000) / 10 : 0,
+                        heat: {
+                            ON_FIRE: Number(r.heat_on_fire || 0) || 0,
+                            VERY_HOT: Number(r.heat_very_hot || 0) || 0,
+                            HOT: Number(r.heat_hot || 0) || 0,
+                            WARM: Number(r.heat_warm || 0) || 0,
+                            COLD: Number(r.heat_cold || 0) || 0
+                        }
+                    };
+                });
+            } catch (e) {
+                salesmenPerformance = [];
+            }
+        }
+
         res.json({
             success: true,
             analytics: {
                 salesByDate,
                 activityByDate,
-                period: parseInt(period),
-                totalRevenue: Object.values(salesByDate).reduce((sum, amount) => sum + amount, 0),
-                totalMessages: customerActivity?.length || 0
+                period,
+                totalRevenue,
+                productRevenue: Math.round(productRevenue * 100) / 100,
+                shippingRevenue: Math.round(shippingRevenue * 100) / 100,
+                gstCollected: Math.round(gstCollected * 100) / 100,
+                avgOrderValue,
+                conversionRate,
+                // Legacy/compat keys
+                totalMessages: customerActivity?.length || 0,
+                // New
+                salesmenPerformance,
+                unassignedPerformance
             }
         });
     } catch (error) {
@@ -2531,7 +2672,64 @@ router.post('/conversation/:tenantId/:conversationId/reply', async (req, res) =>
             return res.status(400).json({ success: false, error: 'Conversation has no phone number' });
         }
 
-        const messageId = await sendMessage(to, text, tenantId);
+        // Premium/Enterprise multi-WhatsApp: try sending from the assigned salesman's WhatsApp Web session.
+        let messageId = null;
+        let routedSessionName = 'default';
+        let routedSalesmanId = null;
+        try {
+            routedSalesmanId = conversation.assigned_to != null ? String(conversation.assigned_to) : null;
+            const { sendWebMessage } = require('../../services/whatsappWebService');
+
+            // Prefer the assigned salesman's connected session.
+            if (routedSalesmanId) {
+                const { data: rows } = await dbClient
+                    .from('whatsapp_connections')
+                    .select('session_name, status, provider, updated_at, is_primary')
+                    .eq('tenant_id', tenantId)
+                    .eq('provider', 'whatsapp_web')
+                    .eq('salesman_id', routedSalesmanId)
+                    .order('is_primary', { ascending: false })
+                    .order('updated_at', { ascending: false })
+                    .limit(1);
+
+                const row = Array.isArray(rows) ? rows[0] : null;
+                if (row && String(row.status || '').toLowerCase() === 'connected') {
+                    routedSessionName = String(row.session_name || 'default');
+                    const r = await sendWebMessage(String(tenantId), to, text, routedSessionName);
+                    if (r?.success) {
+                        messageId = r.messageId || r.message_id || ('waweb_' + Date.now());
+                    }
+                }
+            }
+
+            // Fallback to primary connected session for tenant
+            if (!messageId) {
+                const { data: rows } = await dbClient
+                    .from('whatsapp_connections')
+                    .select('session_name, status, provider, updated_at, is_primary')
+                    .eq('tenant_id', tenantId)
+                    .eq('provider', 'whatsapp_web')
+                    .eq('status', 'connected')
+                    .order('is_primary', { ascending: false })
+                    .order('updated_at', { ascending: false })
+                    .limit(1);
+                const row = Array.isArray(rows) ? rows[0] : null;
+                if (row) {
+                    routedSessionName = String(row.session_name || 'default');
+                    const r = await sendWebMessage(String(tenantId), to, text, routedSessionName);
+                    if (r?.success) {
+                        messageId = r.messageId || r.message_id || ('waweb_' + Date.now());
+                    }
+                }
+            }
+        } catch (e) {
+            // Ignore and fall back to standard provider routing.
+        }
+
+        // Default provider routing (Maytapi or tenant default WA Web).
+        if (!messageId) {
+            messageId = await sendMessage(to, text, tenantId);
+        }
         if (!messageId) {
             return res.status(502).json({ success: false, error: 'Failed to send WhatsApp message' });
         }
@@ -2564,7 +2762,7 @@ router.post('/conversation/:tenantId/:conversationId/reply', async (req, res) =>
             .eq('id', conversationId)
             .eq('tenant_id', tenantId);
 
-        return res.json({ success: true, messageId });
+        return res.json({ success: true, messageId, routedSalesmanId, routedSessionName });
     } catch (err) {
         console.error('[dashboard.reply.exception]', err && err.stack ? err.stack : err);
         return res.status(500).json({ success: false, error: 'Failed to send reply' });

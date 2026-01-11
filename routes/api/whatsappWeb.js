@@ -25,7 +25,7 @@ function setNoCacheJson(res) {
  */
 router.post('/connect', async (req, res) => {
     try {
-        const { tenantId } = req.body;
+        const { tenantId, sessionName, salesmanId } = req.body;
 
         if (!tenantId) {
             return res.status(400).json({
@@ -34,9 +34,10 @@ router.post('/connect', async (req, res) => {
             });
         }
 
-        console.log('[WA_WEB_API] Initializing connection for tenant:', tenantId);
+        const sn = String(sessionName || 'default');
+        console.log('[WA_WEB_API] Initializing connection for tenant:', tenantId, 'session:', sn, 'salesmanId:', salesmanId || null);
 
-        const result = await initializeClient(tenantId);
+        const result = await initializeClient(tenantId, sn, { salesmanId: salesmanId || null });
 
         return res.json({
             success: result.success,
@@ -61,8 +62,9 @@ router.get('/qr/:tenantId', async (req, res) => {
     try {
         setNoCacheJson(res);
         const { tenantId } = req.params;
+        const sessionName = req.query.sessionName || 'default';
 
-        const result = getQRCode(tenantId);
+        const result = getQRCode(tenantId, sessionName);
 
         return res.json({
             success: true,
@@ -87,11 +89,12 @@ router.get('/status/:tenantId', async (req, res) => {
     try {
         setNoCacheJson(res);
         const { tenantId } = req.params;
+        const sessionName = req.query.sessionName || 'default';
 
         // Set response timeout to prevent hanging
         req.setTimeout(5000); // 5 second timeout
 
-        const result = getClientStatus(tenantId);
+        const result = getClientStatus(tenantId, sessionName);
 
         // Also get from database with timeout
         const { data: dbConnection, error: dbError } = await Promise.race([
@@ -99,6 +102,7 @@ router.get('/status/:tenantId', async (req, res) => {
                 .from('whatsapp_connections')
                 .select('*')
                 .eq('tenant_id', tenantId)
+                .eq('session_name', String(sessionName || 'default').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'default')
                 .single(),
             new Promise((_, reject) => 
                 setTimeout(() => reject(new Error('Database query timeout')), 3000)
@@ -131,7 +135,7 @@ router.get('/status/:tenantId', async (req, res) => {
  */
 router.post('/disconnect', async (req, res) => {
     try {
-        const { tenantId } = req.body;
+        const { tenantId, sessionName } = req.body;
 
         if (!tenantId) {
             return res.status(400).json({
@@ -140,9 +144,10 @@ router.post('/disconnect', async (req, res) => {
             });
         }
 
-        console.log('[WA_WEB_API] Disconnecting tenant:', tenantId);
+        const sn = String(sessionName || 'default');
+        console.log('[WA_WEB_API] Disconnecting tenant:', tenantId, 'session:', sn);
 
-        const result = await disconnectClient(tenantId);
+        const result = await disconnectClient(tenantId, sn);
 
         return res.json(result);
 
