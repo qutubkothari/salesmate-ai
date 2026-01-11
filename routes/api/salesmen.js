@@ -168,9 +168,9 @@ router.get('/:tenantId/:salesmanId/workload', (req, res) => {
     const { tenantId, salesmanId } = req.params;
 
     const activeLeads = db.prepare(`
-      SELECT c.*, cp.name, cp.phone
+      SELECT c.*, cp.name, cp.phone_number
       FROM conversations c
-      LEFT JOIN customer_profiles cp ON c.end_user_phone = cp.phone
+      LEFT JOIN customer_profiles cp ON c.end_user_phone = cp.phone_number
       WHERE c.tenant_id = ? AND c.assigned_to = ? AND c.status = 'OPEN'
       ORDER BY c.last_activity_at DESC
     `).all(tenantId, salesmanId);

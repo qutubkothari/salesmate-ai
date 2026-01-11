@@ -18,7 +18,7 @@ router.get('/:tenantId', (req, res) => {
     
     let query = `
       SELECT c.*, 
-             cp.name as lead_name, cp.phone as customer_phone,
+              cp.name as lead_name, cp.phone_number as customer_phone,
              s.name as salesman_name
       FROM calls c
       LEFT JOIN customer_profiles cp ON c.lead_id = cp.id
@@ -104,7 +104,7 @@ router.get('/:tenantId/scheduled-callbacks', (req, res) => {
     
     const callbacks = db.prepare(`
       SELECT c.*, 
-             cp.name as lead_name, cp.phone as customer_phone,
+             cp.name as lead_name, cp.phone_number as customer_phone,
              s.name as salesman_name
       FROM calls c
       LEFT JOIN customer_profiles cp ON c.lead_id = cp.id
@@ -165,8 +165,8 @@ router.post('/:tenantId', (req, res) => {
     
     // Update last_activity_at for conversation if linked
     if (conversation_id) {
-      db.prepare('UPDATE conversations SET last_activity_at = CURRENT_TIMESTAMP WHERE id = ?')
-        .run(conversation_id);
+      db.prepare('UPDATE conversations SET last_activity_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?')
+        .run(conversation_id, tenantId);
     }
     
     res.json({ success: true, call });

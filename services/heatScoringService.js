@@ -3,7 +3,7 @@
  * Analyzes messages to assign heat levels: COLD → WARM → HOT → VERY_HOT → ON_FIRE
  */
 
-const { getTenantDb } = require('./config');
+const { db } = require('./config');
 const openaiService = require('./openaiService');
 
 // Heat levels (matches SAK-SMS enum)
@@ -185,19 +185,19 @@ Respond in JSON:
  * @param {string[]} reasons
  */
 async function updateConversationHeat(tenantId, conversationId, newHeat, confidence, reasons = []) {
-  const db = getTenantDb(tenantId);
-  
   try {
     // Get current heat
-    const conversation = db.prepare('SELECT heat FROM conversations WHERE id = ?').get(conversationId);
+    const conversation = db
+      .prepare('SELECT heat FROM conversations WHERE id = ? AND tenant_id = ?')
+      .get(conversationId, tenantId);
     const oldHeat = conversation?.heat;
 
     // Update heat in conversations table
     db.prepare(`
       UPDATE conversations 
       SET heat = ?, ai_confidence = ?, last_activity_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(newHeat, confidence, conversationId);
+      WHERE id = ? AND tenant_id = ?
+    `).run(newHeat, confidence, conversationId, tenantId);
 
     // Log heat change event
     if (oldHeat && oldHeat !== newHeat) {
@@ -257,12 +257,10 @@ async function analyzeAndUpdateHeat(tenantId, conversationId, message, options =
  * @returns {Array}
  */
 function getConversationsByHeat(tenantId, heatLevel) {
-  const db = getTenantDb(tenantId);
-  
   return db.prepare(`
-    SELECT c.*, cp.name, cp.phone, cp.email
+    SELECT c.*, cp.name, cp.phone_number, cp.email
     FROM conversations c
-    LEFT JOIN customer_profiles cp ON c.end_user_phone = cp.phone
+    LEFT JOIN customer_profiles cp ON c.end_user_phone = cp.phone_number
     WHERE c.tenant_id = ? AND c.heat = ?
     ORDER BY c.last_activity_at DESC
   `).all(tenantId, heatLevel);
@@ -274,8 +272,6 @@ function getConversationsByHeat(tenantId, heatLevel) {
  * @returns {object}
  */
 function getHeatDistribution(tenantId) {
-  const db = getTenantDb(tenantId);
-  
   const distribution = db.prepare(`
     SELECT heat, COUNT(*) as count
     FROM conversations
@@ -306,14 +302,15 @@ function getHeatDistribution(tenantId) {
  */
 async function escalateHighHeatLead(tenantId, conversationId, heat) {
   if (heat === HEAT_LEVELS.ON_FIRE || heat === HEAT_LEVELS.VERY_HOT) {
-    const db = getTenantDb(tenantId);
-    
     // Check if already in triage
-    const existing = db.prepare('SELECT id FROM triage_queue WHERE conversation_id = ? AND status = ?')
-      .get(conversationId, 'open');
+    const existing = db
+      .prepare('SELECT id FROM triage_queue WHERE tenant_id = ? AND conversation_id = ? AND status = ?')
+      .get(tenantId, conversationId, 'open');
     
     if (!existing) {
-      const conversation = db.prepare('SELECT end_user_phone FROM conversations WHERE id = ?').get(conversationId);
+      const conversation = db
+        .prepare('SELECT end_user_phone FROM conversations WHERE id = ? AND tenant_id = ?')
+        .get(conversationId, tenantId);
       
       db.prepare(`
         INSERT INTO triage_queue (tenant_id, conversation_id, end_user_phone, type, status, created_at)

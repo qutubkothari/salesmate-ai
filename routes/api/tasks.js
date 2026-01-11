@@ -18,7 +18,7 @@ router.get('/:tenantId', (req, res) => {
     
     let query = `
       SELECT t.*, 
-             cp.name as lead_name, cp.phone as lead_phone,
+              cp.name as lead_name, cp.phone_number as lead_phone,
              s.name as salesman_name
       FROM tasks t
       LEFT JOIN customer_profiles cp ON t.lead_id = cp.id
@@ -70,7 +70,7 @@ router.get('/:tenantId/my-tasks', (req, res) => {
     
     const tasks = db.prepare(`
       SELECT t.*, 
-             cp.name as lead_name, cp.phone as lead_phone
+             cp.name as lead_name, cp.phone_number as lead_phone
       FROM tasks t
       LEFT JOIN customer_profiles cp ON t.lead_id = cp.id
       WHERE t.tenant_id = ? AND t.assigned_to = ? AND t.status != 'COMPLETED'

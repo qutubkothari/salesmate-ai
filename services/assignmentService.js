@@ -3,7 +3,7 @@
  * Implements: ROUND_ROBIN, LEAST_ACTIVE, SKILLS_BASED, GEOGRAPHIC
  */
 
-const { getTenantDb } = require('./config');
+const { db } = require('./config');
 
 // Assignment strategies
 const STRATEGIES = {
@@ -17,8 +17,6 @@ const STRATEGIES = {
  * Get assignment configuration for tenant
  */
 function getAssignmentConfig(tenantId) {
-  const db = getTenantDb(tenantId);
-  
   let config = db.prepare('SELECT * FROM assignment_config WHERE tenant_id = ?').get(tenantId);
   
   // Create default config if doesn't exist
@@ -38,8 +36,6 @@ function getAssignmentConfig(tenantId) {
  * Get all active salesmen for tenant
  */
 function getActiveSalesmen(tenantId) {
-  const db = getTenantDb(tenantId);
-  
   return db.prepare(`
     SELECT * FROM salesman
     WHERE tenant_id = ? AND active = 1
@@ -51,8 +47,6 @@ function getActiveSalesmen(tenantId) {
  * Get salesman's current workload
  */
 function getSalesmanWorkload(tenantId, salesmanId) {
-  const db = getTenantDb(tenantId);
-  
   const activeLeads = db.prepare(`
     SELECT COUNT(*) as count
     FROM conversations
@@ -67,7 +61,6 @@ function getSalesmanWorkload(tenantId, salesmanId) {
  * Assigns to next salesman in rotation, skipping overloaded ones
  */
 function assignRoundRobin(tenantId, conversationId, config) {
-  const db = getTenantDb(tenantId);
   const salesmen = getActiveSalesmen(tenantId);
   
   if (salesmen.length === 0) {
@@ -162,7 +155,6 @@ function assignLeastActive(tenantId, conversationId, config) {
  * Match product keywords or language to salesman skills
  */
 function assignSkillsBased(tenantId, conversationId, config) {
-  const db = getTenantDb(tenantId);
   const salesmen = getActiveSalesmen(tenantId);
   
   if (salesmen.length === 0) {
@@ -231,7 +223,6 @@ function assignSkillsBased(tenantId, conversationId, config) {
  * Match customer location to salesman territory
  */
 function assignGeographic(tenantId, conversationId, config) {
-  const db = getTenantDb(tenantId);
   const salesmen = getActiveSalesmen(tenantId);
   
   if (salesmen.length === 0) {
@@ -240,7 +231,7 @@ function assignGeographic(tenantId, conversationId, config) {
   
   // Get customer profile
   const conversation = db.prepare('SELECT end_user_phone FROM conversations WHERE id = ?').get(conversationId);
-  const customer = db.prepare('SELECT * FROM customer_profiles WHERE phone = ?').get(conversation?.end_user_phone);
+  const customer = db.prepare('SELECT * FROM customer_profiles WHERE phone_number = ?').get(conversation?.end_user_phone);
   
   if (!customer || !customer.address) {
     console.log('[Assignment] No customer location data, falling back to round-robin');
@@ -271,7 +262,6 @@ function assignGeographic(tenantId, conversationId, config) {
  * Assign conversation to salesman using configured strategy
  */
 async function assignConversation(tenantId, conversationId, options = {}) {
-  const db = getTenantDb(tenantId);
   const config = getAssignmentConfig(tenantId);
   
   // Check if already assigned
@@ -346,8 +336,6 @@ async function assignConversation(tenantId, conversationId, options = {}) {
  * Reassign conversation to different salesman
  */
 function reassignConversation(tenantId, conversationId, newSalesmanId, reason = '') {
-  const db = getTenantDb(tenantId);
-  
   const conversation = db.prepare('SELECT assigned_to FROM conversations WHERE id = ?').get(conversationId);
   const oldSalesmanId = conversation?.assigned_to;
   
