@@ -1,3 +1,4 @@
+## Deploy using the currently open file
 # Automated Salesmate Deployment to Hostinger VPS
 param(
     [string]$Message = "Deploy Salesmate"
