@@ -806,7 +806,16 @@ function ensureSqliteSchema(dbInstance) {
     // Tenant-level Maytapi credentials (optional)
     { name: 'maytapi_product_id', type: 'TEXT' },
     { name: 'maytapi_phone_id', type: 'TEXT' },
-    { name: 'maytapi_api_key', type: 'TEXT' }
+    { name: 'maytapi_api_key', type: 'TEXT' },
+    // Tenant-level Gmail OAuth + Pub/Sub (optional)
+    { name: 'gmail_connected_email', type: 'TEXT' },
+    { name: 'gmail_refresh_token', type: 'TEXT' },
+    { name: 'gmail_access_token', type: 'TEXT' },
+    { name: 'gmail_token_expiry', type: 'TEXT' },
+    { name: 'gmail_history_id', type: 'TEXT' },
+    { name: 'gmail_watch_expiry', type: 'TEXT' },
+    { name: 'gmail_oauth_state', type: 'TEXT' },
+    { name: 'gmail_oauth_state_created_at', type: 'TEXT' }
   ]);
 
   ensureColumns('inbound_messages', [
@@ -864,6 +873,8 @@ function ensureSqliteSchema(dbInstance) {
     { name: 'subject', type: 'TEXT' },
     { name: 'body', type: 'TEXT' },
     { name: 'received_at', type: 'TEXT' },
+    { name: 'message_id', type: 'TEXT' },
+    { name: 'thread_id', type: 'TEXT' },
     { name: 'raw', type: 'TEXT' },
     { name: 'created_at', type: "TEXT DEFAULT (DATETIME('now'))" }
   ]);
@@ -1205,6 +1216,7 @@ function ensureSqliteSchema(dbInstance) {
   tryExec(`CREATE INDEX IF NOT EXISTS idx_notifications_tenant_unread ON notifications(tenant_id, is_read);`);
   tryExec(`CREATE INDEX IF NOT EXISTS idx_tenant_bots_tenant ON tenant_bots(tenant_id);`);
   tryExec(`CREATE INDEX IF NOT EXISTS idx_email_enquiries_tenant_received ON email_enquiries(tenant_id, received_at);`);
+  tryExec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_enquiries_tenant_msg_unique ON email_enquiries(tenant_id, message_id);`);
 
   tryExec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_contact_groups_tenant_group_name ON contact_groups(tenant_id, group_name);`);
   tryExec(`CREATE INDEX IF NOT EXISTS idx_messages_tenant_created ON messages(tenant_id, created_at);`);
