@@ -8,96 +8,124 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="/features/_shared.css" />
   <style>
-    body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-    .email-item { transition: all 0.2s; border-left: 3px solid transparent; }
-    .email-item:hover { background: rgba(255,255,255,0.1); border-left-color: #fff; }
-    .email-item.selected { background: rgba(255,255,255,0.15); border-left-color: #fff; }
-    .badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
-    .badge-unread { background: rgba(239,68,68,0.9); color: #fff; }
-    .badge-assigned { background: rgba(34,197,94,0.9); color: #fff; }
-    .glass-card { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { 
+      height: 100%; 
+      overflow: hidden;
+      background: #f8fafc;
+      font-size: 15px;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+    .email-item { 
+      transition: all 0.2s; 
+      border-left: 3px solid transparent;
+      background: white;
+    }
+    .email-item:hover { 
+      background: #f1f5f9; 
+      border-left-color: #3b82f6;
+    }
+    .email-item.selected { 
+      background: #eff6ff; 
+      border-left-color: #3b82f6;
+    }
+    .badge { 
+      display: inline-block; 
+      padding: 4px 10px; 
+      border-radius: 12px; 
+      font-size: 11px; 
+      font-weight: 600;
+    }
+    .badge-unread { background: #ef4444; color: #fff; }
+    .badge-assigned { background: #22c55e; color: #fff; }
+    .content-wrapper {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
   </style>
 </head>
-<body class="min-h-screen">
+<body>
   <!-- Header -->
-  <div class="glass-card p-4 mb-4">
-    <div class="container mx-auto flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <i class="fas fa-envelope text-white text-2xl"></i>
-        <h1 class="text-2xl font-bold text-white">Email Management</h1>
-      </div>
+  <div class="bg-white border-b border-gray-200 px-6 py-4">
+    <div class="flex items-center gap-3">
+      <i class="fas fa-envelope text-blue-600 text-2xl"></i>
+      <h1 class="text-2xl font-bold text-gray-800">Email Management</h1>
     </div>
   </div>
 
-  <!-- Toolbar -->
-  <div class="glass-card p-4 mb-4">
-    <div class="container mx-auto flex flex-wrap items-center gap-4">
-      <button id="refreshBtn" class="px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30">
-        <i class="fas fa-sync-alt mr-2"></i>Refresh
-      </button>
-      <button id="deleteSelectedBtn" class="px-4 py-2 bg-red-500/80 text-white rounded-lg hover:bg-red-600 disabled:opacity-50" disabled>
-        <i class="fas fa-trash mr-2"></i>Delete Selected (<span id="selectedCount">0</span>)
-      </button>
-      <select id="assignToSales" class="px-4 py-2 bg-white/10 text-white rounded-lg border border-white/20" disabled>
-        <option value="">Assign to...</option>
-      </select>
-      <button id="assignBtn" class="px-4 py-2 bg-green-500/80 text-white rounded-lg hover:bg-green-600 disabled:opacity-50" disabled>
-        <i class="fas fa-user-check mr-2"></i>Assign
-      </button>
-      <div class="ml-auto flex items-center gap-2">
-        <input type="text" id="searchEmail" placeholder="Search emails..." class="px-4 py-2 bg-white/10 text-white placeholder-white/50 rounded-lg border border-white/20" />
-        <select id="filterStatus" class="px-4 py-2 bg-white/10 text-white rounded-lg border border-white/20">
-          <option value="all">All Status</option>
-          <option value="unread">Unread</option>
-          <option value="assigned">Assigned</option>
-          <option value="unassigned">Unassigned</option>
+  <div class="content-wrapper">
+    <!-- Toolbar -->
+    <div class="bg-white rounded-lg shadow-sm p-4 mb-4">
+      <div class="flex flex-wrap items-center gap-3">
+        <button id="refreshBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+          <i class="fas fa-sync-alt mr-2"></i>Refresh
+        </button>
+        <button id="deleteSelectedBtn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium" disabled>
+          <i class="fas fa-trash mr-2"></i>Delete (<span id="selectedCount">0</span>)
+        </button>
+        <select id="assignToSales" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg disabled:opacity-50 font-medium" disabled>
+          <option value="">Assign to...</option>
         </select>
+        <button id="assignBtn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium" disabled>
+          <i class="fas fa-user-check mr-2"></i>Assign
+        </button>
+        <div class="ml-auto flex items-center gap-2">
+          <input type="text" id="searchEmail" placeholder="Search emails..." class="px-4 py-2 bg-white border border-gray-300 text-gray-700 placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+          <select id="filterStatus" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium">
+            <option value="all">All Status</option>
+            <option value="unread">Unread</option>
+            <option value="assigned">Assigned</option>
+            <option value="unassigned">Unassigned</option>
+          </select>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Email List -->
-  <div class="container mx-auto px-6 pb-6">
-    <div class="glass-card rounded-lg">
+    <!-- Email List -->
+    <div class="bg-white rounded-lg shadow-sm">
       <!-- Email Header -->
-      <div class="p-4 border-b border-gray-700 flex items-center gap-4">
-        <input type="checkbox" id="selectAll" class="w-4 h-4 rounded" />
-        <div class="flex-1 grid grid-cols-12 gap-4 text-sm font-semibold text-gray-400">
-          <div class="col-span-1">Statwhite/10 flex items-center gap-4">
-        <input type="checkbox" id="selectAll" class="w-4 h-4 rounded" />
-        <div class="flex-1 grid grid-cols-12 gap-4 text-sm font-semibold text-white/7
+      <div class="p-4 border-b border-gray-200 flex items-center gap-4 bg-gray-50">
+        <input type="checkbox" id="selectAll" class="w-5 h-5 rounded border-gray-300" />
+        <div class="flex-1 grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
+          <div class="col-span-1">Status</div>
+          <div class="col-span-3">From</div>
+          <div class="col-span-4">Subject</div>
           <div class="col-span-2">Assigned To</div>
           <div class="col-span-2">Date</div>
         </div>
       </div>
 
       <!-- Email Items -->
-      <div id="emailList" class="divide-y divide-white/10">
+      <div id="emailList" class="divide-y divide-gray-100">
         <!-- Loading state -->
-        <div id="loadingState" class="p-8 text-center text-white/70">
-          <i class="fas fa-spinner fa-spin text-3xl mb-4"></i>
-          <p>Loading emails...</p>
+        <div id="loadingState" class="p-12 text-center text-gray-500">
+          <i class="fas fa-spinner fa-spin text-4xl mb-4 text-blue-600"></i>
+          <p class="text-lg">Loading emails...</p>
         </div>
         <!-- Empty state (hidden initially) -->
-        <div id="emptyState" class="p-8 text-center text-white/70 hidden">
-          <i class="fas fa-inbox text-5xl mb-4 opacity-50"></i>
-          <p class="text-lg">No emails found</p>
-          <p class="text-sm mt-2">Configure your email integration to start receiving emails</p>
+        <div id="emptyState" class="p-12 text-center text-gray-500 hidden">
+          <i class="fas fa-inbox text-6xl mb-4 text-gray-300"></i>
+          <p class="text-xl font-medium text-gray-700">No emails found</p>
+          <p class="text-base mt-2">Configure your email integration to start receiving emails</p>
         </div>
       </div>
     </div>
 
     <!-- Pagination -->
-    <div id="pagination" class="mt-6 flex items-center justify-between text-white/70 hidden">
-      <div>
+    <div id="pagination" class="mt-6 flex items-center justify-between text-gray-600 bg-white rounded-lg shadow-sm p-4 hidden">
+      <div class="font-medium">
         Showing <span id="showingFrom">0</span> to <span id="showingTo">0</span> of <span id="totalEmails">0</span> emails
       </div>
-      <div class="flex items-center gap-2">
-        <button id="prevPage" class="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 disabled:opacity-50 text-white" disabled>
+      <div class="flex items-center gap-3">
+        <button id="prevPage" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium" disabled>
           <i class="fas fa-chevron-left"></i>
         </button>
-        <span id="currentPage">1</span> / <span id="totalPages">1</span>
-        <button id="nextPage" class="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 disabled:opacity-50 text-white" disabled>
+        <span class="font-medium"><span id="currentPage">1</span> / <span id="totalPages">1</span></span>
+        <button id="nextPage" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium" disabled>
           <i class="fas fa-chevron-right"></i>
         </button>
       </div>
@@ -225,8 +253,8 @@
       
       let filtered = allEmails.filter(email => {
         const matchesSearch = !searchTerm || 
-          email.from.toLowerCase().includes(searchTerm) ||
-          email.subject.toLowerCase().includes(searchTerm);
+          (email.sender || '').toLowerCase().includes(searchTerm) ||
+          (email.subject || '').toLowerCase().includes(searchTerm);
         
         const matchesStatus = statusFilter === 'all' ||
           (statusFilter === 'unread' && !email.read) ||
@@ -261,18 +289,18 @@
       
       div.innerHTML = `
         <div class="flex items-center gap-4">
-          <input type="checkbox" class="email-checkbox w-4 h-4 rounded" data-email-id="${email.id}" />
-          <div class="flex-1 grid grid-cols-12 gap-4 items-center text-sm">
-            <div class="col-span-1">
+          <input type="checkbox" class="email-checkbox w-5 h-5 rounded border-gray-300" data-email-id="${email.id}" />
+          <div class="flex-1 grid grid-cols-12 gap-4 items-center text-base">
+            <div class="col-span-1 flex gap-1">
               ${!email.read ? '<span class="badge badge-unread">New</span>' : ''}
               ${email.assigned_to ? '<span class="badge badge-assigned">Assigned</span>' : ''}
             </div>
-            <div class="col-span-3 text-white truncate">${escapeHtml(email.from)}</div>
-            <div class="col-span-4 text-gray-300 truncate font-medium">${escapeHtml(email.subject)}</div>
-            <div class="col-span-2 text-gray-400 truncate">
-              ${assignedPerson ? assignedPerson.name : '<span class="text-gray-500">Unassigned</span>'}
+            <div class="col-span-3 text-gray-800 truncate font-medium">${escapeHtml(email.sender)}</div>
+            <div class="col-span-4 text-gray-700 truncate font-medium">${escapeHtml(email.subject)}</div>
+            <div class="col-span-2 text-gray-600 truncate">
+              ${assignedPerson ? assignedPerson.name : '<span class="text-gray-400">Unassigned</span>'}
             </div>
-            <div class="col-span-2 text-gray-400">${formatDate(email.received_at)}</div>
+            <div class="col-span-2 text-gray-500">${formatDate(email.received_at)}</div>
           </div>
         </div>
       `;
