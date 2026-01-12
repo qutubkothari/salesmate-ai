@@ -143,12 +143,17 @@ Your Salesmate application now has a **complete enterprise-grade multi-user auth
 
 ## 🚀 How to Get Started
 
-### Step 1: Run Migration
-```bash
-# On your server
-cd /root/salesmate
+### Step 1: Run Migration (Local Database)
+```powershell
+# On your local machine where SQLite DB is located
+cd C:\Users\QK\Documents\GitHub\salesmate
 sqlite3 salesmate.db < migrations/001_multi_user_support.sql
+
+# Or use PowerShell with Get-Content:
+Get-Content migrations/001_multi_user_support.sql | sqlite3 salesmate.db
 ```
+
+**Important:** Your database is **local SQLite**, not on the remote server. Run migration locally before deploying code.
 
 ### Step 2: Invite First Admin
 ```bash
@@ -400,8 +405,10 @@ pm2 logs salesmate        # Application logs
 sqlite3 salesmate.db      # Database queries
 ```
 
-### Common Commands
-```bash
+### Common Commands (Local SQLite)
+```powershell
+# All commands run on your local machine where salesmate.db is located
+
 # Check user sessions
 sqlite3 salesmate.db "SELECT * FROM user_sessions WHERE is_active = 1;"
 
@@ -413,6 +420,10 @@ sqlite3 salesmate.db "DELETE FROM user_sessions WHERE expires_at < datetime('now
 
 # Deactivate user
 sqlite3 salesmate.db "UPDATE sales_users SET is_active = 0 WHERE email = 'user@email.com';"
+
+# Or use PowerShell-friendly format:
+$db = "C:\Users\QK\Documents\GitHub\salesmate\salesmate.db"
+sqlite3 $db "SELECT * FROM user_sessions WHERE is_active = 1;"
 ```
 
 ---

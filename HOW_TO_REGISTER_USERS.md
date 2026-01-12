@@ -16,21 +16,20 @@ You now have a **complete multi-user authentication system** with role-based acc
 
 Before you can start inviting users, you need to update your database schema:
 
-### On Your Server (Hostinger VPS):
+### On Your Local Machine (Where SQLite DB is):
 
-```bash
-# Connect to your server via SSH
-ssh root@your-vps-ip
+```powershell
+# Navigate to your project directory
+cd C:\Users\QK\Documents\GitHub\salesmate
 
-# Navigate to your app directory
-cd /root/salesmate
-
-# Run the migration
+# Run the migration on your local SQLite database
 sqlite3 salesmate.db < migrations/001_multi_user_support.sql
 
-# Verify the migration
+# Verify the migration worked
 sqlite3 salesmate.db "SELECT * FROM sqlite_master WHERE type='table' AND name='user_sessions';"
 ```
+
+**Note:** Your database is **local SQLite**, so the migration runs on your development machine, not on the remote server.
 
 ### Expected Output:
 You should see confirmation that the following tables were created or modified:
@@ -49,10 +48,11 @@ Since you don't have a UI for user management yet, use these API calls to get st
 ### Option A: Using cURL (from terminal)
 
 ```bash
-# First, get your tenant ID and web_auth_token from tenants table
+# First, get your tenant ID and web_auth_token from local SQLite database
 sqlite3 salesmate.db "SELECT id, web_auth_token FROM tenants LIMIT 1;"
 
 # Then invite a tenant admin (replace YOUR_TOKEN with actual token)
+# Use localhost:8081 for local dev or salesmate.saksolution.com for production
 curl -X POST http://localhost:8081/api/users/invite \
   -H "Content-Type: application/json" \
   -H "x-auth-token: YOUR_WEB_AUTH_TOKEN" \
