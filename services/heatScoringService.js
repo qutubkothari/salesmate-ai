@@ -156,9 +156,9 @@ Respond in JSON:
 }`;
 
     const aiResponse = await openaiService.getChatCompletion(
-      tenantId,
       [{ role: 'user', content: prompt }],
-      { temperature: 0.3, max_tokens: 300 }
+      'gpt-3.5-turbo',
+      0.3
     );
 
     const result = JSON.parse(aiResponse);

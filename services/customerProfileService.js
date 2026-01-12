@@ -2,8 +2,9 @@
 const { dbClient } = require('./config');
 const { normalizePhone, toWhatsAppFormat } = require('../utils/phoneUtils');
 
-const USE_LOCAL_DB = process.env.USE_LOCAL_DB === 'true';
-const CUSTOMER_PHONE_COL = USE_LOCAL_DB ? 'phone_number' : 'phone';
+// ALWAYS use local SQLite now (Supabase deprecated)
+const USE_LOCAL_DB = true;
+const CUSTOMER_PHONE_COL = 'phone_number';
 
 function normalizeCustomerRow(row) {
     if (!row || typeof row !== 'object') return row;
