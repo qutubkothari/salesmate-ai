@@ -901,6 +901,7 @@ function ensureSqliteSchema(dbInstance) {
     { name: 'thread_id', type: 'TEXT' },
     { name: 'lead_conversation_id', type: 'TEXT' },
     { name: 'lead_customer_profile_id', type: 'TEXT' },
+    { name: 'assigned_to', type: 'TEXT' },
     { name: 'lead_created_at', type: 'TEXT' },
     { name: 'raw', type: 'TEXT' },
     { name: 'created_at', type: "TEXT DEFAULT (DATETIME('now'))" }

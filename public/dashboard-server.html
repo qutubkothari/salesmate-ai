@@ -167,14 +167,6 @@
                         <i class="fas fa-user-tag"></i>
                         <span>Leads</span>
                     </div>
-                    <div class="sidebar-item" onclick="switchTab('email')" data-tab="email">
-                        <i class="fas fa-envelope"></i>
-                        <span>Email</span>
-                    </div>
-                    <div class="sidebar-item" onclick="switchTab('interactive')" data-tab="interactive">
-                        <i class="fas fa-hand-pointer"></i>
-                        <span>Interactive</span>
-                    </div>
                     <div class="sidebar-item" onclick="switchTab('triage')" data-tab="triage">
                         <i class="fas fa-life-ring"></i>
                         <span>Triage</span>
@@ -1710,8 +1702,6 @@
                 case 'whatsapp-web': await loadWhatsAppWeb(); break;
                 case 'followups': await loadFollowUps(); break;
                 case 'leads': await loadLeads(); break;
-                case 'email': await loadEmailTab(); break;
-                case 'interactive': await loadInteractiveTab(); break;
                 case 'triage': await loadTriage(); break;
                 case 'customers': 
                     content.classList.add('hidden');
@@ -5730,22 +5720,6 @@
         } catch (err) {
             showNotification(err.message || String(err), 'error');
         }
-    }
-
-    // ---------- Email Functions ----------
-    async function loadEmailTab() {
-        const content = document.getElementById('tabContent');
-        const token = encodeURIComponent(state.session.token || '');
-        const tenantId = encodeURIComponent(state.session.tenantId || '');
-        content.innerHTML = `<iframe src="/features/email.html?token=${token}&tenantId=${tenantId}" style="width:100%;height:calc(100vh - 80px);border:none;"></iframe>`;
-    }
-
-    // ---------- Interactive Messages Functions ----------
-    async function loadInteractiveTab() {
-        const content = document.getElementById('tabContent');
-        const token = encodeURIComponent(state.session.token || '');
-        const tenantId = encodeURIComponent(state.session.tenantId || '');
-        content.innerHTML = `<iframe src="/features/interactive.html?token=${token}&tenantId=${tenantId}" style="width:100%;height:calc(100vh - 80px);border:none;"></iframe>`;
     }
 
     // ---------- Triage Functions ----------

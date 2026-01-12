@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAK Feature: Interactive Messages</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="/features/_shared.css" />
+  <style>
+    body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .message-card { transition: all 0.2s; border-left: 3px solid transparent; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); }
+    .message-card:hover { background: rgba(255,255,255,0.15); border-left-color: #fff; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+    .badge-pending { background: rgba(251,191,36,0.9); color: #fff; }
+    .badge-replied { background: rgba(34,197,94,0.9); color: #fff; }
+    .badge-expired { background: rgba(107,114,128,0.9); color: #fff; }
+    .glass-card { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); }
+  </style>
+</head>
+<body class="min-h-screen">
+  <!-- Header -->
+  <div class="glass-card p-4 mb-4">
+    <div class="container mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <i class="fas fa-hand-pointer text-white text-2xl"></i>
+        <h1 class="text-2xl font-bold text-white">Interactive Messages</h1>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="glass-card p-4 mb-4">
+    <div class="container mx-auto flex flex-wrap items-center gap-4">
+      <button id="refreshBtn" class="px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30">
+        <i class="fas fa-sync-alt mr-2"></i>Refresh
+      </button>
+      <button id="createNewBtn" class="px-4 py-2 bg-green-500/80 text-white rounded-lg hover:bg-green-600">
+        <i class="fas fa-plus mr-2"></i>New Interactive Message
+      </button>
+      <div class="ml-auto flex items-center gap-2">
+        <input type="text" id="searchMessage" placeholder="Search messages..." class="px-4 py-2 bg-white/10 text-white placeholder-white/50 rounded-lg border border-white/20" />
+        <select id="filterStatus" class="px-4 py-2 bg-white/10 text-white rounded-lg border border-white/20">
+          <option value="all">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="replied">Replied</option>
+          <option value="expired">Expired</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Message List -->
+  <div class="container mx-auto px-6 pb-6">
+    <div class="grid gap-4">
+      <!-- Loading state -->
+      <div id="loadingState" class="glass-card rounded-lg p-8 text-center text-white/70">
+        <i class="fas fa-spinner fa-spin text-3xl mb-4"></i>
+        <p>Loading interactive messages...</p>
+      </div>
+      
+      <!-- Empty state (hidden initially) -->
+      <div id="emptyState" class="glass-card rounded-lg p-8 text-center text-white/70 hidden">
+        <i class="fas fa-comments text-5xl mb-4 opacity-50"></i>
+        <p class="text-lg">No interactive messages found</p>
+        <p class="text-sm mt-2">Create your first interactive message to engage with customers</p>
+      </div>
+      
+      <!-- Message cards container -->
+      <div id="messageList"></div>
+    </div>
+
+    <!-- Pagination -->
+    <div id="pagination" class="mt-6 flex items-center justify-between text-white/70 hidden">
+      <div>
+        Showing <span id="showingFrom">0</span> to <span id="showingTo">0</span> of <span id="totalMessages">0</span> messages
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="prevPage" class="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 disabled:opacity-50 text-white" disabled>
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        <span id="currentPage">1</span> / <span id="totalPages">1</span>
+        <button id="nextPage" class="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 disabled:opacity-50 text-white" disabled>
+          <i class="fas fa-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create/Edit Modal -->
+  <div id="messageModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="glass-card rounded-lg p-6 w-full max-w-2xl mx-4">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-bold text-white">
+          <i class="fas fa-hand-pointer mr-2"></i>
+          <span id="modalTitle">New Interactive Message</span>
+        </h2>
+        <button id="closeModal" class="text-gray-400 hover:text-white">
+          <i class="fas fa-times text-xl"></i>
+        </button>
+      </div>
+
+      <form id="messageForm" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-white/90 mb-2">Message Type</label>
+          <select id="messageType" class="w-full px-4 py-2 bg-white/10 text-white rounded-lg border border-white/20" required>
+            <option value="list">List Message</option>
+            <option value="buttons">Button Message</option>
+            <option value="quick_reply">Quick Reply</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-white/90 mb-2">Recipients (comma-separated phone numbers)</label>
+          <textarea id="recipients" class="w-full px-4 py-2 bg-white/10 text-white rounded-lg border border-white/20 placeholder-white/50" rows="3" placeholder="919876543210, 919876543211" required></textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-white/90 mb-2">Message Body</label>
+          <textarea id="messageBody" class="w-full px-4 py-2 bg-white/10 text-white rounded-lg border border-white/20 placeholder-white/50" rows="4" placeholder="Enter your message text..." required></textarea>
+        </div>
+
+        <div id="optionsContainer">
+          <label class="block text-sm font-medium text-white/90 mb-2">Options (JSON format)</label>
+          <textarea id="messageOptions" class="w-full px-4 py-2 bg-white/10 text-white rounded-lg border border-white/20 placeholder-white/50 font-mono text-sm" rows="6" placeholder='{"buttons": [{"type": "reply", "title": "Option 1"}]}'></textarea>
+          <p class="text-xs text-white/50 mt-1">Enter button/list options in JSON format</p>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-4">
+          <button type="button" id="cancelBtn" class="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20">
+            Cancel
+          </button>
+          <button type="submit" class="px-4 py-2 bg-white/30 text-white rounded-lg hover:bg-white/40">
+            <i class="fas fa-paper-plane mr-2"></i>Send Message
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let allMessages = [];
+    let currentPage = 1;
+    const itemsPerPage = 12;
+    let editingMessageId = null;
+
+    // Get session from localStorage
+    function getSession() {
+      const sessionStr = localStorage.getItem('dashboardSession');
+      if (!sessionStr) return null;
+      try {
+        return JSON.parse(sessionStr);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // Get token from URL params or session
+    function getAuthToken() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tokenFromUrl = urlParams.get('token');
+      if (tokenFromUrl) return tokenFromUrl;
+
+      const session = getSession();
+      // Use tenantId as the auth token since there's no separate token
+      return session?.tenantId || '';
+    }
+
+    function getTenantId() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tenantIdFromUrl = urlParams.get('tenantId');
+      if (tenantIdFromUrl) return tenantIdFromUrl;
+
+      const session = getSession();
+      return session?.tenantId || session?.tenant_id || '';
+    }
+
+    // Initialize
+    async function init() {
+      await loadMessages();
+      setupEventListeners();
+    }
+
+    async function loadMessages() {
+      try {
+        document.getElementById('loadingState').classList.remove('hidden');
+        document.getElementById('emptyState').classList.add('hidden');
+        
+        const response = await fetch('/api/interactive/list', {
+          headers: { 
+            'Authorization': `Bearer ${getAuthToken()}`,
+            'X-Tenant-Id': getTenantId()
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          allMessages = data.messages || [];
+          renderMessages();
+        } else {
+          showError('Failed to load messages');
+        }
+      } catch (error) {
+        console.error('Error loading messages:', error);
+        showError('Error loading messages');
+      } finally {
+        document.getElementById('loadingState').classList.add('hidden');
+      }
+    }
+
+    function renderMessages() {
+      const messageList = document.getElementById('messageList');
+      const emptyState = document.getElementById('emptyState');
+      
+      // Clear existing
+      messageList.innerHTML = '';
+      
+      if (allMessages.length === 0) {
+        emptyState.classList.remove('hidden');
+        return;
+      }
+      
+      emptyState.classList.add('hidden');
+      
+      // Apply filters
+      const searchTerm = document.getElementById('searchMessage').value.toLowerCase();
+      const statusFilter = document.getElementById('filterStatus').value;
+      
+      let filtered = allMessages.filter(msg => {
+        const matchesSearch = !searchTerm || 
+          msg.body.toLowerCase().includes(searchTerm) ||
+          msg.type.toLowerCase().includes(searchTerm);
+        
+        const matchesStatus = statusFilter === 'all' || msg.status === statusFilter;
+        
+        return matchesSearch && matchesStatus;
+      });
+      
+      // Pagination
+      const totalPages = Math.ceil(filtered.length / itemsPerPage);
+      const start = (currentPage - 1) * itemsPerPage;
+      const end = start + itemsPerPage;
+      const pageMessages = filtered.slice(start, end);
+      
+      // Render each message
+      pageMessages.forEach(msg => {
+        const card = createMessageCard(msg);
+        messageList.appendChild(card);
+      });
+      
+      // Update pagination
+      updatePagination(filtered.length, totalPages);
+    }
+
+    function createMessageCard(msg) {
+      const div = document.createElement('div');
+      div.className = 'message-card bg-gray-800 rounded-lg border border-gray-700 p-6';
+      
+      const statusBadge = getStatusBadge(msg.status);
+      
+      div.innerHTML = `
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <div class="flex items-center gap-3 mb-2">
+              <i class="fas fa-${getTypeIcon(msg.type)} text-purple-400"></i>
+              <h3 class="text-lg font-semibold text-white">${escapeHtml(msg.type)}</h3>
+              ${statusBadge}
+            </div>
+            <p class="text-sm text-gray-400">
+              <i class="far fa-calendar mr-1"></i>
+              ${formatDate(msg.created_at)}
+            </p>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="viewStats('${msg.id}')" class="px-3 py-1 bg-gray-700 text-white rounded hover:bg-gray-600 text-sm">
+              <i class="fas fa-chart-bar mr-1"></i>Stats
+            </button>
+            <button onclick="deleteMessage('${msg.id}')" class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>
+        
+        <div class="bg-gray-900 rounded-lg p-4 mb-4">
+          <p class="text-gray-300">${escapeHtml(msg.body)}</p>
+        </div>
+        
+        <div class="grid grid-cols-3 gap-4 text-sm text-gray-400">
+          <div>
+            <span class="block text-gray-500">Recipients</span>
+            <span class="text-white font-medium">${msg.recipient_count || 0}</span>
+          </div>
+          <div>
+            <span class="block text-gray-500">Responses</span>
+            <span class="text-white font-medium">${msg.response_count || 0}</span>
+          </div>
+          <div>
+            <span class="block text-gray-500">Response Rate</span>
+            <span class="text-white font-medium">${calculateResponseRate(msg)}%</span>
+          </div>
+        </div>
+      `;
+      
+      return div;
+    }
+
+    function setupEventListeners() {
+      // Toolbar buttons
+      document.getElementById('refreshBtn').addEventListener('click', loadMessages);
+      document.getElementById('createNewBtn').addEventListener('click', openCreateModal);
+      
+      // Modal
+      document.getElementById('closeModal').addEventListener('click', closeModal);
+      document.getElementById('cancelBtn').addEventListener('click', closeModal);
+      document.getElementById('messageForm').addEventListener('submit', handleSubmit);
+      
+      // Filters
+      document.getElementById('searchMessage').addEventListener('input', debounce(renderMessages, 300));
+      document.getElementById('filterStatus').addEventListener('change', renderMessages);
+      
+      // Pagination
+      document.getElementById('prevPage').addEventListener('click', () => {
+        if (currentPage > 1) {
+          currentPage--;
+          renderMessages();
+        }
+      });
+      document.getElementById('nextPage').addEventListener('click', () => {
+        const totalPages = parseInt(document.getElementById('totalPages').textContent);
+        if (currentPage < totalPages) {
+          currentPage++;
+          renderMessages();
+        }
+      });
+    }
+
+    function openCreateModal() {
+      editingMessageId = null;
+      document.getElementById('modalTitle').textContent = 'New Interactive Message';
+      document.getElementById('messageForm').reset();
+      document.getElementById('messageModal').classList.remove('hidden');
+      document.getElementById('messageModal').classList.add('flex');
+    }
+
+    function closeModal() {
+      document.getElementById('messageModal').classList.add('hidden');
+      document.getElementById('messageModal').classList.remove('flex');
+    }
+
+    async function handleSubmit(e) {
+      e.preventDefault();
+      
+      const messageType = document.getElementById('messageType').value;
+      const recipients = document.getElementById('recipients').value.split(',').map(r => r.trim());
+      const body = document.getElementById('messageBody').value;
+      const optionsText = document.getElementById('messageOptions').value;
+      
+      let options = {};
+      if (optionsText) {
+        try {
+          options = JSON.parse(optionsText);
+        } catch (error) {
+          showError('Invalid JSON in options field');
+          return;
+        }
+      }
+      
+      try {
+        const response = await fetch('/api/interactive/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getAuthToken()}`,
+            'X-Tenant-Id': getTenantId()
+          },
+          body: JSON.stringify({
+            type: messageType,
+            recipients,
+            body,
+            options
+          })
+        });
+        
+        if (response.ok) {
+          showSuccess('Interactive message sent successfully');
+          closeModal();
+          await loadMessages();
+        } else {
+          const error = await response.json();
+          showError(error.message || 'Failed to send message');
+        }
+      } catch (error) {
+        console.error('Error sending message:', error);
+        showError('Error sending message');
+      }
+    }
+
+    async function deleteMessage(id) {
+      if (!confirm('Delete this interactive message?')) return;
+      
+      try {
+        const response = await fetch(`/api/interactive/${id}`, {
+          method: 'DELETE',
+          headers: { 
+            'Authorization': `Bearer ${getAuthToken()}`,
+            'X-Tenant-Id': getTenantId()
+          }
+        });
+        
+        if (response.ok) {
+          showSuccess('Message deleted');
+          await loadMessages();
+        } else {
+          showError('Failed to delete message');
+        }
+      } catch (error) {
+        console.error('Error deleting message:', error);
+        showError('Error deleting message');
+      }
+    }
+
+    async function viewStats(id) {
+      // Placeholder for stats view
+      alert('Stats view coming soon for message: ' + id);
+    }
+
+    function updatePagination(total, totalPages) {
+      if (total === 0) {
+        document.getElementById('pagination').classList.add('hidden');
+        return;
+      }
+      
+      document.getElementById('pagination').classList.remove('hidden');
+      const start = (currentPage - 1) * itemsPerPage + 1;
+      const end = Math.min(currentPage * itemsPerPage, total);
+      
+      document.getElementById('showingFrom').textContent = start;
+      document.getElementById('showingTo').textContent = end;
+      document.getElementById('totalMessages').textContent = total;
+      document.getElementById('currentPage').textContent = currentPage;
+      document.getElementById('totalPages').textContent = totalPages;
+      
+      document.getElementById('prevPage').disabled = currentPage === 1;
+      document.getElementById('nextPage').disabled = currentPage === totalPages;
+    }
+
+    // Utilities
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    }
+
+    function getStatusBadge(status) {
+      const badges = {
+        pending: '<span class="badge badge-pending">Pending</span>',
+        replied: '<span class="badge badge-replied">Replied</span>',
+        expired: '<span class="badge badge-expired">Expired</span>'
+      };
+      return badges[status] || '';
+    }
+
+    function getTypeIcon(type) {
+      const icons = {
+        list: 'list-ul',
+        buttons: 'th-large',
+        quick_reply: 'reply-all'
+      };
+      return icons[type] || 'comment';
+    }
+
+    function calculateResponseRate(msg) {
+      if (!msg.recipient_count || msg.recipient_count === 0) return 0;
+      return Math.round((msg.response_count / msg.recipient_count) * 100);
+    }
+
+    function debounce(func, wait) {
+      let timeout;
+      return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
+    }
+
+    function showSuccess(message) {
+      alert(message);
+    }
+
+    function showError(message) {
+      alert('Error: ' + message);
+    }
+
+    // Initialize on load
+    init();
+  </script>
+</body>
+</html>

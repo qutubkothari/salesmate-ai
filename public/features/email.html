@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAK Feature: Email Integration</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="/features/_shared.css" />
+  <style>
+    body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .email-item { transition: all 0.2s; border-left: 3px solid transparent; }
+    .email-item:hover { background: rgba(255,255,255,0.1); border-left-color: #fff; }
+    .email-item.selected { background: rgba(255,255,255,0.15); border-left-color: #fff; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+    .badge-unread { background: rgba(239,68,68,0.9); color: #fff; }
+    .badge-assigned { background: rgba(34,197,94,0.9); color: #fff; }
+    .glass-card { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); }
+  </style>
+</head>
+<body class="min-h-screen">
+  <!-- Header -->
+  <div class="glass-card p-4 mb-4">
+    <div class="container mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <i class="fas fa-envelope text-white text-2xl"></i>
+        <h1 class="text-2xl font-bold text-white">Email Management</h1>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="glass-card p-4 mb-4">
+    <div class="container mx-auto flex flex-wrap items-center gap-4">
+      <button id="refreshBtn" class="px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30">
+        <i class="fas fa-sync-alt mr-2"></i>Refresh
+      </button>
+      <button id="deleteSelectedBtn" class="px-4 py-2 bg-red-500/80 text-white rounded-lg hover:bg-red-600 disabled:opacity-50" disabled>
+        <i class="fas fa-trash mr-2"></i>Delete Selected (<span id="selectedCount">0</span>)
+      </button>
+      <select id="assignToSales" class="px-4 py-2 bg-white/10 text-white rounded-lg border border-white/20" disabled>
+        <option value="">Assign to...</option>
+      </select>
+      <button id="assignBtn" class="px-4 py-2 bg-green-500/80 text-white rounded-lg hover:bg-green-600 disabled:opacity-50" disabled>
+        <i class="fas fa-user-check mr-2"></i>Assign
+      </button>
+      <div class="ml-auto flex items-center gap-2">
+        <input type="text" id="searchEmail" placeholder="Search emails..." class="px-4 py-2 bg-white/10 text-white placeholder-white/50 rounded-lg border border-white/20" />
+        <select id="filterStatus" class="px-4 py-2 bg-white/10 text-white rounded-lg border border-white/20">
+          <option value="all">All Status</option>
+          <option value="unread">Unread</option>
+          <option value="assigned">Assigned</option>
+          <option value="unassigned">Unassigned</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Email List -->
+  <div class="container mx-auto px-6 pb-6">
+    <div class="glass-card rounded-lg">
+      <!-- Email Header -->
+      <div class="p-4 border-b border-gray-700 flex items-center gap-4">
+        <input type="checkbox" id="selectAll" class="w-4 h-4 rounded" />
+        <div class="flex-1 grid grid-cols-12 gap-4 text-sm font-semibold text-gray-400">
+          <div class="col-span-1">Statwhite/10 flex items-center gap-4">
+        <input type="checkbox" id="selectAll" class="w-4 h-4 rounded" />
+        <div class="flex-1 grid grid-cols-12 gap-4 text-sm font-semibold text-white/7
+          <div class="col-span-2">Assigned To</div>
+          <div class="col-span-2">Date</div>
+        </div>
+      </div>
+
+      <!-- Email Items -->
+      <div id="emailList" class="divide-y divide-white/10">
+        <!-- Loading state -->
+        <div id="loadingState" class="p-8 text-center text-white/70">
+          <i class="fas fa-spinner fa-spin text-3xl mb-4"></i>
+          <p>Loading emails...</p>
+        </div>
+        <!-- Empty state (hidden initially) -->
+        <div id="emptyState" class="p-8 text-center text-white/70 hidden">
+          <i class="fas fa-inbox text-5xl mb-4 opacity-50"></i>
+          <p class="text-lg">No emails found</p>
+          <p class="text-sm mt-2">Configure your email integration to start receiving emails</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div id="pagination" class="mt-6 flex items-center justify-between text-white/70 hidden">
+      <div>
+        Showing <span id="showingFrom">0</span> to <span id="showingTo">0</span> of <span id="totalEmails">0</span> emails
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="prevPage" class="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 disabled:opacity-50 text-white" disabled>
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        <span id="currentPage">1</span> / <span id="totalPages">1</span>
+        <button id="nextPage" class="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 disabled:opacity-50 text-white" disabled>
+          <i class="fas fa-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let selectedEmails = new Set();
+    let allEmails = [];
+    let salespeople = [];
+    let currentPage = 1;
+    const itemsPerPage = 20;
+
+    // Get session from localStorage
+    function getSession() {
+      const sessionStr = localStorage.getItem('dashboardSession');
+      if (!sessionStr) return null;
+      try {
+        return JSON.parse(sessionStr);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // Get token from URL params or session
+    function getAuthToken() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tokenFromUrl = urlParams.get('token');
+      if (tokenFromUrl) return tokenFromUrl;
+
+      const session = getSession();
+      // Use tenantId as the auth token since there's no separate token
+      return session?.tenantId || '';
+    }
+
+    function getTenantId() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tenantIdFromUrl = urlParams.get('tenantId');
+      if (tenantIdFromUrl) return tenantIdFromUrl;
+
+      const session = getSession();
+      return session?.tenantId || session?.tenant_id || '';
+    }
+
+    // Initialize
+    async function init() {
+      await loadSalespeople();
+      await loadEmails();
+      setupEventListeners();
+    }
+
+    async function loadSalespeople() {
+      try {
+        const tenantId = getTenantId();
+        const response = await fetch(`/api/sales-team/${tenantId}`, {
+          headers: { 'Authorization': `Bearer ${getAuthToken()}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          salespeople = data.users || [];
+          populateSalesDropdown();
+        }
+      } catch (error) {
+        console.error('Failed to load salespeople:', error);
+      }
+    }
+
+    function populateSalesDropdown() {
+      const select = document.getElementById('assignToSales');
+      select.innerHTML = '<option value="">Assign to...</option>';
+      salespeople.forEach(person => {
+        const option = document.createElement('option');
+        option.value = person.id;
+        option.textContent = person.name;
+        select.appendChild(option);
+      });
+    }
+
+    async function loadEmails() {
+      try {
+        document.getElementById('loadingState').classList.remove('hidden');
+        document.getElementById('emptyState').classList.add('hidden');
+        
+        const response = await fetch('/api/email/list', {
+           headers: { 
+            'Authorization': `Bearer ${getAuthToken()}`,
+            'X-Tenant-Id': getTenantId()
+           }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          allEmails = data.emails || [];
+          renderEmails();
+        } else {
+          showError('Failed to load emails');
+        }
+      } catch (error) {
+        console.error('Error loading emails:', error);
+        showError('Error loading emails');
+      } finally {
+        document.getElementById('loadingState').classList.add('hidden');
+      }
+    }
+
+    function renderEmails() {
+      const emailList = document.getElementById('emailList');
+      const loadingState = document.getElementById('loadingState');
+      const emptyState = document.getElementById('emptyState');
+      
+      // Clear existing items (except loading/empty states)
+      const items = emailList.querySelectorAll('.email-item');
+      items.forEach(item => item.remove());
+      
+      if (allEmails.length === 0) {
+        emptyState.classList.remove('hidden');
+        return;
+      }
+      
+      emptyState.classList.add('hidden');
+      
+      // Apply filters
+      const searchTerm = document.getElementById('searchEmail').value.toLowerCase();
+      const statusFilter = document.getElementById('filterStatus').value;
+      
+      let filtered = allEmails.filter(email => {
+        const matchesSearch = !searchTerm || 
+          email.from.toLowerCase().includes(searchTerm) ||
+          email.subject.toLowerCase().includes(searchTerm);
+        
+        const matchesStatus = statusFilter === 'all' ||
+          (statusFilter === 'unread' && !email.read) ||
+          (statusFilter === 'assigned' && email.assigned_to) ||
+          (statusFilter === 'unassigned' && !email.assigned_to);
+        
+        return matchesSearch && matchesStatus;
+      });
+      
+      // Pagination
+      const totalPages = Math.ceil(filtered.length / itemsPerPage);
+      const start = (currentPage - 1) * itemsPerPage;
+      const end = start + itemsPerPage;
+      const pageEmails = filtered.slice(start, end);
+      
+      // Render each email
+      pageEmails.forEach(email => {
+        const item = createEmailItem(email);
+        emailList.appendChild(item);
+      });
+      
+      // Update pagination
+      updatePagination(filtered.length, totalPages);
+    }
+
+    function createEmailItem(email) {
+      const div = document.createElement('div');
+      div.className = 'email-item p-4 cursor-pointer';
+      div.dataset.emailId = email.id;
+      
+      const assignedPerson = email.assigned_to ? salespeople.find(p => p.id === email.assigned_to) : null;
+      
+      div.innerHTML = `
+        <div class="flex items-center gap-4">
+          <input type="checkbox" class="email-checkbox w-4 h-4 rounded" data-email-id="${email.id}" />
+          <div class="flex-1 grid grid-cols-12 gap-4 items-center text-sm">
+            <div class="col-span-1">
+              ${!email.read ? '<span class="badge badge-unread">New</span>' : ''}
+              ${email.assigned_to ? '<span class="badge badge-assigned">Assigned</span>' : ''}
+            </div>
+            <div class="col-span-3 text-white truncate">${escapeHtml(email.from)}</div>
+            <div class="col-span-4 text-gray-300 truncate font-medium">${escapeHtml(email.subject)}</div>
+            <div class="col-span-2 text-gray-400 truncate">
+              ${assignedPerson ? assignedPerson.name : '<span class="text-gray-500">Unassigned</span>'}
+            </div>
+            <div class="col-span-2 text-gray-400">${formatDate(email.received_at)}</div>
+          </div>
+        </div>
+      `;
+      
+      return div;
+    }
+
+    function setupEventListeners() {
+      // Select all checkbox
+      document.getElementById('selectAll').addEventListener('change', (e) => {
+        const checkboxes = document.querySelectorAll('.email-checkbox');
+        checkboxes.forEach(cb => {
+          cb.checked = e.target.checked;
+          if (e.target.checked) {
+            selectedEmails.add(cb.dataset.emailId);
+          } else {
+            selectedEmails.delete(cb.dataset.emailId);
+          }
+        });
+        updateToolbarState();
+      });
+      
+      // Email list delegation
+      document.getElementById('emailList').addEventListener('change', (e) => {
+        if (e.target.classList.contains('email-checkbox')) {
+          const emailId = e.target.dataset.emailId;
+          if (e.target.checked) {
+            selectedEmails.add(emailId);
+          } else {
+            selectedEmails.delete(emailId);
+          }
+          updateToolbarState();
+        }
+      });
+      
+      // Toolbar buttons
+      document.getElementById('refreshBtn').addEventListener('click', loadEmails);
+      document.getElementById('deleteSelectedBtn').addEventListener('click', deleteSelected);
+      document.getElementById('assignBtn').addEventListener('click', assignSelected);
+      
+      // Filters
+      document.getElementById('searchEmail').addEventListener('input', debounce(renderEmails, 300));
+      document.getElementById('filterStatus').addEventListener('change', renderEmails);
+      
+      // Pagination
+      document.getElementById('prevPage').addEventListener('click', () => {
+        if (currentPage > 1) {
+          currentPage--;
+          renderEmails();
+        }
+      });
+      document.getElementById('nextPage').addEventListener('click', () => {
+        const totalPages = parseInt(document.getElementById('totalPages').textContent);
+        if (currentPage < totalPages) {
+          currentPage++;
+          renderEmails();
+        }
+      });
+    }
+
+    function updateToolbarState() {
+      const count = selectedEmails.size;
+      document.getElementById('selectedCount').textContent = count;
+      document.getElementById('deleteSelectedBtn').disabled = count === 0;
+      document.getElementById('assignToSales').disabled = count === 0;
+      document.getElementById('assignBtn').disabled = count === 0;
+    }
+
+    async function deleteSelected() {
+      if (selectedEmails.size === 0) return;
+      
+      if (!confirm(`Delete ${selectedEmails.size} email(s)?`)) return;
+      
+      try {
+        const response = await fetch('/api/email/delete', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+              'Authorization': `Bearer ${getAuthToken()}`,
+              'X-Tenant-Id': getTenantId()
+          },
+          body: JSON.stringify({ ids: Array.from(selectedEmails) })
+        });
+        
+        if (response.ok) {
+          showSuccess(`${selectedEmails.size} email(s) deleted`);
+          selectedEmails.clear();
+          await loadEmails();
+        } else {
+          showError('Failed to delete emails');
+        }
+      } catch (error) {
+        console.error('Error deleting emails:', error);
+        showError('Error deleting emails');
+      }
+    }
+
+    async function assignSelected() {
+      const salesPersonId = document.getElementById('assignToSales').value;
+      if (!salesPersonId || selectedEmails.size === 0) return;
+      
+      try {
+        const response = await fetch('/api/email/assign', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+              'Authorization': `Bearer ${getAuthToken()}`,
+              'X-Tenant-Id': getTenantId()
+          },
+          body: JSON.stringify({ 
+            emailIds: Array.from(selectedEmails),
+            salesPersonId 
+          })
+        });
+        
+        if (response.ok) {
+          showSuccess(`${selectedEmails.size} email(s) assigned`);
+          selectedEmails.clear();
+          document.getElementById('assignToSales').value = '';
+          await loadEmails();
+        } else {
+          showError('Failed to assign emails');
+        }
+      } catch (error) {
+        console.error('Error assigning emails:', error);
+        showError('Error assigning emails');
+      }
+    }
+
+    function updatePagination(total, totalPages) {
+      if (total === 0) {
+        document.getElementById('pagination').classList.add('hidden');
+        return;
+      }
+      
+      document.getElementById('pagination').classList.remove('hidden');
+      const start = (currentPage - 1) * itemsPerPage + 1;
+      const end = Math.min(currentPage * itemsPerPage, total);
+      
+      document.getElementById('showingFrom').textContent = start;
+      document.getElementById('showingTo').textContent = end;
+      document.getElementById('totalEmails').textContent = total;
+      document.getElementById('currentPage').textContent = currentPage;
+      document.getElementById('totalPages').textContent = totalPages;
+      
+      document.getElementById('prevPage').disabled = currentPage === 1;
+      document.getElementById('nextPage').disabled = currentPage === totalPages;
+    }
+
+    // Utilities
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / 60000);
+      
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
+      
+      return date.toLocaleDateString();
+    }
+
+    function debounce(func, wait) {
+      let timeout;
+      return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
+    }
+
+    function showSuccess(message) {
+      // Simple alert for now - can be replaced with toast notification
+      alert(message);
+    }
+
+    function showError(message) {
+      alert('Error: ' + message);
+    }
+
+    // Initialize on load
+    init();
+  </script>
+</body>
+</html>
