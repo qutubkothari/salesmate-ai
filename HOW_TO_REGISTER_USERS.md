@@ -14,22 +14,25 @@ You now have a **complete multi-user authentication system** with role-based acc
 
 ## Step 1: Run the Database Migration
 
-Before you can start inviting users, you need to update your database schema:
+Before you can start inviting users, you need to update your database schema.
 
-### On Your Local Machine (Where SQLite DB is):
+### On Hostinger Server (Where SQLite DB Lives):
 
-```powershell
-# Navigate to your project directory
-cd C:\Users\QK\Documents\GitHub\salesmate
+```bash
+# SSH into your Hostinger VPS
+ssh qutubk@72.62.192.228 -i ~/.ssh/hostinger_ed25519
 
-# Run the migration on your local SQLite database
+# Navigate to your app directory
+cd /var/www/salesmate-ai
+
+# Run the migration
 sqlite3 salesmate.db < migrations/001_multi_user_support.sql
 
 # Verify the migration worked
 sqlite3 salesmate.db "SELECT * FROM sqlite_master WHERE type='table' AND name='user_sessions';"
 ```
 
-**Note:** Your database is **local SQLite**, so the migration runs on your development machine, not on the remote server.
+**Note:** Your SQLite database runs on the **Hostinger VPS server** (not locally), so migration must run there.
 
 ### Expected Output:
 You should see confirmation that the following tables were created or modified:
@@ -48,12 +51,12 @@ Since you don't have a UI for user management yet, use these API calls to get st
 ### Option A: Using cURL (from terminal)
 
 ```bash
-# First, get your tenant ID and web_auth_token from local SQLite database
+# First, get your tenant ID and web_auth_token from SQLite database
 sqlite3 salesmate.db "SELECT id, web_auth_token FROM tenants LIMIT 1;"
 
 # Then invite a tenant admin (replace YOUR_TOKEN with actual token)
-# Use localhost:8081 for local dev or salesmate.saksolution.com for production
-curl -X POST http://localhost:8081/api/users/invite \
+# Use https://salesmate.saksolution.com for production
+curl -X POST https://salesmate.saksolution.com/api/users/invite \
   -H "Content-Type: application/json" \
   -H "x-auth-token: YOUR_WEB_AUTH_TOKEN" \
   -d '{
@@ -76,7 +79,7 @@ $body = @{
     role = "tenant_admin"
 } | ConvertTo-Json
 
-Invoke-RestMethod -Uri "http://localhost:8081/api/users/invite" `
+Invoke-RestMethod -Uri "https://salesmate.saksolution.com/api/users/invite" `
     -Method POST `
     -Headers @{ "x-auth-token" = $token; "Content-Type" = "application/json" } `
     -Body $body
@@ -92,7 +95,7 @@ Invoke-RestMethod -Uri "http://localhost:8081/api/users/invite" `
     "name": "Admin Name",
     "role": "tenant_admin"
   },
-  "inviteUrl": "http://localhost:8081/accept-invitation?token=abc123..."
+  "inviteUrl": "https://salesmate.saksolution.com/accept-invitation?token=abc123..."
 }
 ```
 
@@ -133,7 +136,7 @@ Once an admin is logged in, they can invite more users:
 ### Invite a Sales Manager
 
 ```bash
-curl -X POST http://localhost:8081/api/users/invite \
+curl -X POST https://salesmate.saksolution.com/api/users/invite \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer SESSION_TOKEN_FROM_LOGIN" \
   -d '{
@@ -146,7 +149,7 @@ curl -X POST http://localhost:8081/api/users/invite \
 ### Invite a Salesman
 
 ```bash
-curl -X POST http://localhost:8081/api/users/invite \
+curl -X POST https://salesmate.saksolution.com/api/users/invite \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer SESSION_TOKEN_FROM_LOGIN" \
   -d '{
@@ -160,7 +163,7 @@ curl -X POST http://localhost:8081/api/users/invite \
 
 ## Step 5: User Login
 
-Users can log in at: `http://localhost:8081/user-login.html`
+Users can log in at: `https://salesmate.saksolution.com/user-login.html`
 
 ### Login Form:
 ```
@@ -268,7 +271,7 @@ Each salesman will be able to connect their own Gmail:
 
 ```bash
 # Admin enables Gmail for a salesman
-curl -X PUT http://localhost:8081/api/users/123 \
+curl -X PUT https://salesmate.saksolution.com/api/users/123 \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -d '{
     "gmail_access_token": "ya29.xxx",

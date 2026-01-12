@@ -65,12 +65,29 @@ Invoke-RemoteCommand "cd $REMOTE_PATH; git pull origin main"
 Write-Host "Code updated on server" -ForegroundColor Green
 
 # ====== STEP 5: Install Dependencies ======
-Write-Host "`n[5/6] Installing Dependencies" -ForegroundColor Yellow
+Write-Host "`n[5/7] Installing Dependencies" -ForegroundColor Yellow
 Invoke-RemoteCommand "cd $REMOTE_PATH; npm install --production"
 Write-Host "Dependencies updated" -ForegroundColor Green
 
-# ====== STEP 6: Restart PM2 ======
-Write-Host "`n[6/6] Restarting Application" -ForegroundColor Yellow
+# ====== STEP 6: Run Migrations (if any) ======
+Write-Host "`n[6/7] Running Database Migrations" -ForegroundColor Yellow
+$migrationExists = ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $KEY_PATH "$HOSTINGER_USER@$HOSTINGER_IP" "test -f $REMOTE_PATH/migrations/001_multi_user_support.sql && echo 'exists' || echo 'missing'"
+if ($migrationExists -match "exists") {
+    Write-Host "  Found migration file, checking if already applied..." -ForegroundColor Gray
+    $tableExists = ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $KEY_PATH "$HOSTINGER_USER@$HOSTINGER_IP" "cd $REMOTE_PATH; sqlite3 salesmate.db `"SELECT name FROM sqlite_master WHERE type='table' AND name='user_sessions';`" 2>/dev/null || echo ''"
+    if ($tableExists -match "user_sessions") {
+        Write-Host "  Migration already applied (user_sessions table exists)" -ForegroundColor Green
+    } else {
+        Write-Host "  Applying migration..." -ForegroundColor Yellow
+        Invoke-RemoteCommand "cd $REMOTE_PATH; sqlite3 salesmate.db < migrations/001_multi_user_support.sql"
+        Write-Host "  Migration applied successfully" -ForegroundColor Green
+    }
+} else {
+    Write-Host "  No pending migrations" -ForegroundColor Gray
+}
+
+# ====== STEP 7: Restart PM2 ======
+Write-Host "`n[7/7] Restarting Application" -ForegroundColor Yellow
 Invoke-RemoteCommand "cd $REMOTE_PATH; pm2 restart $PM2_PROCESS; sleep 2; pm2 list"
 Write-Host "Application restarted" -ForegroundColor Green
 

@@ -143,22 +143,30 @@ Your Salesmate application now has a **complete enterprise-grade multi-user auth
 
 ## 🚀 How to Get Started
 
-### Step 1: Run Migration (Local Database)
-```powershell
-# On your local machine where SQLite DB is located
-cd C:\Users\QK\Documents\GitHub\salesmate
+### Step 1: Run Migration (On Hostinger Server)
+```bash
+# SSH into Hostinger VPS
+ssh qutubk@72.62.192.228 -i ~/.ssh/hostinger_ed25519
+
+# Navigate to app directory
+cd /var/www/salesmate-ai
+
+# Run migration on server's SQLite database
 sqlite3 salesmate.db < migrations/001_multi_user_support.sql
 
-# Or use PowerShell with Get-Content:
-Get-Content migrations/001_multi_user_support.sql | sqlite3 salesmate.db
+# Verify tables created
+sqlite3 salesmate.db "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('user_sessions','product_expertise','activity_log');"
 ```
 
-**Important:** Your database is **local SQLite**, not on the remote server. Run migration locally before deploying code.
+**Important:** Your SQLite database is on the **Hostinger server**, not local. Run migration via SSH.
 
 ### Step 2: Invite First Admin
 ```bash
-# Using your existing tenant token
-curl -X POST http://localhost:8081/api/users/invite \
+# Get tenant token from Hostinger database
+ssh qutubk@72.62.192.228 -i ~/.ssh/hostinger_ed25519 "cd /var/www/salesmate-ai && sqlite3 salesmate.db 'SELECT web_auth_token FROM tenants LIMIT 1;'"
+
+# Invite first admin
+curl -X POST https://salesmate.saksolution.com/api/users/invite \
   -H "Content-Type: application/json" \
   -H "x-auth-token: YOUR_TENANT_TOKEN" \
   -d '{
@@ -217,7 +225,7 @@ Now you can invite managers and salesmen from the admin account.
 └────────┬────────┘
          │
 ┌────────▼────────┐
-│  Data Layer     │ - SQLite via Supabase client
+│  Data Layer     │ - SQLite (better-sqlite3)
 └─────────────────┘
 ```
 
@@ -405,9 +413,13 @@ pm2 logs salesmate        # Application logs
 sqlite3 salesmate.db      # Database queries
 ```
 
-### Common Commands (Local SQLite)
-```powershell
-# All commands run on your local machine where salesmate.db is located
+### Common Commands (On Hostinger Server)
+```bash
+# All commands run via SSH on Hostinger where salesmate.db is located
+
+# SSH into server
+ssh qutubk@72.62.192.228 -i ~/.ssh/hostinger_ed25519
+cd /var/www/salesmate-ai
 
 # Check user sessions
 sqlite3 salesmate.db "SELECT * FROM user_sessions WHERE is_active = 1;"
@@ -420,10 +432,6 @@ sqlite3 salesmate.db "DELETE FROM user_sessions WHERE expires_at < datetime('now
 
 # Deactivate user
 sqlite3 salesmate.db "UPDATE sales_users SET is_active = 0 WHERE email = 'user@email.com';"
-
-# Or use PowerShell-friendly format:
-$db = "C:\Users\QK\Documents\GitHub\salesmate\salesmate.db"
-sqlite3 $db "SELECT * FROM user_sessions WHERE is_active = 1;"
 ```
 
 ---
