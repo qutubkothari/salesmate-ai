@@ -2,7 +2,7 @@
 // Main orchestrator for customer message handling - refactored and modular
 
 const { processIntentAndContext } = require('./intentHandler');
-const { handleSmartResponse } = require('./smartResponseHandler');
+// const { handleSmartResponse } = require('./smartResponseHandler');  // DEPRECATED: No longer used, all queries go through AI
 const { handleDiscountRequests } = require('./discountHandler');
 const { handleAddProduct } = require('./addProductHandler');
 const { sendMessage } = require('../../../services/whatsappService');
