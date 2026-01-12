@@ -240,23 +240,15 @@ async function getAIResponseV2(tenantId, userQuery, opts = {}) {
       _dbgAI('website search failed', e?.message || String(e));
     }
 
-    // (d) Business profile block with platform capabilities
+    // (d) Business profile block - pull from actual tenant data
     let businessProfileContext = "--- BUSINESS PROFILE ---\n";
-    if (tenant.business_name)    businessProfileContext += `Name: ${tenant.business_name}\n`;
+    if (tenant.business_name)    businessProfileContext += `Business: ${tenant.business_name}\n`;
     if (tenant.business_address) businessProfileContext += `Address: ${tenant.business_address}\n`;
     if (tenant.business_website) businessProfileContext += `Website: ${tenant.business_website}\n`;
+    businessProfileContext += "--- END BUSINESS PROFILE ---";
     
-    // Add platform capabilities (always available)
-    businessProfileContext += `\n--- PLATFORM CAPABILITIES ---\n`;
-    businessProfileContext += `- Document Processing: Yes, supports uploading and processing documents (PDFs, policies, FAQs)\n`;
-    businessProfileContext += `- Multilingual Support: Yes, supports Arabic and multiple languages\n`;
-    businessProfileContext += `- AI Assistant: Yes, powered by OpenAI, understands customer intent and context\n`;
-    businessProfileContext += `- Product Catalog: Yes, searchable product information with pricing and variants\n`;
-    businessProfileContext += `- Order Management: Yes, handles orders and cart management through chat\n`;
-    businessProfileContext += `- Integrations: Supports Zoho, Google Sheets, Calendly, Shopify, and more\n`;
-    businessProfileContext += `- Market Focus: UAE, Saudi Arabia, Kuwait, India, and other WhatsApp-first regions\n`;
-    businessProfileContext += `--- END PLATFORM CAPABILITIES ---`;
-    businessProfileContext += "\n--- END BUSINESS PROFILE ---";
+    // Note: Platform-specific capabilities will come from website embeddings and document uploads
+    // Do NOT hardcode generic features here - let the actual business context drive responses
 
     // Add conversation context (prefer conversationId if provided)
     let conversationContext = '';
