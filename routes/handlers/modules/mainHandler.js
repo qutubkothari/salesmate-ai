@@ -667,7 +667,10 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
         const aiResponse = await getAIResponseV2(tenant.id, aiPrompt, {
             phoneNumber: from,
             tenantId: tenant.id,
-            conversationId: conversation?.id
+            conversationId: conversation?.id,
+            rawQuery: userQuery,          // exact last user message for website search
+            userQuery: userQuery,         // pass through for embedding prompt
+            originalUserQuery: userQuery  // backward compatibility
         });
 
         console.log('[MAIN_HANDLER] AI Response generated:', aiResponse ? 'SUCCESS' : 'FAILED');

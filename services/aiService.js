@@ -203,7 +203,8 @@ async function getAIResponseV2(tenantId, userQuery, opts = {}) {
     if (tenantError) throw tenantError;
     console.log('[AI_V2] Tenant loaded:', tenant.business_name);
 
-    const rawQuery = String(opts.originalUserQuery || userQuery || '').trim();
+    // Prefer the exact last user message for search/embeddings; fall back to provided userQuery
+    const rawQuery = String(opts.rawQuery || opts.userQuery || opts.originalUserQuery || userQuery || '').trim();
 
     // (b) Embedding with safe fallback
     let queryEmbedding;
