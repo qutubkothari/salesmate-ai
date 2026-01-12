@@ -661,25 +661,7 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
         console.log('[MAIN_HANDLER] STEP 4: AI Fallback with website context');
         const { getAIResponseV2 } = require('../../../services/aiService');
 
-        // Build AI prompt with conversation history
-        const { dbClient } = require('../../../services/config');
-        
-        // Get conversation history for context
-        const { data: messages } = await dbClient
-            .from('messages')
-            .select('type, body, created_at')
-            .eq('conversation_id', conversation?.id)
-            .order('created_at', { ascending: false })
-            .limit(10);
-
-        let conversationContext = '';
-        if (messages && messages.length > 0) {
-            conversationContext = messages
-                .reverse()
-                .map(m => `${m.type === 'incoming' ? 'Customer' : 'You'}: ${m.body}`)
-                .join('\n');
-        }
-
+        // Build AI prompt with conversation history (use existing conversationContext from intent processing)
         const aiPrompt = conversationContext ? 
             `Previous messages:\n${conversationContext}\n\nCustomer just said: ${userQuery}` :
             userQuery;
