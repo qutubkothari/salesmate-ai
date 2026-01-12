@@ -43,12 +43,7 @@ const listOpenTickets = async () => {
     try {
         const { data, error } = await dbClient
             .from('support_tickets')
-            .select(`
-                id,
-                subject,
-                created_at,
-                tenant:tenants (phone_number)
-            `)
+            .select('id, tenant_id, subject, created_at')
             .eq('status', 'open')
             .order('created_at', { ascending: true });
 
@@ -85,15 +80,8 @@ const getTicketDetails = async (ticketId) => {
     try {
         const { data, error } = await dbClient
             .from('support_tickets')
-            .select(`
-                id,
-                subject,
-                description,
-                status,
-                created_at,
-                tenant:tenants (phone_number)
-            `)
-            .ilike('id', `${ticketId}%`) // Search by the short ID prefix
+            .select('id, tenant_id, subject, description, status, created_at')
+            .ilike('id', `${ticketId}%`)
             .single();
 
         if (error) throw error;

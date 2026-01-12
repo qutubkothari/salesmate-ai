@@ -182,10 +182,7 @@ const processSurveyDeployments = async () => {
     try {
         const { data: pendingDeployments, error } = await dbClient
             .from('survey_deployments')
-            .select(`
-                *,
-                survey:surveys ( tenant_id )
-            `)
+            .select('*')
             .eq('status', 'pending');
 
         if (error) throw error;

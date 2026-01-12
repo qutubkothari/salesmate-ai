@@ -61,14 +61,8 @@ const sendDueManualReminders = async () => {
         const now = new Date().toISOString();
         const { data: dueReminders, error } = await dbClient
             .from('conversations')
-            .select(`
-                id,
-                end_user_phone,
-                reminder_message,
-                tenant:tenants (
-                    phone_number
-                )
-            `)
+            .select('id, tenant_id, end_user_phone, reminder_message, reminder_at')
+            .not('reminder_at', 'is', null)
             .lte('reminder_at', now);
 
         if (error) throw error;
@@ -77,7 +71,9 @@ const sendDueManualReminders = async () => {
             console.log(`Found ${dueReminders.length} due manual reminders to send.`);
 
             for (const reminder of dueReminders) {
-                const tenantPhoneNumber = reminder.tenant.phone_number;
+                const { data: tenant } = await dbClient.from('tenants').select('phone_number').eq('id', reminder.tenant_id).single();
+                if (!tenant?.phone_number) continue;
+                const tenantPhoneNumber = tenant.phone_number;
                 const customerPhoneNumber = reminder.end_user_phone;
                 const reminderMessage = `ðŸ”” *Reminder for your chat with ${customerPhoneNumber}*\n\nYou asked me to remind you: "${reminder.reminder_message}"`;
 

@@ -159,13 +159,8 @@ const sendDueFollowUpReminders = async () => {
         // Find conversations where the follow-up time is in the past
         const { data: dueFollowUps, error } = await dbClient
             .from('conversations')
-            .select(`
-                id,
-                end_user_phone,
-                tenant:tenants (
-                    phone_number
-                )
-            `)
+            .select('id, tenant_id, end_user_phone, follow_up_at')
+            .not('follow_up_at', 'is', null)
             .lte('follow_up_at', now);
 
         if (error) throw error;
@@ -174,7 +169,9 @@ const sendDueFollowUpReminders = async () => {
             console.log(`Found ${dueFollowUps.length} due follow-up reminders to send.`);
 
             for (const followUp of dueFollowUps) {
-                const tenantPhoneNumber = followUp.tenant.phone_number;
+                const { data: tenant } = await dbClient.from('tenants').select('phone_number').eq('id', followUp.tenant_id).single();
+                if (!tenant?.phone_number) continue;
+                const tenantPhoneNumber = tenant.phone_number;
                 const customerPhoneNumber = followUp.end_user_phone;
                 const reminderMessage = `Hi! This is a reminder to follow up with your customer at ${customerPhoneNumber}. They seemed interested!`;
 

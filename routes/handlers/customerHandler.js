@@ -58,6 +58,7 @@ const handleCustomer = async (req, res) => {
     }
     let conversation = null;
     const { dbClient } = require('../../services/config');
+    const customerProfileService = require('../../services/customerProfileService');
     
     try {
         // Fetch latest conversation context
@@ -94,6 +95,24 @@ const handleCustomer = async (req, res) => {
             } else {
                 console.error('[CUSTOMER_HANDLER] Failed to create conversation:', createError);
             }
+        }
+        
+        // AUTO-CREATE CUSTOMER PROFILE (if it doesn't exist)
+        try {
+            const { customer: existingCustomer } = await customerProfileService.getCustomerByPhone(tenant.id, from);
+            if (!existingCustomer) {
+                console.log('[CUSTOMER_HANDLER] Creating new customer profile for:', from);
+                await customerProfileService.upsertCustomerByPhone(tenant.id, from, {
+                    name: null, // Will be updated later when AI extracts name
+                    lead_score: 0,
+                    total_orders: 0,
+                    total_spent: 0.00
+                });
+                console.log('[CUSTOMER_HANDLER] Customer profile created');
+            }
+        } catch (customerError) {
+            console.error('[CUSTOMER_HANDLER] Error creating customer profile:', customerError);
+            // Continue even if customer creation fails
         }
     } catch (e) {
         console.error('[CUSTOMER_HANDLER] Error fetching/creating conversation:', e);

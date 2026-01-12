@@ -281,6 +281,11 @@ function createLocalDbWrapper(dbInstance) {
               const whereValues = [];
               if (this._wheres.length > 0) {
                 whereClause = ' WHERE ' + this._wheres.map(w => {
+                  if (w.operator === 'IN' || w.operator === 'NOT IN') {
+                    const placeholders = (w.value || []).map(() => '?').join(', ');
+                    whereValues.push(...(w.value || []));
+                    return `${w.column} ${w.operator} (${placeholders})`;
+                  }
                   whereValues.push(w.value);
                   return `${w.column} ${w.operator} ?`;
                 }).join(' AND ');
