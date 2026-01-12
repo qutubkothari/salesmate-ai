@@ -154,9 +154,20 @@ async function searchWebsiteContent(query, tenantId, options = {}) {
                 // Boost title/url hits
                 const titleLower = String(item.page_title || '').toLowerCase();
                 const urlLower = String(item.url || '').toLowerCase();
+                const contentLower = String(item.chunk_text || item.content || '').toLowerCase();
+                
                 for (const t of tokens) {
-                    if (titleLower.includes(t)) score += 1;
-                    if (urlLower.includes(t)) score += 0.5;
+                    if (titleLower.includes(t)) score += 2; // Double boost for title
+                    if (urlLower.includes(t)) score += 1;
+                }
+                
+                // Document management keyword boosting for lexical fallback
+                const queryLower = query.toLowerCase();
+                if ((queryLower.includes('document') || queryLower.includes('scan') || 
+                     queryLower.includes('management') || queryLower.includes('paperless')) &&
+                    (contentLower.includes('document') || contentLower.includes('paperless') || 
+                     contentLower.includes('scan') || contentLower.includes('upload'))) {
+                    score *= 2; // Double the score for document-related matches
                 }
 
                 return { item, score };

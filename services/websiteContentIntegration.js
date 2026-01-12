@@ -23,10 +23,11 @@ async function searchWebsiteForQuery(query, tenantId, productCode = null) {
             results = await findProductInfo(productCode, tenantId);
         } else {
             // General semantic search - ALWAYS search, not just for product queries
+            // Falls back to lexical search if embeddings unavailable
             console.log('[WebsiteContentIntegration] Performing semantic search for:', query);
             results = await searchWebsiteContent(query, tenantId, {
-                limit: 5,  // Increased from 3 to get more results
-                minSimilarity: 0.15  // Lowered from 0.25 to catch more relevant results
+                limit: 8,  // Increased to get more potential results
+                minSimilarity: 0.05  // Very low threshold to catch results from lexical fallback
             });
             console.log('[WebsiteContentIntegration] Found', results ? results.length : 0, 'results');
         }
