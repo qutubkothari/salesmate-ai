@@ -1173,6 +1173,14 @@ app.use('/api/assignment', assignmentRouter);
 const usersRouter = require('./routes/api/users');
 app.use('/api/users', usersRouter);
 
+// FSM Integration - Phase 1: Field Service Management Routes
+const visitsRouter = require('./routes/api/visits');
+const targetsRouter = require('./routes/api/targets');
+const unifiedUsersRouter = require('./routes/api/unified-users');
+app.use('/api/visits', visitsRouter);
+app.use('/api/targets', targetsRouter);
+app.use('/api/users/salesmen', unifiedUsersRouter);
+
 // Cron endpoint for processing broadcast queue
 app.get('/cron/process-broadcasts', async (req, res) => {
   try {
