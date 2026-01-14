@@ -427,6 +427,161 @@ const runEmergencyTasks = async () => {
 
 // Schedule product sync from Zoho every 4 hours
 const cron = require('node-cron');
+
+// ========== PHASE 2: FSM INTEGRATION SCHEDULER JOBS ==========
+
+// Import Phase 2 services
+const dailySummaryService = require('./services/dailySummaryService');
+const targetSyncService = require('./services/targetSyncService');
+const targetService = require('./services/targetService');
+
+/**
+ * Daily Summary Job - Runs at 6 PM IST
+ * Generates and sends daily team performance summary to managers
+ */
+cron.schedule('0 18 * * *', async () => {
+    console.log('[SCHEDULER] [Phase 2] Running daily summary generation at 6 PM...');
+    try {
+        const { dbClient } = require('./services/config');
+        
+        // Get all active tenants
+        const { data: tenants } = await dbClient
+            .from('tenants')
+            .select('id, business_name')
+            .eq('is_active', true);
+
+        let summariesGenerated = 0;
+        
+        for (const tenant of tenants || []) {
+            try {
+                console.log(`[SCHEDULER] Generating summary for ${tenant.business_name}...`);
+                
+                // Generate daily summary
+                const summaryResult = await dailySummaryService.generateDailySummary(
+                    tenant.id,
+                    new Date().toISOString().split('T')[0]
+                );
+
+                if (summaryResult.ok) {
+                    // Format for WhatsApp
+                    const formattedResult = await dailySummaryService.formatSummaryForWhatsApp(summaryResult.summary);
+                    
+                    if (formattedResult.ok) {
+                        // Send to management
+                        const sendResult = await dailySummaryService.sendSummaryToManagement(
+                            tenant.id,
+                            formattedResult.message
+                        );
+                        
+                        if (sendResult.ok) {
+                            console.log(`✅ Daily summary sent for ${tenant.business_name}`);
+                            summariesGenerated++;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error(`[SCHEDULER] Summary generation failed for ${tenant.id}:`, error.message);
+            }
+        }
+        
+        console.log(`[SCHEDULER] Daily summary job completed - ${summariesGenerated} summaries sent`);
+    } catch (error) {
+        console.error('[SCHEDULER] Daily summary job failed:', error.message);
+    }
+}, {
+    timezone: "Asia/Kolkata"
+});
+console.log('[Scheduler] Daily summary job scheduled for 6 PM IST');
+
+/**
+ * Daily Target Sync Job - Runs at 9 AM IST
+ * Syncs target status to broadcast messaging and AI context
+ */
+cron.schedule('0 9 * * *', async () => {
+    console.log('[SCHEDULER] [Phase 2] Running daily target sync at 9 AM...');
+    try {
+        // Sync targets for all tenants
+        const syncResult = await targetSyncService.syncAllTenantsTargets();
+        
+        if (syncResult.ok) {
+            console.log(`✅ Target sync completed for ${syncResult.synced_tenants} tenants`);
+        } else {
+            console.error('[SCHEDULER] Target sync failed:', syncResult.error);
+        }
+    } catch (error) {
+        console.error('[SCHEDULER] Target sync job failed:', error.message);
+    }
+}, {
+    timezone: "Asia/Kolkata"
+});
+console.log('[Scheduler] Daily target sync job scheduled for 9 AM IST');
+
+/**
+ * Month-End Target Rollover Job - Runs at 11:59 PM on last day of month
+ * Automatically rolls over targets to new month
+ */
+cron.schedule('59 23 28-31 * *', async () => {
+    console.log('[SCHEDULER] [Phase 2] Running month-end target rollover...');
+    try {
+        const { dbClient } = require('./services/config');
+        
+        // Check if it's actually the last day of month
+        const now = new Date();
+        const nextDay = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const isLastDay = (nextDay - now) <= 24*60*60*1000;
+        
+        if (!isLastDay) {
+            console.log('[SCHEDULER] Not the last day of month, skipping rollover');
+            return;
+        }
+
+        // Get all active tenants
+        const { data: tenants } = await dbClient
+            .from('tenants')
+            .select('id, business_name')
+            .eq('is_active', true);
+
+        let rolloversCompleted = 0;
+        
+        for (const tenant of tenants || []) {
+            try {
+                console.log(`[SCHEDULER] Rolling over targets for ${tenant.business_name}...`);
+                
+                // Get current targets
+                const currentTargets = await targetService.getSalesmanTargets(
+                    tenant.id,
+                    null,
+                    null
+                );
+                
+                if (currentTargets.ok && currentTargets.targets) {
+                    // Rollover to next month
+                    const rolloverResult = await targetService.rolloverTargets(
+                        tenant.id,
+                        currentTargets.targets
+                    );
+                    
+                    if (rolloverResult.ok) {
+                        console.log(`✅ Targets rolled over for ${tenant.business_name}`);
+                        rolloversCompleted++;
+                    }
+                }
+            } catch (error) {
+                console.error(`[SCHEDULER] Target rollover failed for ${tenant.id}:`, error.message);
+            }
+        }
+        
+        console.log(`[SCHEDULER] Month-end rollover completed - ${rolloversCompleted} tenants updated`);
+    } catch (error) {
+        console.error('[SCHEDULER] Month-end rollover job failed:', error.message);
+    }
+}, {
+    timezone: "Asia/Kolkata"
+});
+console.log('[Scheduler] Month-end target rollover job scheduled for 11:59 PM on 28-31 of each month');
+
+// ========== END PHASE 2 SCHEDULER JOBS ==========
+
 // Runs every 4 hours (6 times per day: 12 AM, 4 AM, 8 AM, 12 PM, 4 PM, 8 PM)
 cron.schedule('0 */4 * * *', async () => {
     console.log('[Scheduler] Running 4-hourly Zoho product sync...');

@@ -7,6 +7,9 @@
 const express = require('express');
 const router = express.Router();
 const visitService = require('../../services/visitService');
+const orderService = require('../../services/orderService');
+const conversationLinkingService = require('../../services/conversationLinkingService');
+const targetSyncService = require('../../services/targetSyncService');
 const { authenticateToken, authorizeRole } = require('../../middleware/auth');
 
 // Middleware
@@ -117,23 +120,78 @@ router.get('/detail/:visit_id', async (req, res) => {
  * PUT /api/visits/:visit_id/complete
  * Mark visit as completed
  * Body: { time_out?, remarks?, next_action_date?, final_status? }
+ * Phase 2: Auto-creates order from products discussed, links to conversation, records achievement
  */
 router.put('/:visit_id/complete', authorizeRole(['salesman', 'admin']), async (req, res) => {
   try {
     const { visit_id } = req.params;
+    const { tenantId, userId } = req.user;
     const completionData = req.body;
 
-    const result = await visitService.completeVisit(visit_id, completionData);
+    // 1. Complete the visit
+    const visitResult = await visitService.completeVisit(visit_id, completionData);
 
-    if (!result.ok) {
-      return res.status(400).json({ error: result.error });
+    if (!visitResult.ok) {
+      return res.status(400).json({ error: visitResult.error });
+    }
+
+    const visit = visitResult.visit;
+    const autoActions = {
+      order_created: false,
+      conversation_linked: false,
+      target_synced: false
+    };
+
+    // 2. Auto-create order if products were discussed
+    if (visit.products_discussed && visit.products_discussed.length > 0) {
+      console.log('[VISITS_API] Auto-creating order from visit products');
+      
+      const orderResult = await orderService.createOrderFromVisit(tenantId, visit_id);
+      if (orderResult.ok) {
+        autoActions.order_created = true;
+        autoActions.order_id = orderResult.order_id;
+      } else {
+        console.error('[VISITS_API] Failed to create order:', orderResult.error);
+      }
+    }
+
+    // 3. Link visit to customer conversation
+    if (visit.customer_id) {
+      console.log('[VISITS_API] Linking visit to conversation');
+      
+      const linkResult = await conversationLinkingService.linkVisitToConversation(
+        tenantId,
+        visit.customer_id,
+        visit_id
+      );
+      
+      if (linkResult.ok) {
+        autoActions.conversation_linked = true;
+      } else {
+        console.error('[VISITS_API] Failed to link conversation:', linkResult.error);
+      }
+    }
+
+    // 4. Sync targets to conversation for AI context
+    if (visit.customer_id) {
+      console.log('[VISITS_API] Syncing targets to conversation');
+      
+      const syncResult = await targetSyncService.syncTargetsToConversation(
+        tenantId,
+        visit.customer_id
+      );
+      
+      if (syncResult.ok) {
+        autoActions.target_synced = true;
+      }
     }
 
     res.json({
       ok: true,
-      visit: result.visit,
-      duration_minutes: result.duration_minutes,
-      message: 'Visit completed successfully'
+      visit: visit,
+      duration_minutes: visitResult.duration_minutes,
+      auto_actions: autoActions,
+      message: 'Visit completed successfully with auto-actions'
     });
 
   } catch (error) {
