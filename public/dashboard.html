@@ -76,6 +76,211 @@
             color: white;
             box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
         }
+        .sidebar-item i { width: 24px; min-width: 24px; text-align: center; font-size: 18px; }
+        .sidebar-item span {
+            margin-left: 16px;
+            white-space: nowrap;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+        .sidebar.collapsed .sidebar-item span { opacity: 0; width: 0; overflow: hidden; }
+        .main-content { 
+            margin-left: 280px; 
+            transition: margin-left 0.3s ease;
+            min-height: 100vh;
+        }
+        .main-content.expanded { margin-left: 80px; }
+        .sidebar-toggle {
+            position: fixed;
+            top: 24px;
+            left: calc(280px - 18px);
+            z-index: 51;
+            transition: left 0.3s ease;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 9999px;
+            background: rgba(255,255,255,0.14);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        .sidebar-toggle:hover { background: rgba(255,255,255,0.22); }
+        .sidebar-toggle.collapsed { left: calc(80px - 18px); }
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.mobile-open { transform: translateX(0); }
+            .main-content { margin-left: 0; }
+            .sidebar-toggle { left: 16px; }
+        }
+    </style>
+</head>
+<body class="min-h-screen gradient-bg">
+    <div id="app" class="min-h-screen">
+        <!-- Loading Screen -->
+        <div id="loadingScreen" class="fixed inset-0 gradient-bg flex items-center justify-center z-50">
+            <div class="text-center glass-effect p-8 rounded-2xl">
+                <div class="loading-spinner mx-auto mb-4"></div>
+                <h2 class="text-white text-xl font-semibold mb-2">Loading Dashboard</h2>
+                <p class="text-white/70">Please wait while we fetch your data...</p>
+            </div>
+        </div>
+
+        <!-- Main Dashboard -->
+        <div id="dashboard" class="hidden">
+            <!-- Sidebar Navigation -->
+            <aside id="sidebar" class="sidebar glass-effect">
+                <div class="sidebar-header p-6 border-b border-white/20">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                            <img src="/assets/logo.png" alt="Logo" class="w-6 h-6" />
+                        </div>
+                        <div class="sidebar-text">
+                            <h2 class="text-white font-bold text-lg">Salesmate</h2>
+                            <p class="text-white/60 text-xs">Dashboard</p>
+                        </div>
+                    </div>
+                </div>
+
+                <nav class="py-4">
+                    <!-- Dashboard / Overview - Always visible -->
+                    <div class="sidebar-item active" onclick="switchTab('overview')" data-tab="overview">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Dashboard</span>
+                    </div>
+
+                    <!-- Hidden tabs - will be activated based on subscription modules -->
+                    <div class="sidebar-item" onclick="switchTab('conversations')" data-tab="conversations" style="display: none;">
+                        <i class="fas fa-comments"></i>
+                        <span>Conversations</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('orders')" data-tab="orders" style="display: none;">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span>Orders</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('followups')" data-tab="followups">
+                        <i class="fas fa-clock"></i>
+                        <span>Follow-ups</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('leads')" data-tab="leads">
+                        <i class="fas fa-user-tag"></i>
+                        <span>Leads</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('email')" data-tab="email">
+                        <i class="fas fa-envelope"></i>
+                        <span>Email</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('interactive')" data-tab="interactive">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span>Interactive</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('triage')" data-tab="triage">
+                        <i class="fas fa-life-ring"></i>
+                        <span>Triage</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('products')" data-tab="products">
+                        <i class="fas fa-box"></i>
+                        <span>Products</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('documents')" data-tab="documents">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Documents</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('customers')" data-tab="customers">
+                        <i class="fas fa-users"></i>
+                        <span>Customers</span>
+                    </div>
+
+                    <!-- FSM Section -->
+                    <div class="px-4 py-2 mt-4">
+                        <p class="text-white/40 text-xs font-semibold uppercase tracking-wider">Field Sales</p>
+                    </div>
+
+                    <div class="sidebar-item" onclick="switchTab('visits')" data-tab="visits">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span>Visits</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('salesmen')" data-tab="salesmen">
+                        <i class="fas fa-user-tie"></i>
+                        <span>Sales Team</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('targets')" data-tab="targets">
+                        <i class="fas fa-bullseye"></i>
+                        <span>Targets</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('branches')" data-tab="branches">
+                        <i class="fas fa-code-branch"></i>
+                        <span>Branches</span>
+                    </div>
+
+                    <div class="px-4 py-2 mt-4">
+                        <p class="text-white/40 text-xs font-semibold uppercase tracking-wider">System</p>
+                    </div>
+
+                    <div class="sidebar-item" onclick="switchTab('settings')" data-tab="settings">
+                        <i class="fas fa-cog"></i>
+                        <span>Settings</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('analytics')" data-tab="analytics">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>Analytics</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('reports')" data-tab="reports">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Reports</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('activity-feed')" data-tab="activity-feed">
+                        <i class="fas fa-list"></i>
+                        <span>Activity Feed</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('audit-logs')" data-tab="audit-logs">
+                        <i class="fas fa-clipboard-list"></i>
+                        <span>Audit Logs</span>
+                    </div>
+                    <div class="sidebar-item" onclick="switchTab('broadcast')" data-tab="broadcast">
+                        <i class="fas fa-broadcast-tower"></i>
+                        <span>Broadcast</span>
+                    </div>
+                </nav>
+            </aside>
+
+            <!-- Sidebar Toggle Button -->
+            <button id="sidebarToggle" onclick="toggleSidebar()" class="sidebar-toggle text-white transition-all" aria-label="Toggle sidebar" title="Toggle sidebar">
+                <i id="sidebarToggleIcon" class="fas fa-angles-left" style="font-size: 14px;"></i>
+            </button>
+
+            <!-- Main Content Area -->
+            <div id="mainContent" class="main-content">
+                <!-- Header -->
+                <header class="glass-effect border-b border-white/20 sticky top-0 z-40">
+                    <div class="max-w-7xl mx-auto px-6 py-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-4">
+                                <div>
+                                    <h1 class="text-2xl font-bold text-white" id="businessName">Sales Dashboard</h1>
+                                    <p class="text-white/70 text-sm">WhatsApp AI Assistant</p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center space-x-4">
+                                <div class="relative">
+                                    <input type="text" id="globalSearch" placeholder="Search conversations, orders..." class="search-input pl-10 pr-4 py-2 rounded-xl border-0 w-64 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                    <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                                </div>
+
+                                <button onclick="toggleNotifications()" class="glass-effect p-3 rounded-xl text-white hover:bg-white/20 transition-colors relative">
+                                    <i class="fas fa-bell"></i>
+                                    <span id="notifBadge" class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-xs flex items-center justify-center">0</span>
+                                </button>
+
+                                <button onclick="handleLogout()" class="glass-effect px-4 py-2 rounded-xl text-white hover:bg-white/20 transition-colors">
+                                    <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </header>
 
                 <!-- Notifications Panel -->
                 <div id="notificationsPanel" class="hidden fixed top-20 right-6 w-96 max-h-[600px] rounded-2xl shadow-2xl z-40 overflow-hidden bg-slate-900/90 backdrop-blur-xl border border-white/10">
