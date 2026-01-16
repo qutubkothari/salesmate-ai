@@ -372,7 +372,17 @@ router.get('/visits/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const visit = db.prepare('SELECT * FROM visits WHERE id = ?').get(id);
+    const visit = db.prepare(`
+      SELECT 
+        v.*,
+        s.name as salesman_name,
+        s.phone as salesman_phone,
+        COALESCE(p.name, v.plant_id) as plant_name
+      FROM visits v
+      LEFT JOIN salesmen s ON s.id = v.salesman_id
+      LEFT JOIN plants p ON p.id = v.plant_id
+      WHERE v.id = ?
+    `).get(id);
     
     if (!visit) {
       return res.status(404).json({

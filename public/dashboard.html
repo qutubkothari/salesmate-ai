@@ -8430,38 +8430,11 @@
             document.getElementById('visitModalMeta').textContent = `Visit ID: ${visit.id}`;
             document.getElementById('visitCustomer').textContent = visit.customer_name || '-';
             
-            // Get salesman name - try different fields
-            let salesmanName = '-';
-            if (visit.salesman_name) {
-                salesmanName = visit.salesman_name;
-            } else if (visit.salesman_id) {
-                // Fetch salesman details
-                try {
-                    const sResp = await fetch(`/api/fsm/salesmen?tenant_id=${encodeURIComponent(visit.tenant_id)}`);
-                    const sData = await sResp.json();
-                    const salesman = (sData.data || []).find(s => s.id === visit.salesman_id);
-                    if (salesman) salesmanName = salesman.name || salesman.phone || visit.salesman_id;
-                } catch (e) {
-                    salesmanName = visit.salesman_id;
-                }
-            }
-            document.getElementById('visitSalesman').textContent = salesmanName;
+            // Salesman name - already joined from API
+            document.getElementById('visitSalesman').textContent = visit.salesman_name || visit.salesman_phone || '-';
             
-            // Get branch/plant name
-            let branchName = '-';
-            if (visit.plant_name) {
-                branchName = visit.plant_name;
-            } else if (visit.plant_id) {
-                try {
-                    const pResp = await fetch(`/api/fsm/plants?tenant_id=${encodeURIComponent(visit.tenant_id)}`);
-                    const pData = await pResp.json();
-                    const plant = (pData.data || []).find(p => p.id === visit.plant_id);
-                    if (plant) branchName = plant.name || visit.plant_id;
-                } catch (e) {
-                    branchName = visit.plant_id;
-                }
-            }
-            document.getElementById('visitBranch').textContent = branchName;
+            // Branch/plant name - already joined from API
+            document.getElementById('visitBranch').textContent = visit.plant_name || '-';
             
             document.getElementById('visitType').textContent = visit.visit_type || '-';
             
