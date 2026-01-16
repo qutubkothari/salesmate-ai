@@ -194,14 +194,7 @@ router.post('/login', async (req, res) => {
             return;
         }
 
-        // Try multiple phone number formats to find tenant
-        // Format 1: Just digits (e.g., 919537653927)
-        // Format 2: With @c.us suffix (e.g., 919537653927@c.us)
-        const phoneFormats = [
-            inputDigits,
-            `${inputDigits}@c.us`
-        ];
-
+        // Try multiple phone number formats to find tenant (phoneFormats already defined above)
         const getTenantId = (tenantRow) => tenantRow?.id || tenantRow?.tenantId || tenantRow?.tenant_id;
         const getBusinessName = (tenantRow) =>
             tenantRow?.business_name ||
