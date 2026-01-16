@@ -8007,11 +8007,12 @@
             const params = new URLSearchParams();
             if (filters.branch) params.append('branch', filters.branch);
             if (filters.salesman) params.append('salesman', filters.salesman);
-            if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
-            if (filters.dateTo) params.append('dateTo', filters.dateTo);
+            if (filters.dateFrom) params.append('start_date', filters.dateFrom);
+            if (filters.dateTo) params.append('end_date', filters.dateTo);
             
-            const response = await fetch(`/api/visits?${params}`);
-            const visits = await response.json();
+            const response = await fetch(`/api/fsm/visits?${params}`);
+            const result = await response.json();
+            const visits = result.data || [];
             
             // Update stats
             document.getElementById('totalVisitsCount').textContent = visits.length;
@@ -8112,22 +8113,25 @@
     // Load Salesmen
     async function loadSalesmen() {
         try {
-            const response = await fetch('/api/salesmen');
-            const salesmen = await response.json();
+            const response = await fetch('/api/fsm/salesmen');
+            const result = await response.json();
+            const salesmen = result.data || [];
             
             // Update stats
             document.getElementById('totalSalesmenCount').textContent = salesmen.length;
             
             const today = new Date().toISOString().split('T')[0];
             // Get today's active salesmen (those with visits today)
-            const visitsResp = await fetch(`/api/visits?dateFrom=${today}&dateTo=${today}`);
-            const todayVisits = await visitsResp.json();
+            const visitsResp = await fetch(`/api/fsm/visits?start_date=${today}&end_date=${today}`);
+            const visitsResult = await visitsResp.json();
+            const todayVisits = visitsResult.data || [];
             const activeTodaySet = new Set(todayVisits.map(v => v.salesman_id));
             document.getElementById('activeTodayCount').textContent = activeTodaySet.size;
             
             // Get targets to calculate "on target" count
-            const targetsResp = await fetch('/api/targets');
-            const targets = await targetsResp.json();
+            const targetsResp = await fetch('/api/fsm/targets');
+            const targetsResult = await targetsResp.json();
+            const targets = targetsResult.data || [];
             const onTarget = targets.filter(t => {
                 const progress = t.target_visits > 0 ? (t.achieved_visits / t.target_visits * 100) : 0;
                 return progress >= 80;
@@ -8207,8 +8211,9 @@
                 monthFilter.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
             }
             
-            const response = await fetch('/api/targets');
-            const targets = await response.json();
+            const response = await fetch('/api/fsm/targets');
+            const result = await response.json();
+            const targets = result.data || [];
             
             // Update stats
             document.getElementById('totalTargetsCount').textContent = targets.length;
