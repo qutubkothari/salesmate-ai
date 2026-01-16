@@ -137,4 +137,3 @@ module.exports.initOutbound = function initOutbound() {
   patchGlobalSenders();
   console.log('[OUTBOUND] guard initialized');
 };
-

@@ -1,4 +1,4 @@
-// Enhanced follow-up scheduling and debugging utilities
+﻿// Enhanced follow-up scheduling and debugging utilities
 const { dbClient } = require('./config');
 const { isUnsubscribed } = require('./unsubscribeService');
 
@@ -274,5 +274,4 @@ module.exports = {
     enhancedFollowUpScheduler,
     testFollowUpSystem
 };
-
 

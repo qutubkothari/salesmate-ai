@@ -24,4 +24,3 @@ router.use('/audit', crmAuditRouter);
 router.use('/sla', crmSlaRouter);
 
 module.exports = router;
-

@@ -1,4 +1,4 @@
-// services/realtimeTestingService.js
+﻿// services/realtimeTestingService.js
 const { dbClient } = require('./config');
 const { scoreLead } = require('./leadScoringService');
 const { analyzeConversationContext } = require('./enhancedFollowUpService');
@@ -100,7 +100,7 @@ class ConversationTracker {
 
       // Get updated lead score from database
       const { data: convData } = await dbClient
-        .from('conversations_new')
+        .from('conversations')
         .select('lead_score, id')
         .eq('tenant_id', tenantId)
         .eq('end_user_phone', endUserPhone)
@@ -119,7 +119,7 @@ class ConversationTracker {
       
       if (context) {
         await dbClient
-          .from('conversations_new')
+          .from('conversations')
           .update({ context_analysis: JSON.stringify(context) })
           .eq('id', convData.id);
       }
@@ -137,7 +137,7 @@ class ConversationTracker {
 
       // Update conversation with follow-up schedule
       await dbClient
-        .from('conversations_new')
+        .from('conversations')
         .update({
           follow_up_at: followUpTime.toISOString(),
           follow_up_count: 0,
@@ -155,7 +155,7 @@ class ConversationTracker {
         .single();
 
       if (tenant?.owner_whatsapp_number) {
-        const adminNotification = `🤖 Lead Analysis Complete
+        const adminNotification = `ðŸ¤– Lead Analysis Complete
         
 Customer: ${endUserPhone}
 Lead Score: ${leadScore}
@@ -287,4 +287,3 @@ module.exports = {
   getAllActiveChats,
   conversationTracker
 };
-

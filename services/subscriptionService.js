@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @title Subscription Management Service
  * @description Handles tenant subscription status checks and activation key logic.
  */
@@ -111,5 +111,4 @@ module.exports = {
     checkSubscriptionStatus,
     activateSubscription,
 };
-
 

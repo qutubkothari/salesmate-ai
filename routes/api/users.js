@@ -416,4 +416,3 @@ router.post('/resend-invitation', requireAuth, requirePermission(PERMISSIONS.INV
 });
 
 module.exports = router;
-

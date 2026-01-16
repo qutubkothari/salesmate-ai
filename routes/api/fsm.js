@@ -384,4 +384,3 @@ router.get('/salesmen/:id/performance', async (req, res) => {
 });
 
 module.exports = router;
-

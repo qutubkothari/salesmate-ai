@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Website Content Search Service
  * Performs semantic search over website embeddings
  */
@@ -402,5 +402,4 @@ module.exports = {
     findProductInfo,
     generateAnswerFromResults
 };
-
 

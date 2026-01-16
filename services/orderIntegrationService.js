@@ -1,4 +1,4 @@
-// services/orderIntegrationService.js - Complete Order Integration
+﻿// services/orderIntegrationService.js - Complete Order Integration
 const enhancedOrderProcessor = require('./enhancedOrderProcessingWithZoho');
 const { extractOrderDetails } = require('./orderProcessingService');
 
@@ -82,7 +82,7 @@ class OrderIntegrationService {
         }
 
         await dbClient
-            .from('conversations_new')
+            .from('conversations')
             .update({ 
                 state: result.isMultipleProducts ? 'multi_product_order_discussion' : 'order_discussion',
                 last_product_discussed: lastProductDiscussed,
@@ -112,5 +112,4 @@ class OrderIntegrationService {
 }
 
 module.exports = new OrderIntegrationService();
-
 

@@ -1,4 +1,4 @@
-// services/auditLogService.js
+﻿// services/auditLogService.js
 const { dbClient } = require('./config');
 
 function safeJsonStringify(value) {
@@ -51,5 +51,4 @@ async function writeAuditLog(input) {
 module.exports = {
   writeAuditLog,
 };
-
 

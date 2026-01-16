@@ -332,4 +332,3 @@ module.exports = {
   getHeatDistribution,
   escalateHighHeatLead
 };
-

@@ -102,4 +102,3 @@ module.exports = {
   isUnsubscribed,
   filterUnsubscribed,
 };
-

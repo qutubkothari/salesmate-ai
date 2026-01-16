@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TEST: Directly update customer_profiles with known values and log result
  */
 async function testCustomerProfileUpdate() {
@@ -14,7 +14,7 @@ async function testCustomerProfileUpdate() {
   };
   console.log('[TEST] Attempting to update customer_profiles for tenantId:', tenantId, 'phone:', customerPhone);
   const updateResult = await dbClient
-    .from('customer_profiles_new')
+    .from('customer_profiles')
     .update(updateFields)
     .eq('tenant_id', tenantId)
     .eq('phone', customerPhone);
@@ -42,7 +42,7 @@ async function getPreviousShippingAddress(tenantId, customerPhone) {
   try {
     // First check customer profile for default address
     const { data: profile } = await dbClient
-      .from('customer_profiles_new')
+      .from('customer_profiles')
       .select('default_shipping_address, default_shipping_city, default_shipping_state, default_shipping_pincode, default_transporter_name')
       .eq('tenant_id', tenantId)
       .eq('phone', customerPhone)
@@ -63,7 +63,7 @@ async function getPreviousShippingAddress(tenantId, customerPhone) {
 
     // Check recent orders for shipping address
     const { data: conversation } = await dbClient
-      .from('conversations_new')
+      .from('conversations')
       .select('id')
       .eq('tenant_id', tenantId)
       .eq('end_user_phone', customerPhone)
@@ -71,7 +71,7 @@ async function getPreviousShippingAddress(tenantId, customerPhone) {
 
     if (conversation) {
       const { data: recentOrder } = await dbClient
-        .from('orders_new')
+        .from('orders')
         .select('shipping_address, transporter_name, transporter_contact')
         .eq('tenant_id', tenantId)
         .eq('conversation_id', conversation.id)
@@ -119,7 +119,7 @@ async function requestShippingInfo(tenantId, customerPhone, orderId, orderDetail
       
       // Use previous address automatically
       await dbClient
-        .from('orders_new')
+        .from('orders')
         .update({
           shipping_address: previousAddress.address,
           transporter_name: previousAddress.transporter || null,
@@ -136,17 +136,17 @@ async function requestShippingInfo(tenantId, customerPhone, orderId, orderDetail
       }
 
       // Send confirmation with option to update
-      const message = `✅ *Order Confirmed!*
+      const message = `âœ… *Order Confirmed!*
 
-📦 *Order Summary:*
+ðŸ“¦ *Order Summary:*
 ${orderDetails}
 
 ---
 
-🚚 *Using your saved shipping details:*
+ðŸšš *Using your saved shipping details:*
 
-📍 *Address:* ${previousAddress.address}${previousAddress.city ? `, ${previousAddress.city}` : ''}${previousAddress.state ? `, ${previousAddress.state}` : ''}${previousAddress.pincode ? ` - ${previousAddress.pincode}` : ''}
-${previousAddress.transporter ? `🚚 *Transporter:* ${previousAddress.transporter}` : ''}
+ðŸ“ *Address:* ${previousAddress.address}${previousAddress.city ? `, ${previousAddress.city}` : ''}${previousAddress.state ? `, ${previousAddress.state}` : ''}${previousAddress.pincode ? ` - ${previousAddress.pincode}` : ''}
+${previousAddress.transporter ? `ðŸšš *Transporter:* ${previousAddress.transporter}` : ''}
 
 ---
 
@@ -158,14 +158,14 @@ _To update your shipping address, reply with:_
     }
 
     // No previous address - ask for it
-    const message = `✅ *Order Confirmed!*
+    const message = `âœ… *Order Confirmed!*
 
-📦 *Order Summary:*
+ðŸ“¦ *Order Summary:*
 ${orderDetails}
 
 ---
 
-🚚 To complete your order, please provide:
+ðŸšš To complete your order, please provide:
 
 *1. Shipping Address:*
 (Full address with pincode)
@@ -188,7 +188,7 @@ Please reply with all three details.`;
       shipping_request_sent_at: new Date().toISOString()
     };
     const updateResult = await dbClient
-      .from('conversations_new')
+      .from('conversations')
       .update({
         state: 'awaiting_shipping_info',
         metadata: newMetadata
@@ -425,7 +425,7 @@ async function saveShippingInfo(orderId, shippingInfo, tenantId = null, customer
     console.log(`[SHIPPING] Extracted address components:`, addressComponents);
 
     const { error } = await dbClient
-      .from('orders_new')
+      .from('orders')
       .update({
         shipping_address: shippingInfo.shippingAddress,
         transporter_name: shippingInfo.transporterName,
@@ -443,7 +443,7 @@ async function saveShippingInfo(orderId, shippingInfo, tenantId = null, customer
       // Use raw phone (with @c.us) for matching
       console.log(`[SHIPPING][DEBUG] Attempting to update customer_profiles for tenantId: ${tenantId}, phone: ${customerPhone}`);
       const updateResult = await dbClient
-        .from('customer_profiles_new')
+        .from('customer_profiles')
         .update({
           default_shipping_address: shippingInfo.shippingAddress,
           default_shipping_city: addressComponents.city,
@@ -486,7 +486,7 @@ async function updateCustomerShippingAddress(tenantId, customerPhone, shippingIn
     // Use raw phone (with @c.us) for matching
     console.log(`[SHIPPING][DEBUG] Attempting to update customer_profiles for tenantId: ${tenantId}, phone: ${customerPhone}`);
     const updateResult = await dbClient
-      .from('customer_profiles_new')
+      .from('customer_profiles')
       .update({
         default_shipping_address: shippingInfo.shippingAddress,
         default_shipping_city: addressComponents.city,
@@ -522,7 +522,7 @@ async function updateZohoSalesOrderNotes(orderId) {
 
     // Get order with shipping info
     const { data: order, error } = await dbClient
-      .from('orders_new')
+      .from('orders')
       .select('*, tenants(zoho_organization_id)')
       .eq('id', orderId)
       .single();
@@ -539,16 +539,16 @@ async function updateZohoSalesOrderNotes(orderId) {
 
     // Format notes
     const shippingNotes = `
-🚚 SHIPPING DETAILS:
-━━━━━━━━━━━━━━━━━━━━
-📍 Shipping Address:
+ðŸšš SHIPPING DETAILS:
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+ðŸ“ Shipping Address:
 ${order.shipping_address || 'Not provided'}
 
-🚛 Transporter: ${order.transporter_name || 'Not specified'}
-📞 Contact: ${order.transporter_contact || 'Not provided'}
+ðŸš› Transporter: ${order.transporter_name || 'Not specified'}
+ðŸ“ž Contact: ${order.transporter_contact || 'Not provided'}
 
-📅 Info Collected: ${order.shipping_collected_at ? new Date(order.shipping_collected_at).toLocaleString('en-IN') : 'N/A'}
-━━━━━━━━━━━━━━━━━━━━
+ðŸ“… Info Collected: ${order.shipping_collected_at ? new Date(order.shipping_collected_at).toLocaleString('en-IN') : 'N/A'}
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 `.trim();
 
     // Update in Zoho Books
@@ -586,21 +586,21 @@ async function processShippingInfo(tenantId, customerPhone, messageText, orderId
     await updateZohoSalesOrderNotes(orderId);
 
     // Send confirmation
-    const confirmationMessage = `✅ *Shipping Details Received!*
+    const confirmationMessage = `âœ… *Shipping Details Received!*
 
-📍 *Address:* ${shippingInfo.shippingAddress}
-🚛 *Transporter:* ${shippingInfo.transporterName}
-📞 *Contact:* ${shippingInfo.transporterContact}
+ðŸ“ *Address:* ${shippingInfo.shippingAddress}
+ðŸš› *Transporter:* ${shippingInfo.transporterName}
+ðŸ“ž *Contact:* ${shippingInfo.transporterContact}
 
 _This address has been saved as your default for future orders._
 
-Your order will be processed and shipped soon. We'll keep you updated! 📦`;
+Your order will be processed and shipped soon. We'll keep you updated! ðŸ“¦`;
 
     await sendMessage(customerPhone, confirmationMessage);
 
     // Clear conversation state
     await dbClient
-      .from('conversations_new')
+      .from('conversations')
       .update({
         state: null,
         metadata: {
@@ -630,7 +630,7 @@ async function handleShippingAddressUpdate(tenantId, customerPhone) {
 
     // Set conversation state to await address update
     const { data: updateResult, error: updateError } = await dbClient
-      .from('conversations_new')
+      .from('conversations')
       .update({
         state: 'awaiting_address_update'
       })
@@ -650,7 +650,7 @@ async function handleShippingAddressUpdate(tenantId, customerPhone) {
     }
 
     // Send request message
-    const message = `📝 *Update Shipping Address*
+    const message = `ðŸ“ *Update Shipping Address*
 
 Please provide your new shipping details:
 
@@ -690,22 +690,22 @@ async function processAddressUpdate(tenantId, customerPhone, messageText) {
     await updateCustomerShippingAddress(tenantId, customerPhone, shippingInfo);
 
     // Build confirmation message
-    const confirmationMessage = `✅ *Shipping Address Updated!*
+    const confirmationMessage = `âœ… *Shipping Address Updated!*
 
 Your new default shipping details:
 
-📍 *Address:* ${shippingInfo.shippingAddress}
-🚛 *Transporter:* ${shippingInfo.transporterName}
-📞 *Contact:* ${shippingInfo.transporterContact}
+ðŸ“ *Address:* ${shippingInfo.shippingAddress}
+ðŸš› *Transporter:* ${shippingInfo.transporterName}
+ðŸ“ž *Contact:* ${shippingInfo.transporterContact}
 
-This address will be used for all future orders. ✓`;
+This address will be used for all future orders. âœ“`;
 
     // NOTE: Don't send message here - mainHandler will send it
     // await sendMessage(customerPhone, confirmationMessage);
 
     // Clear conversation state
     await dbClient
-      .from('conversations_new')
+      .from('conversations')
       .update({
         state: null
       })
@@ -723,7 +723,7 @@ This address will be used for all future orders. ✓`;
     console.error('[SHIPPING] Error processing address update:', error);
     return {
       success: false,
-      message: '❌ Sorry, there was an error updating your address. Please try again.',
+      message: 'âŒ Sorry, there was an error updating your address. Please try again.',
       error: error.message
     };
   }
@@ -734,7 +734,7 @@ This address will be used for all future orders. ✓`;
  */
 async function getConversationMetadata(tenantId, customerPhone) {
   const { data } = await dbClient
-    .from('conversations_new')
+    .from('conversations')
     .select('metadata')
     .eq('tenant_id', tenantId)
     .eq('end_user_phone', customerPhone)
@@ -755,5 +755,4 @@ module.exports = {
   updateCustomerShippingAddress,
   testCustomerProfileUpdate
 };
-
 

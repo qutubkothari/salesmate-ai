@@ -1,4 +1,4 @@
-function stableHash(input) {
+﻿function stableHash(input) {
   // Small deterministic hash for tie-breaking; not crypto.
   let hash = 2166136261;
   for (let i = 0; i < input.length; i++) {
@@ -407,5 +407,4 @@ module.exports = {
   pickAssigneeForTriage,
   autoAssignTriageItemIfNeeded,
 };
-
 

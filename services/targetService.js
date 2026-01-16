@@ -564,4 +564,3 @@ class TargetService {
 }
 
 module.exports = new TargetService();
-

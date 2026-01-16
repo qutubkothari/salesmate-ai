@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const { dbClient } = require('../../services/config');
 const {
@@ -190,5 +190,4 @@ router.get('/connections', async (req, res) => {
 });
 
 module.exports = router;
-
 

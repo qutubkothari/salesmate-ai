@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const { dbClient } = require('../../services/config');
 const { getTriageAssignmentConfig } = require('../../services/triageRoutingService');
@@ -201,5 +201,4 @@ router.put('/:tenantId/config', async (req, res) => {
     return res.status(500).json({ success: false, error: error.message || String(error) });
   }
 });
-
 

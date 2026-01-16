@@ -186,4 +186,3 @@ router.put('/:tenantId/heat/:conversationId', async (req, res) => {
 });
 
 module.exports = router;
-

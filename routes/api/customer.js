@@ -119,4 +119,3 @@ router.delete('/notes/:noteId', async (req, res) => {
 });
 
 module.exports = router;
-

@@ -220,4 +220,3 @@ module.exports = {
     fallbackIntentRecognition,
     recognizeIntentBatch
 };
-

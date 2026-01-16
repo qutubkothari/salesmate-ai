@@ -225,4 +225,3 @@ router.delete('/:tenantId/:taskId', (req, res) => {
 });
 
 module.exports = router;
-

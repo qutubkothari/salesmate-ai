@@ -1,4 +1,4 @@
-// services/zohoCustomerMatchingService.js
+﻿// services/zohoCustomerMatchingService.js
 // New service to match and pull customer data from Zoho
 
 const zoho = require('./zohoIntegrationService');
@@ -15,7 +15,7 @@ class ZohoCustomerMatchingService {
             const cleanPhone = phoneNumber.replace(/\D/g, '');
             // Check if customer already linked
             const { data: existingProfile } = await dbClient
-                .from('customer_profiles_new')
+                .from('customer_profiles')
                 .select('id, zoho_customer_id, company')
                 .eq('tenant_id', tenantId)
                 .eq('phone', cleanPhone)
@@ -141,7 +141,7 @@ class ZohoCustomerMatchingService {
             }
             
             await dbClient
-                .from('customer_profiles_new')
+                .from('customer_profiles')
                 .update(updateData)
                 .eq('id', customerId);
             
@@ -180,4 +180,3 @@ if (matchResult.success) {
     // Continue with normal flow
 }
 */
-

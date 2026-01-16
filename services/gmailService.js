@@ -327,4 +327,3 @@ module.exports = {
   startWatch,
   processPubSubNotification,
 };
-

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @title Service Configuration
  * @description Initializes and exports clients for external services like OpenAI and Google Cloud Storage.
  * This project currently uses local SQLite for persistence.
@@ -1369,5 +1369,4 @@ try {
     console.log('[CONFIG] Models fast/smart:', process.env.AI_MODEL_FAST, process.env.AI_MODEL_SMART);
   }
 } catch (e) {}
-
 

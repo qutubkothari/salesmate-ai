@@ -13,4 +13,3 @@ router.get('/gst/verify/:gstin', async (req, res) => {
 });
 
 module.exports = router;
-

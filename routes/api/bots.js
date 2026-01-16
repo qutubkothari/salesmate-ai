@@ -103,4 +103,3 @@ router.delete('/:tenantId/:botId', requireTenantAuth({ allowApiKey: false, allow
 });
 
 module.exports = router;
-

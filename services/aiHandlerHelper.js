@@ -64,4 +64,3 @@ module.exports = {
     return 'This is a forced AI response.';
   }
 };
-

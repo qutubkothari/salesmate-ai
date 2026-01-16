@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Calculate pricing breakdown with GST
  * @param {number} priceBeforeTax - Unit price BEFORE tax (as stored in products table)
  * @param {number} quantity - Quantity ordered
@@ -353,7 +353,7 @@ const processMultipleOrderRequest = async (tenantId, from, orderDetails) => {
         const { addCartonProductToCart } = require('./cartonPricingService');
         let allResults = [];
         let productCount = 0;
-        let responseMessage = '✅ **Added to Cart** (multi-product)\n\n';
+        let responseMessage = 'âœ… **Added to Cart** (multi-product)\n\n';
 
         for (let i = 0; i < orderDetails.products.length; i++) {
             const order = orderDetails.products[i];
@@ -469,4 +469,3 @@ module.exports = {
     calculatePricingBreakdown,
     createOrderItemsWithPricing
 };
-

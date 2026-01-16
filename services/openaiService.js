@@ -77,4 +77,3 @@ module.exports = {
   // Export raw client for advanced usage
   client: openai
 };
-

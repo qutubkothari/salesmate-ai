@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const { dbClient } = require('../../services/config');
@@ -150,5 +150,4 @@ router.delete('/:tenantId/:id', async (req, res) => {
 });
 
 module.exports = router;
-
 

@@ -1,4 +1,4 @@
-let warnedMissingTriageTable = false;
+﻿let warnedMissingTriageTable = false;
 
 const { autoAssignTriageItemIfNeeded } = require('./triageRoutingService');
 
@@ -122,5 +122,4 @@ async function upsertTriageForConversation(dbClient, {
 module.exports = {
   upsertTriageForConversation,
 };
-
 

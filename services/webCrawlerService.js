@@ -432,4 +432,3 @@ module.exports = {
     detectContentType,
     normalizeUrl
 };
-

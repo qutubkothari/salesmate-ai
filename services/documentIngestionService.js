@@ -54,4 +54,3 @@ class DocumentIngestionService {
 }
 
 module.exports = DocumentIngestionService;
-

@@ -121,7 +121,7 @@ class TargetSyncService {
 
       // Get conversation
       const convResult = await dbClient
-        .from('conversations_new')
+        .from('conversations')
         .select('*')
         .eq('id', conversationId)
         .single();
@@ -151,7 +151,7 @@ class TargetSyncService {
       existingContext.target_context_updated_at = new Date().toISOString();
 
       const updateResult = await dbClient
-        .from('conversations_new')
+        .from('conversations')
         .update({
           context: JSON.stringify(existingContext)
         })
@@ -385,4 +385,3 @@ class TargetSyncService {
 }
 
 module.exports = new TargetSyncService();
-

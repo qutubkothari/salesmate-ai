@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Website Embedding Service
  * Handles text chunking and embedding generation for crawled content
  * Now using FREE embeddings!
@@ -341,5 +341,4 @@ module.exports = {
     deleteWebsiteEmbeddings,
     extractKeywords
 };
-
 
