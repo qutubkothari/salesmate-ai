@@ -200,6 +200,136 @@ router.get('/salesmen', async (req, res) => {
   }
 });
 
+// Create new salesman
+router.post('/salesmen', async (req, res) => {
+  try {
+    const DEFAULT_TENANT_ID = process.env.FSM_DEFAULT_TENANT_ID || '112f12b8-55e9-4de8-9fda-d58e37c75796';
+    const { name, phone, email, plant_id, is_active, tenant_id } = req.body;
+    
+    if (!name || !phone) {
+      return res.status(400).json({
+        success: false,
+        error: 'Name and phone are required'
+      });
+    }
+    
+    // Generate UUID for new salesman
+    const id = require('crypto').randomUUID();
+    const finalTenantId = tenant_id || DEFAULT_TENANT_ID;
+    
+    const insertQuery = `
+      INSERT INTO salesmen (id, tenant_id, name, phone, email, plant_id, is_active, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    `;
+    
+    db.prepare(insertQuery).run(
+      id,
+      finalTenantId,
+      name,
+      phone,
+      email || null,
+      plant_id || null,
+      is_active ? 1 : 0
+    );
+    
+    // Fetch the created salesman
+    const salesman = db.prepare('SELECT * FROM salesmen WHERE id = ?').get(id);
+    
+    res.json({
+      success: true,
+      data: salesman,
+      message: 'Salesman created successfully'
+    });
+  } catch (error) {
+    console.error('[FSM_API] Error creating salesman:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Update salesman
+router.put('/salesmen/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, phone, email, plant_id, is_active } = req.body;
+    
+    // Check if salesman exists
+    const existing = db.prepare('SELECT * FROM salesmen WHERE id = ?').get(id);
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        error: 'Salesman not found'
+      });
+    }
+    
+    const updateQuery = `
+      UPDATE salesmen 
+      SET name = ?, phone = ?, email = ?, plant_id = ?, is_active = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `;
+    
+    db.prepare(updateQuery).run(
+      name || existing.name,
+      phone || existing.phone,
+      email !== undefined ? email : existing.email,
+      plant_id !== undefined ? plant_id : existing.plant_id,
+      is_active !== undefined ? (is_active ? 1 : 0) : existing.is_active,
+      id
+    );
+    
+    // Fetch updated salesman
+    const salesman = db.prepare('SELECT * FROM salesmen WHERE id = ?').get(id);
+    
+    res.json({
+      success: true,
+      data: salesman,
+      message: 'Salesman updated successfully'
+    });
+  } catch (error) {
+    console.error('[FSM_API] Error updating salesman:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Delete salesman
+router.delete('/salesmen/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if salesman exists
+    const existing = db.prepare('SELECT * FROM salesmen WHERE id = ?').get(id);
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        error: 'Salesman not found'
+      });
+    }
+    
+    // Delete associated data first (visits, targets)
+    db.prepare('DELETE FROM visits WHERE salesman_id = ?').run(id);
+    db.prepare('DELETE FROM salesman_targets WHERE salesman_id = ?').run(id);
+    
+    // Delete salesman
+    db.prepare('DELETE FROM salesmen WHERE id = ?').run(id);
+    
+    res.json({
+      success: true,
+      message: 'Salesman and associated records deleted successfully'
+    });
+  } catch (error) {
+    console.error('[FSM_API] Error deleting salesman:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Get salesman statistics
 router.get('/salesmen/stats', async (req, res) => {
   try {

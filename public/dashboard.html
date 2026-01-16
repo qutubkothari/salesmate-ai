@@ -978,6 +978,108 @@
         </div>
     </div>
 
+    <!-- Add/Edit Salesman Modal -->
+    <div id="addEditSalesmanModal" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4" onclick="if(event.target === this) closeSalesmanForm()">
+        <div class="modal-backdrop absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div class="modal-content relative w-full max-w-2xl bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl shadow-2xl overflow-hidden animate-slide-up" onclick="event.stopPropagation()">
+            <!-- Modal Header -->
+            <header class="bg-gradient-to-r from-purple-700 to-blue-700 text-white p-6">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                                <i class="fas fa-user-plus text-2xl" id="salesmanFormIcon"></i>
+                            </div>
+                            <div>
+                                <h2 id="salesmanFormTitle" class="text-2xl font-bold">Add Salesman</h2>
+                                <div class="text-white/80 text-sm mt-1">Complete all required fields</div>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="closeSalesmanForm()" class="ml-4 w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Form Content -->
+            <div class="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+                <form id="salesmanForm" class="space-y-4">
+                    <input type="hidden" id="salesmanFormId" value="">
+                    
+                    <!-- Name -->
+                    <div>
+                        <label class="block text-white/90 text-sm font-semibold mb-2">
+                            <i class="fas fa-user mr-2"></i>Full Name <span class="text-red-400">*</span>
+                        </label>
+                        <input type="text" id="salesmanFormName" required 
+                            class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-transparent"
+                            placeholder="Enter salesman name">
+                    </div>
+
+                    <!-- Phone -->
+                    <div>
+                        <label class="block text-white/90 text-sm font-semibold mb-2">
+                            <i class="fas fa-phone mr-2"></i>Phone Number <span class="text-red-400">*</span>
+                        </label>
+                        <input type="tel" id="salesmanFormPhone" required 
+                            class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-transparent"
+                            placeholder="10-digit mobile number" pattern="[0-9]{10,15}">
+                    </div>
+
+                    <!-- Email -->
+                    <div>
+                        <label class="block text-white/90 text-sm font-semibold mb-2">
+                            <i class="fas fa-envelope mr-2"></i>Email Address
+                        </label>
+                        <input type="email" id="salesmanFormEmail" 
+                            class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-transparent"
+                            placeholder="email@example.com">
+                    </div>
+
+                    <!-- Plant/Branch Assignment (Multi-Select) -->
+                    <div>
+                        <label class="block text-white/90 text-sm font-semibold mb-2">
+                            <i class="fas fa-building mr-2"></i>Assigned Branches <span class="text-red-400">*</span>
+                        </label>
+                        <div class="bg-white/10 border border-white/20 rounded-lg p-3 max-h-48 overflow-y-auto">
+                            <div id="plantCheckboxes" class="space-y-2">
+                                <div class="text-white/60 text-sm">Loading branches...</div>
+                            </div>
+                        </div>
+                        <div class="text-white/60 text-xs mt-1">Select one or more branches for this salesman</div>
+                    </div>
+
+                    <!-- Status -->
+                    <div>
+                        <label class="block text-white/90 text-sm font-semibold mb-2">
+                            <i class="fas fa-toggle-on mr-2"></i>Status
+                        </label>
+                        <select id="salesmanFormStatus" 
+                            class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-transparent">
+                            <option value="1" class="bg-purple-800">Active</option>
+                            <option value="0" class="bg-purple-800">Inactive</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="p-6 bg-white/5 border-t border-white/10 flex justify-end space-x-3">
+                <button type="button" onclick="closeSalesmanForm()" 
+                    class="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors font-medium">
+                    <i class="fas fa-times mr-2"></i>Cancel
+                </button>
+                <button type="submit" form="salesmanForm" id="salesmanFormSubmit"
+                    class="px-6 py-3 bg-white hover:bg-white/90 text-purple-700 rounded-lg transition-colors font-bold shadow-lg">
+                    <i class="fas fa-save mr-2"></i>Save Salesman
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Conversation Modal -->
     <!-- Conversation Details Modal -->
     <div id="conversationModal" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4" onclick="if(event.target === this) this.classList.add('hidden')">
@@ -8691,96 +8793,186 @@
         }
     }
     
-    function showAddSalesmanModal() {
-        // Simple prompt-based add for now
-        const name = prompt('Enter salesman name:');
-        if (!name) return;
+    // Salesman Form Management
+    async function showAddSalesmanModal() {
+        // Reset form
+        document.getElementById('salesmanFormId').value = '';
+        document.getElementById('salesmanFormName').value = '';
+        document.getElementById('salesmanFormPhone').value = '';
+        document.getElementById('salesmanFormEmail').value = '';
+        document.getElementById('salesmanFormStatus').value = '1';
         
-        const phone = prompt('Enter phone number:');
-        if (!phone) return;
+        // Update modal title
+        document.getElementById('salesmanFormTitle').textContent = 'Add Salesman';
+        document.getElementById('salesmanFormIcon').className = 'fas fa-user-plus text-2xl';
         
-        // Create salesman
-        fetch('/api/fsm/salesmen', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name: name,
-                phone: phone,
-                tenant_id: state.session?.tenantId || '',
-                is_active: true
-            })
-        })
-        .then(res => res.json())
-        .then(result => {
-            if (result.success) {
-                showNotification('Salesman added successfully', 'success');
-                loadSalesmen();
-            } else {
-                showNotification(result.error || 'Failed to add salesman', 'error');
+        // Load plants for checkboxes
+        await loadPlantCheckboxes();
+        
+        // Show modal
+        document.getElementById('addEditSalesmanModal').classList.remove('hidden');
+    }
+    
+    async function editSalesman(salesmanId) {
+        try {
+            // Fetch salesman data
+            const response = await fetch(`/api/fsm/salesmen?tenant_id=${encodeURIComponent(state.session?.tenantId || '')}`);
+            const result = await response.json();
+            const salesman = (result.data || []).find(s => s.id === salesmanId);
+            
+            if (!salesman) {
+                showNotification('Salesman not found', 'error');
+                return;
             }
-        })
-        .catch(err => {
-            console.error('Error adding salesman:', err);
-            showNotification('Error adding salesman', 'error');
-        });
+            
+            // Populate form
+            document.getElementById('salesmanFormId').value = salesman.id;
+            document.getElementById('salesmanFormName').value = salesman.name || '';
+            document.getElementById('salesmanFormPhone').value = salesman.phone || '';
+            document.getElementById('salesmanFormEmail').value = salesman.email || '';
+            document.getElementById('salesmanFormStatus').value = salesman.is_active ? '1' : '0';
+            
+            // Update modal title
+            document.getElementById('salesmanFormTitle').textContent = 'Edit Salesman';
+            document.getElementById('salesmanFormIcon').className = 'fas fa-user-edit text-2xl';
+            
+            // Load plants and check the salesman's current plant(s)
+            await loadPlantCheckboxes(salesman.plant_id);
+            
+            // Show modal
+            document.getElementById('addEditSalesmanModal').classList.remove('hidden');
+            
+        } catch (error) {
+            console.error('Error loading salesman:', error);
+            showNotification('Error loading salesman data', 'error');
+        }
     }
     
-    function editSalesman(salesmanId) {
-        // Fetch current data first
-        fetch(`/api/fsm/salesmen?tenant_id=${encodeURIComponent(state.session?.tenantId || '')}`)
-            .then(res => res.json())
-            .then(result => {
-                const salesman = (result.data || []).find(s => s.id === salesmanId);
-                if (!salesman) {
-                    showNotification('Salesman not found', 'error');
-                    return;
-                }
+    async function loadPlantCheckboxes(selectedPlantId = null) {
+        try {
+            const response = await fetch(`/api/fsm/plants?tenant_id=${encodeURIComponent(state.session?.tenantId || '')}`);
+            const result = await response.json();
+            const plants = result.data || [];
+            
+            const container = document.getElementById('plantCheckboxes');
+            
+            if (plants.length === 0) {
+                container.innerHTML = '<div class="text-white/60 text-sm">No branches available. Please add branches first.</div>';
+                return;
+            }
+            
+            // Parse selected plants (could be JSON array for multi-select in future)
+            const selectedPlants = selectedPlantId ? [selectedPlantId] : [];
+            
+            container.innerHTML = plants.map(plant => {
+                const plantId = plant.plant_id || plant.id;
+                const plantName = plant.plant_name || plant.name || 'Unnamed Branch';
+                const isChecked = selectedPlants.includes(plantId);
                 
-                const name = prompt('Enter salesman name:', salesman.name);
-                if (!name) return;
-                
-                const phone = prompt('Enter phone number:', salesman.phone);
-                if (!phone) return;
-                
-                // Update salesman
-                fetch(`/api/fsm/salesmen/${salesmanId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name: name,
-                        phone: phone
-                    })
-                })
-                .then(res => res.json())
-                .then(result => {
-                    if (result.success) {
-                        showNotification('Salesman updated successfully', 'success');
-                        loadSalesmen();
-                    } else {
-                        showNotification(result.error || 'Failed to update salesman', 'error');
-                    }
-                })
-                .catch(err => {
-                    console.error('Error updating salesman:', err);
-                    showNotification('Error updating salesman', 'error');
-                });
-            })
-            .catch(err => {
-                console.error('Error fetching salesman:', err);
-                showNotification('Error fetching salesman data', 'error');
-            });
+                return `
+                    <label class="flex items-center space-x-3 p-2 hover:bg-white/5 rounded cursor-pointer">
+                        <input type="checkbox" name="plantAssignment" value="${plantId}" 
+                            ${isChecked ? 'checked' : ''}
+                            class="w-4 h-4 text-purple-600 bg-white/10 border-white/30 rounded focus:ring-purple-500">
+                        <span class="text-white text-sm flex-1">${escapeHtml(plantName)}</span>
+                        ${plant.city ? `<span class="text-white/40 text-xs">${escapeHtml(plant.city)}</span>` : ''}
+                    </label>
+                `;
+            }).join('');
+            
+        } catch (error) {
+            console.error('Error loading plants:', error);
+            document.getElementById('plantCheckboxes').innerHTML = '<div class="text-red-400 text-sm">Error loading branches</div>';
+        }
     }
     
-    function deleteSalesman(salesmanId, salesmanName) {
-        if (!confirm(`Are you sure you want to delete ${salesmanName}?`)) {
+    function closeSalesmanForm() {
+        document.getElementById('addEditSalesmanModal').classList.add('hidden');
+    }
+    
+    // Handle form submission
+    document.getElementById('salesmanForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const salesmanId = document.getElementById('salesmanFormId').value;
+        const name = document.getElementById('salesmanFormName').value.trim();
+        const phone = document.getElementById('salesmanFormPhone').value.trim();
+        const email = document.getElementById('salesmanFormEmail').value.trim();
+        const is_active = document.getElementById('salesmanFormStatus').value === '1';
+        
+        // Get selected plants
+        const checkedPlants = Array.from(document.querySelectorAll('input[name="plantAssignment"]:checked'))
+            .map(cb => cb.value);
+        
+        if (!name) {
+            showNotification('Please enter salesman name', 'error');
             return;
         }
         
-        fetch(`/api/fsm/salesmen/${salesmanId}`, {
-            method: 'DELETE'
-        })
-        .then(res => res.json())
-        .then(result => {
+        if (!phone || phone.length < 10) {
+            showNotification('Please enter a valid phone number (min 10 digits)', 'error');
+            return;
+        }
+        
+        if (checkedPlants.length === 0) {
+            showNotification('Please select at least one branch', 'error');
+            return;
+        }
+        
+        // For now, use first selected plant as primary (can be enhanced for multi-plant later)
+        const plant_id = checkedPlants[0];
+        
+        const data = {
+            name,
+            phone,
+            email: email || null,
+            plant_id,
+            is_active,
+            tenant_id: state.session?.tenantId || ''
+        };
+        
+        try {
+            const url = salesmanId 
+                ? `/api/fsm/salesmen/${salesmanId}` 
+                : '/api/fsm/salesmen';
+            const method = salesmanId ? 'PUT' : 'POST';
+            
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showNotification(
+                    salesmanId ? 'Salesman updated successfully' : 'Salesman added successfully', 
+                    'success'
+                );
+                closeSalesmanForm();
+                loadSalesmen();
+            } else {
+                showNotification(result.error || 'Operation failed', 'error');
+            }
+        } catch (error) {
+            console.error('Error saving salesman:', error);
+            showNotification('Error saving salesman', 'error');
+        }
+    });
+    
+    async function deleteSalesman(salesmanId, salesmanName) {
+        if (!confirm(`Are you sure you want to delete ${salesmanName}?\n\nThis will permanently remove the salesman and all associated visit records.`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/fsm/salesmen/${salesmanId}`, {
+                method: 'DELETE'
+            });
+            
+            const result = await response.json();
+            
             if (result.success) {
                 showNotification('Salesman deleted successfully', 'success');
                 loadSalesmen();
