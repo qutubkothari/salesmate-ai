@@ -455,8 +455,9 @@
                                     <tr class="text-white/60 text-sm border-b border-white/10">
                                         <th class="text-left py-3 px-4">Name</th>
                                         <th class="text-left py-3 px-4">Phone</th>
-                                        <th class="text-left py-3 px-4">Email</th>
                                         <th class="text-left py-3 px-4">Branch</th>
+                                        <th class="text-left py-3 px-4">Visits (Month)</th>
+                                        <th class="text-left py-3 px-4">Target Progress</th>
                                         <th class="text-left py-3 px-4">Status</th>
                                         <th class="text-left py-3 px-4">Actions</th>
                                     </tr>
@@ -8558,6 +8559,12 @@
             const allVisitsResult = await allVisitsResp.json();
             const allVisits = allVisitsResult.data || [];
             
+            // Get plants for branch names
+            const plantsResp = await fetch(`/api/fsm/plants?tenant_id=${encodeURIComponent(state.session?.tenantId || '')}`);
+            const plantsData = await plantsResp.json();
+            const plants = plantsData.data || [];
+            const plantMap = new Map(plants.map(p => [p.id, p.name]));
+            
             tbody.innerHTML = salesmen.map(salesman => {
                 const salesmanVisits = allVisits.filter(v => v.salesman_id === salesman.id);
                 const thisMonthVisits = salesmanVisits.filter(v => {
@@ -8571,15 +8578,17 @@
                     ? Math.round(target.achieved_visits / target.target_visits * 100)
                     : 0;
                 
-                const statusBadge = salesman.status === 'active' 
+                const statusBadge = salesman.is_active 
                     ? '<span class="px-2 py-1 rounded text-xs bg-green-500/20 text-green-300">Active</span>'
                     : '<span class="px-2 py-1 rounded text-xs bg-gray-500/20 text-gray-300">Inactive</span>';
+                
+                const branchName = salesman.plant_id ? (plantMap.get(salesman.plant_id) || salesman.plant_id) : '-';
                 
                 return `
                     <tr class="text-white border-b border-white/10 hover:bg-white/5">
                         <td class="py-3 px-4">${escapeHtml(salesman.name || 'N/A')}</td>
                         <td class="py-3 px-4">${escapeHtml(salesman.phone || '-')}</td>
-                        <td class="py-3 px-4">${escapeHtml(salesman.territory || '-')}</td>
+                        <td class="py-3 px-4">${escapeHtml(branchName)}</td>
                         <td class="py-3 px-4">${thisMonthVisits}</td>
                         <td class="py-3 px-4">
                             <div class="w-full bg-white/10 rounded-full h-2">
@@ -8607,8 +8616,60 @@
         showNotification('Add salesman feature coming soon', 'info');
     }
     
-    function viewSalesmanDetails(salesmanId) {
-        showNotification('Salesman details feature coming soon', 'info');
+    async function viewSalesmanDetails(salesmanId) {
+        try {
+            // Fetch salesman details
+            const salesmanResp = await fetch(`/api/fsm/salesmen?tenant_id=${encodeURIComponent(state.session?.tenantId || '')}`);
+            const salesmanData = await salesmanResp.json();
+            const salesman = (salesmanData.data || []).find(s => s.id === salesmanId);
+            
+            if (!salesman) {
+                showNotification('Salesman not found', 'error');
+                return;
+            }
+            
+            // Fetch salesman's visits
+            const visitsResp = await fetch(`/api/fsm/visits?salesman_id=${salesmanId}&tenant_id=${encodeURIComponent(state.session?.tenantId || '')}`);
+            const visitsData = await visitsResp.json();
+            const visits = visitsData.data || [];
+            
+            // Get plant name
+            let branchName = '-';
+            if (salesman.plant_id) {
+                const plantsResp = await fetch(`/api/fsm/plants?tenant_id=${encodeURIComponent(state.session?.tenantId || '')}`);
+                const plantsData = await plantsResp.json();
+                const plant = (plantsData.data || []).find(p => p.id === salesman.plant_id);
+                branchName = plant ? plant.name : salesman.plant_id;
+            }
+            
+            // Calculate stats
+            const today = new Date().toISOString().split('T')[0];
+            const thisMonth = new Date();
+            const monthVisits = visits.filter(v => {
+                const vDate = new Date(v.visit_date);
+                return vDate.getMonth() === thisMonth.getMonth() && vDate.getFullYear() === thisMonth.getFullYear();
+            });
+            const todayVisits = visits.filter(v => v.visit_date === today);
+            
+            // Show details in a simple alert for now (can be enhanced with a modal later)
+            const details = `
+Salesman: ${salesman.name || 'N/A'}
+Phone: ${salesman.phone || '-'}
+Branch: ${branchName}
+Status: ${salesman.is_active ? 'Active' : 'Inactive'}
+
+Visit Statistics:
+- Total Visits: ${visits.length}
+- This Month: ${monthVisits.length}
+- Today: ${todayVisits.length}
+            `;
+            
+            alert(details.trim());
+            
+        } catch (error) {
+            console.error('Error loading salesman details:', error);
+            showNotification('Error loading salesman details', 'error');
+        }
     }
     
     // Load Targets
