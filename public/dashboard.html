@@ -76,240 +76,6 @@
             color: white;
             box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
         }
-        .sidebar-item i { width: 24px; min-width: 24px; text-align: center; font-size: 18px; }
-        .sidebar-item span { 
-            margin-left: 16px; 
-            white-space: nowrap;
-            opacity: 1;
-            transition: opacity 0.3s ease;
-        }
-        .sidebar.collapsed .sidebar-item span { opacity: 0; width: 0; overflow: hidden; }
-        .main-content { 
-            margin-left: 280px; 
-            transition: margin-left 0.3s ease;
-            min-height: 100vh;
-        }
-        .main-content.expanded { margin-left: 80px; }
-        .sidebar-toggle {
-            position: fixed;
-            top: 24px;
-            left: calc(280px - 18px);
-            z-index: 51;
-            transition: left 0.3s ease;
-            width: 36px;
-            height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 9999px;
-            background: rgba(255,255,255,0.14);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.3);
-        }
-        .sidebar-toggle:hover { background: rgba(255,255,255,0.22); }
-        .sidebar-toggle.collapsed { left: calc(80px - 18px); }
-        @media (max-width: 768px) {
-            .sidebar { transform: translateX(-100%); }
-            .sidebar.mobile-open { transform: translateX(0); }
-            .main-content { margin-left: 0; }
-            .sidebar-toggle { left: 16px; }
-        }
-    </style>
-</head>
-<body class="min-h-screen gradient-bg">
-    <div id="app" class="min-h-screen">
-        <!-- Loading Screen -->
-        <div id="loadingScreen" class="fixed inset-0 gradient-bg flex items-center justify-center z-50">
-            <div class="text-center glass-effect p-8 rounded-2xl">
-                <div class="loading-spinner mx-auto mb-4"></div>
-                <h2 class="text-white text-xl font-semibold mb-2">Loading Dashboard</h2>
-                <p class="text-white/70">Please wait while we fetch your data...</p>
-            </div>
-        </div>
-
-        <!-- Main Dashboard -->
-        <div id="dashboard" class="hidden">
-            <!-- Sidebar Navigation -->
-            <aside id="sidebar" class="sidebar glass-effect">
-                <div class="sidebar-header p-6 border-b border-white/20">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-                            <img src="/assets/logo.png" alt="Logo" class="w-6 h-6" />
-                        </div>
-                        <div class="sidebar-text">
-                            <h2 class="text-white font-bold text-lg">Salesmate</h2>
-                            <p class="text-white/60 text-xs">Dashboard</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <nav class="py-4">
-                    <!-- Dashboard / Overview - Always visible -->
-                    <div class="sidebar-item active" onclick="switchTab('overview')" data-tab="overview">
-                        <i class="fas fa-chart-line"></i>
-                        <span>Dashboard</span>
-                    </div>
-                    
-                    <!-- Hidden tabs - will be activated based on subscription modules -->
-                    <div class="sidebar-item" onclick="switchTab('conversations')" data-tab="conversations" style="display: none;">
-                        <i class="fas fa-comments"></i>
-                        <span>Conversations</span>
-                    </div>
-                    <div class="sidebar-item" onclick="switchTab('orders')" data-tab="orders" style="display: none;">
-                        <i class="fas fa-shopping-cart"></i>
-                        <span>Orders</span>
-                    </div>
-                    <div class="sidebar-item" onclick="switchTab('followups')" data-tab="followups">
-                        <i class="fas fa-clock"></i>
-                        <span>Follow-ups</span>
-                    </div>
-                    <div class="sidebar-item" onclick="switchTab('leads')" data-tab="leads">
-                        <i class="fas fa-user-tag"></i>
-                        <span>Leads</span>
-                    </div>
-                    <div class="sidebar-item" onclick="switchTab('email')" data-tab="email">
-                        <i class="fas fa-envelope"></i>
-                        <span>Email</span>
-                    </div>
-                    <div class="sidebar-item" onclick="switchTab('interactive')" data-tab="interactive">
-                        <i class="fas fa-hand-pointer"></i>
-                        <span>Interactive</span>
-                    </div>
-                    <div class="sidebar-item" onclick="switchTab('triage')" data-tab="triage">
-                        <i class="fas fa-life-ring"></i>
-                        <span>Triage</span>
-                    </div>
-                    <div class="sidebar-item" onclick="switchTab('products')" data-tab="products">
-                        <i class="fas fa-box"></i>
-                        <span>Products</span>
-                    </div>
-                    <div class="sidebar-item" onclick="switchTab('documents')" data-tab="documents">
-                        <i class="fas fa-file-alt"></i>
-                        <span>Documents</span>
-                    </div>
-                    <div class="sidebar-item" onclick="switchTab('customers')" data-tab="customers">
-                        <i class="fas fa-users"></i>
-                        <span>Customers</span>
-                    </div>
-
-                    <!-- FSM Section -->
-                    <div class="px-4 py-2 mt-4">
-                        <p class="text-white/40 text-xs font-semibold uppercase tracking-wider">Field Sales</p>
-                    </div>
-
-                    <div class="sidebar-item" onclick="switchTab('visits')" data-tab="visits">
-                        <i class="fas fa-map-marker-alt"></i>
-                        <span>Visits</span>
-                    </div>
-
-                    <div class="sidebar-item" onclick="switchTab('salesmen')" data-tab="salesmen">
-                        <i class="fas fa-user-tie"></i>
-                        <span>Sales Team</span>
-                    </div>
-
-                    <div class="sidebar-item" onclick="switchTab('targets')" data-tab="targets">
-                        <i class="fas fa-bullseye"></i>
-                        <span>Targets</span>
-                    </div>
-
-                    <div class="sidebar-item" onclick="switchTab('branches')" data-tab="branches">
-                        <i class="fas fa-building"></i>
-                        <span>Branches</span>
-                    </div>
-
-                    <div class="sidebar-item" onclick="switchTab('settings')" data-tab="settings">
-                        <i class="fas fa-cog"></i>
-                        <span>Settings</span>
-                    </div>
-                    <div class="sidebar-item" onclick="switchTab('analytics')" data-tab="analytics">
-                        <i class="fas fa-chart-bar"></i>
-                        <span>Analytics</span>
-                    </div>
-
-                    <div class="sidebar-item" onclick="switchTab('reports')" data-tab="reports">
-                        <i class="fas fa-clipboard-check"></i>
-                        <span>Reports</span>
-                    </div>
-
-                    <div class="sidebar-item" onclick="switchTab('activity-feed')" data-tab="activity-feed">
-                        <i class="fas fa-stream"></i>
-                        <span>Activity Feed</span>
-                    </div>
-
-                    <div class="sidebar-item" onclick="switchTab('audit-logs')" data-tab="audit-logs">
-                        <i class="fas fa-clipboard-list"></i>
-                        <span>Audit Logs</span>
-                    </div>
-                    
-                    <!-- Active tabs - Based on subscription modules -->
-                    <div class="sidebar-item" onclick="switchTab('broadcast')" data-tab="broadcast">
-                        <i class="fas fa-bullhorn"></i>
-                        <span>Broadcast</span>
-                    </div>
-
-                    <div class="sidebar-item" onclick="switchTab('templates')" data-tab="templates">
-                        <i class="fas fa-message"></i>
-                        <span>Templates</span>
-                    </div>
-
-                    <div class="sidebar-item" onclick="switchTab('unsubscribed')" data-tab="unsubscribed">
-                        <i class="fas fa-user-slash"></i>
-                        <span>Unsubscribed</span>
-                    </div>
-                    <!-- Hidden for now - focusing on broadcast functionality -->
-                    <div class="sidebar-item" onclick="switchTab('whatsapp-web')" data-tab="whatsapp-web">
-                        <i class="fas fa-qrcode"></i>
-                        <span>WhatsApp Web</span>
-                    </div>
-                    
-                    <!-- Hidden tabs -->
-                    <div class="sidebar-item" onclick="window.location.href='/discounts.html'" style="display: none;">
-                        <i class="fas fa-tags"></i>
-                        <span>Discounts</span>
-                    </div>
-                    <div class="sidebar-item" onclick="switchTab('website')" data-tab="website">
-                        <i class="fas fa-globe"></i>
-                        <span>Website Indexing</span>
-                    </div>
-                </nav>
-            </aside>
-
-            <!-- Sidebar Toggle Button -->
-            <button id="sidebarToggle" onclick="toggleSidebar()" class="sidebar-toggle text-white transition-all" aria-label="Toggle sidebar" title="Toggle sidebar">
-                <i id="sidebarToggleIcon" class="fas fa-angles-left" style="font-size: 14px;"></i>
-            </button>
-
-            <!-- Main Content Area -->
-            <div id="mainContent" class="main-content">
-                <!-- Header -->
-                <header class="glass-effect border-b border-white/20 sticky top-0 z-40">
-                    <div class="max-w-7xl mx-auto px-6 py-4">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-4">
-                                <div>
-                                    <h1 class="text-2xl font-bold text-white" id="businessName">Sales Dashboard</h1>
-                                    <p class="text-white/70 text-sm">WhatsApp AI Assistant</p>
-                                </div>
-                            </div>
-
-                            <div class="flex items-center space-x-4">
-                                <div class="relative">
-                                    <input type="text" id="globalSearch" placeholder="Search conversations, orders..." class="search-input pl-10 pr-4 py-2 rounded-xl border-0 w-64 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                                    <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
-                                </div>
-
-                                <button onclick="toggleNotifications()" class="glass-effect p-3 rounded-xl text-white hover:bg-white/20 transition-colors relative">
-                                    <i class="fas fa-bell"></i>
-                                    <span id="notifBadge" class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-xs flex items-center justify-center">0</span>
-                                </button>
-
-                                <button onclick="handleLogout()" class="glass-effect px-4 py-2 rounded-xl text-white hover:bg-white/20 transition-colors">
-                                    <i class="fas fa-sign-out-alt mr-2"></i>Logout
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </header>
 
                 <!-- Notifications Panel -->
                 <div id="notificationsPanel" class="hidden fixed top-20 right-6 w-96 max-h-[600px] rounded-2xl shadow-2xl z-40 overflow-hidden bg-slate-900/90 backdrop-blur-xl border border-white/10">
@@ -335,6 +101,240 @@
                     <div id="tabContent" class="animate-fade-in">
                         <!-- Content loaded dynamically by JavaScript -->
                     </div>
+
+                <!-- ========== FSM TABS ========== -->
+                
+                <!-- Visits Tab -->
+                <div id="visitsTab" class="hidden">
+                    <div class="max-w-7xl mx-auto px-6 py-4">
+                        <!-- Header with filters and role indicator -->
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                            <div>
+                                <h2 class="text-white text-2xl font-bold">Field Visits</h2>
+                                <p id="fsmRoleIndicator" class="text-white/60 text-sm mt-1"></p>
+                            </div>
+                            <div class="flex flex-wrap gap-3">
+                                <select id="visitBranchFilter" onchange="loadVisits()" class="px-4 py-2 rounded-lg bg-white/10 text-white border border-white/20">
+                                    <option value="">All Branches</option>
+                                </select>
+                                <select id="visitSalesmanFilter" onchange="loadVisits()" class="px-4 py-2 rounded-lg bg-white/10 text-white border border-white/20">
+                                    <option value="">All Salesmen</option>
+                                </select>
+                                <input type="date" id="visitDateFrom" onchange="loadVisits()" class="px-4 py-2 rounded-lg bg-white/10 text-white border border-white/20" />
+                                <input type="date" id="visitDateTo" onchange="loadVisits()" class="px-4 py-2 rounded-lg bg-white/10 text-white border border-white/20" />
+                                <button onclick="exportVisitsExcel()" class="px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg text-white">
+                                    <i class="fas fa-download mr-2"></i>Export Excel
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Stats Cards -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                            <div class="stat-card p-4 rounded-xl">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-white/60 text-sm">Total Visits</p>
+                                        <p class="text-white text-2xl font-bold" id="totalVisitsCount">0</p>
+                                    </div>
+                                    <i class="fas fa-map-marker-alt text-blue-400 text-3xl"></i>
+                                </div>
+                            </div>
+                            <div class="stat-card p-4 rounded-xl">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-white/60 text-sm">Completed Today</p>
+                                        <p class="text-white text-2xl font-bold" id="todayVisitsCount">0</p>
+                                    </div>
+                                    <i class="fas fa-check-circle text-green-400 text-3xl"></i>
+                                </div>
+                            </div>
+                            <div class="stat-card p-4 rounded-xl">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-white/60 text-sm">Active Salesmen</p>
+                                        <p class="text-white text-2xl font-bold" id="activeSalesmenCount">0</p>
+                                    </div>
+                                    <i class="fas fa-user-tie text-purple-400 text-3xl"></i>
+                                </div>
+                            </div>
+                            <div class="stat-card p-4 rounded-xl">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-white/60 text-sm">Avg. Visit Duration</p>
+                                        <p class="text-white text-2xl font-bold" id="avgVisitDuration">0</p>
+                                        <p class="text-white/60 text-xs">minutes</p>
+                                    </div>
+                                    <i class="fas fa-clock text-yellow-400 text-3xl"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Visits Table -->
+                        <div class="glass-effect rounded-xl p-6 overflow-x-auto">
+                            <table class="w-full" id="visitsTable">
+                                <thead>
+                                    <tr class="text-white/60 text-sm border-b border-white/10">
+                                        <th class="text-left py-3 px-4">Date</th>
+                                        <th class="text-left py-3 px-4">Customer</th>
+                                        <th class="text-left py-3 px-4">Salesman</th>
+                                        <th class="text-left py-3 px-4">Branch</th>
+                                        <th class="text-left py-3 px-4">Type</th>
+                                        <th class="text-left py-3 px-4">Duration</th>
+                                        <th class="text-left py-3 px-4">Potential</th>
+                                        <th class="text-left py-3 px-4">Status</th>
+                                        <th class="text-left py-3 px-4">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="visitsTableBody">
+                                    <tr>
+                                        <td colspan="9" class="text-center py-8 text-white/60">
+                                            <i class="fas fa-spinner fa-spin mr-2"></i>Loading visits...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Salesmen Tab -->
+                <div id="salesmenTab" class="hidden">
+                    <div class="max-w-7xl mx-auto px-6 py-4">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-white text-2xl font-bold">Sales Team</h2>
+                            <button onclick="showAddSalesmanModal()" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-white">
+                                <i class="fas fa-plus mr-2"></i>Add Salesman
+                            </button>
+                        </div>
+
+                        <!-- Salesmen Table -->
+                        <div class="glass-effect rounded-xl p-6 overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="text-white/60 text-sm border-b border-white/10">
+                                        <th class="text-left py-3 px-4">Name</th>
+                                        <th class="text-left py-3 px-4">Phone</th>
+                                        <th class="text-left py-3 px-4">Email</th>
+                                        <th class="text-left py-3 px-4">Branch</th>
+                                        <th class="text-left py-3 px-4">Status</th>
+                                        <th class="text-left py-3 px-4">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="salesmenTableBody">
+                                    <tr>
+                                        <td colspan="6" class="text-center py-8 text-white/60">
+                                            <i class="fas fa-spinner fa-spin mr-2"></i>Loading salesmen...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Targets Tab -->
+                <div id="targetsTab" class="hidden">
+                    <div class="max-w-7xl mx-auto px-6 py-4">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-white text-2xl font-bold">Sales Targets</h2>
+                            <button onclick="showAddTargetModal()" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-white">
+                                <i class="fas fa-plus mr-2"></i>Add Target
+                            </button>
+                        </div>
+
+                        <!-- Targets Summary -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div class="stat-card p-4 rounded-xl">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-white/60 text-sm">Total Targets</p>
+                                        <p class="text-white text-2xl font-bold" id="totalTargetsCount">0</p>
+                                    </div>
+                                    <i class="fas fa-bullseye text-blue-400 text-3xl"></i>
+                                </div>
+                            </div>
+                            <div class="stat-card p-4 rounded-xl">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-white/60 text-sm">Achieved Targets</p>
+                                        <p class="text-white text-2xl font-bold" id="achievedTargetsCount">0</p>
+                                    </div>
+                                    <i class="fas fa-check text-green-400 text-3xl"></i>
+                                </div>
+                            </div>
+                            <div class="stat-card p-4 rounded-xl">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-white/60 text-sm">Pending Targets</p>
+                                        <p class="text-white text-2xl font-bold" id="pendingTargetsCount">0</p>
+                                    </div>
+                                    <i class="fas fa-chart-line text-purple-400 text-3xl"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Targets Table -->
+                        <div class="glass-effect rounded-xl p-6 overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="text-white/60 text-sm border-b border-white/10">
+                                        <th class="text-left py-3 px-4">Salesman</th>
+                                        <th class="text-left py-3 px-4">Month</th>
+                                        <th class="text-left py-3 px-4">Visit Target</th>
+                                        <th class="text-left py-3 px-4">Achieved Visits</th>
+                                        <th class="text-left py-3 px-4">Order Target</th>
+                                        <th class="text-left py-3 px-4">Achieved Orders</th>
+                                        <th class="text-left py-3 px-4">Revenue Target</th>
+                                        <th class="text-left py-3 px-4">Achieved Revenue</th>
+                                        <th class="text-left py-3 px-4">Progress</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="targetsTableBody">
+                                    <tr>
+                                        <td colspan="9" class="text-center py-8 text-white/60">
+                                            <i class="fas fa-spinner fa-spin mr-2"></i>Loading targets...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Branches Tab -->
+                <div id="branchesTab" class="hidden">
+                    <div class="max-w-7xl mx-auto">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-white text-2xl font-bold">Branches & Plants</h2>
+                            <button onclick="showAddBranchModal()" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-white">
+                                <i class="fas fa-plus mr-2"></i>Add Branch
+                            </button>
+                        </div>
+
+                        <!-- Branches Table -->
+                        <div class="glass-effect rounded-xl p-6 overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="text-white/60 text-sm border-b border-white/10">
+                                        <th class="text-left py-3 px-4">Branch Name</th>
+                                        <th class="text-left py-3 px-4">Location</th>
+                                        <th class="text-left py-3 px-4">Contact</th>
+                                        <th class="text-left py-3 px-4">Assigned Salesmen</th>
+                                        <th class="text-left py-3 px-4">Status</th>
+                                        <th class="text-left py-3 px-4">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="branchesTableBody">
+                                    <tr>
+                                        <td colspan="6" class="text-center py-8 text-white/60">
+                                            <i class="fas fa-spinner fa-spin mr-2"></i>Loading branches...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- FIXED: Customers Tab (separate from tabContent) -->
                 <div id="customersTab" class="hidden">
