@@ -17,7 +17,17 @@ router.get('/visits', async (req, res) => {
   try {
     const { salesman_id, plant_id, start_date, end_date, visit_type, limit = 300, role, user_plant_id } = req.query;
     
-    let query = 'SELECT * FROM visits WHERE 1=1';
+    let query = `
+      SELECT 
+        v.*,
+        s.name as salesman_name,
+        s.phone as salesman_phone,
+        COALESCE(p.name, v.plant_id) as plant_name
+      FROM visits v
+      LEFT JOIN salesmen s ON s.id = v.salesman_id
+      LEFT JOIN plants p ON p.id = v.plant_id
+      WHERE 1=1
+    `;
     const params = [];
     
     // Role-based filtering
@@ -25,41 +35,41 @@ router.get('/visits', async (req, res) => {
     // - 'plant_admin': See only their plant
     // - 'salesman': See only their own visits
     if (role === 'salesman' && salesman_id) {
-      query += ' AND salesman_id = ?';
+      query += ' AND v.salesman_id = ?';
       params.push(salesman_id);
     } else if (role === 'plant_admin' && user_plant_id) {
-      query += ' AND plant_id = ?';
+      query += ' AND v.plant_id = ?';
       params.push(user_plant_id);
     }
     // super_admin and admin see all - no additional filter
     
     // Additional filters
     if (salesman_id && role !== 'salesman') {
-      query += ' AND salesman_id = ?';
+      query += ' AND v.salesman_id = ?';
       params.push(salesman_id);
     }
     
     if (plant_id) {
-      query += ' AND plant_id = ?';
+      query += ' AND v.plant_id = ?';
       params.push(plant_id);
     }
     
     if (start_date) {
-      query += ' AND visit_date >= ?';
+      query += ' AND v.visit_date >= ?';
       params.push(start_date);
     }
     
     if (end_date) {
-      query += ' AND visit_date <= ?';
+      query += ' AND v.visit_date <= ?';
       params.push(end_date);
     }
     
     if (visit_type) {
-      query += ' AND visit_type = ?';
+      query += ' AND v.visit_type = ?';
       params.push(visit_type);
     }
     
-    query += ' ORDER BY visit_date DESC, created_at DESC LIMIT ?';
+    query += ' ORDER BY v.visit_date DESC, v.created_at DESC LIMIT ?';
     params.push(parseInt(limit));
     
     const visits = db.prepare(query).all(...params);

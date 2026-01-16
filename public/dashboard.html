@@ -108,6 +108,11 @@
         }
         .sidebar-toggle:hover { background: rgba(255,255,255,0.22); }
         .sidebar-toggle.collapsed { left: calc(80px - 18px); }
+        #visitBranchFilter option,
+        #visitSalesmanFilter option {
+            color: #111;
+            background: #fff;
+        }
         @media (max-width: 768px) {
             .sidebar { transform: translateX(-100%); }
             .sidebar.mobile-open { transform: translateX(0); }
@@ -8119,7 +8124,7 @@
             const salesmanFilter = document.getElementById('visitSalesmanFilter');
             if (salesmanFilter) {
                 salesmanFilter.innerHTML = '<option value="">All Salesmen</option>' + 
-                    salesmen.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+                    salesmen.map(s => `<option value="${s.id}">${escapeHtml(s.name || s.phone || 'Salesman')}</option>`).join('');
 
                 if (state.fsmUser?.role === 'salesman' && state.fsmUser.salesman_id) {
                     salesmanFilter.value = state.fsmUser.salesman_id;
