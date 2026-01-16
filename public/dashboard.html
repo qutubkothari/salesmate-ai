@@ -7429,9 +7429,11 @@
                 }
                 state.session.tenantId = tenantId;
 
-                // Force Hylite tenant id for FSM data
+                // Fallback to Hylite tenant id only if session is missing tenant
                 const HYLITE_TENANT_ID = '112f12b8-55e9-4de8-9fda-d58e37c75796';
-                state.session.tenantId = HYLITE_TENANT_ID;
+                if (!state.session.tenantId) {
+                    state.session.tenantId = HYLITE_TENANT_ID;
+                }
 
                 // Normalize optional fields to avoid redirect loops if tenant metadata is incomplete
                 state.session.businessName =

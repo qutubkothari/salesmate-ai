@@ -1089,6 +1089,42 @@ function ensureSqliteSchema(dbInstance) {
     );
   `);
 
+  // FSM Users (branch/admin/salesman logins)
+  exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+      tenant_id TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      name TEXT NOT NULL,
+      password TEXT,
+      password_hash TEXT,
+      role TEXT DEFAULT 'salesman',
+      email TEXT,
+      assigned_plants TEXT DEFAULT '[]',
+      preferred_language TEXT DEFAULT 'en',
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (DATETIME('now')),
+      updated_at TEXT DEFAULT (DATETIME('now')),
+      FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+      UNIQUE(tenant_id, phone)
+    );
+  `);
+
+  ensureColumns('users', [
+    { name: 'password', type: 'TEXT' },
+    { name: 'password_hash', type: 'TEXT' },
+    { name: 'role', type: "TEXT DEFAULT 'salesman'" },
+    { name: 'email', type: 'TEXT' },
+    { name: 'assigned_plants', type: "TEXT DEFAULT '[]'" },
+    { name: 'preferred_language', type: "TEXT DEFAULT 'en'" },
+    { name: 'is_active', type: 'INTEGER DEFAULT 1' }
+  ]);
+
+  exec(`CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);`);
+  exec(`CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);`);
+  exec(`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);`);
+  exec(`CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);`);
+
   // Sales team / assignees for triage (local SQLite)
   exec(`
     CREATE TABLE IF NOT EXISTS sales_users (

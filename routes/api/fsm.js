@@ -496,14 +496,89 @@ router.get('/user/profile', async (req, res) => {
     let role = 'super_admin';
     let plant_id = null;
     let salesman_id = null;
+    let assigned_plants = [];
+
+    const normalizePhoneDigits = (value) => {
+      if (!value) return '';
+      const withoutSuffix = String(value).replace(/@c\.us$/i, '');
+      return withoutSuffix.replace(/\D/g, '');
+    };
+
+    const parseAssignedPlants = (value) => {
+      if (!value) return [];
+      if (Array.isArray(value)) return value.filter(Boolean);
+      const str = String(value).trim();
+      if (!str) return [];
+      try {
+        const parsed = JSON.parse(str);
+        return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+      } catch {
+        return [];
+      }
+    };
+
+    let user = null;
+
+    if (user_id) {
+      try {
+        user = db.prepare('SELECT * FROM users WHERE id = ?').get(user_id);
+      } catch (e) {
+        console.warn('[FSM_API] Users table lookup failed:', e?.message || e);
+      }
+    }
+
+    if (!user && phone) {
+      try {
+        const inputDigits = normalizePhoneDigits(phone);
+        const allUsers = db.prepare('SELECT * FROM users').all();
+        const matches = allUsers.filter((u) => {
+          const digits = normalizePhoneDigits(u.phone);
+          return digits && (digits === inputDigits || digits.endsWith(inputDigits));
+        });
+        if (matches.length === 1) {
+          user = matches[0];
+        } else if (matches.length > 1) {
+          user = matches.find((u) => normalizePhoneDigits(u.phone) === inputDigits) || null;
+        }
+      } catch (e) {
+        console.warn('[FSM_API] Users phone lookup failed:', e?.message || e);
+      }
+    }
+
+    if (user) {
+      assigned_plants = parseAssignedPlants(user.assigned_plants);
+      const rawRole = String(user.role || '').toLowerCase();
+
+      if (rawRole === 'salesman') {
+        role = 'salesman';
+      } else if (rawRole === 'super_admin') {
+        role = 'super_admin';
+      } else if (rawRole === 'admin') {
+        role = assigned_plants.length > 0 ? 'plant_admin' : 'super_admin';
+      }
+
+      if (role === 'salesman') {
+        const salesmanByUser = user.id ? db.prepare('SELECT * FROM salesmen WHERE user_id = ?').get(user.id) : null;
+        const salesmanByPhone = !salesmanByUser && user.phone ? db.prepare('SELECT * FROM salesmen WHERE phone = ?').get(user.phone) : null;
+        const salesman = salesmanByUser || salesmanByPhone || null;
+        if (salesman) {
+          salesman_id = salesman.id;
+          plant_id = salesman.plant_id;
+        }
+      } else if (role === 'plant_admin' && assigned_plants.length > 0) {
+        plant_id = assigned_plants[0];
+      }
+    }
     
     if (phone) {
       // Check if this phone belongs to a salesman
-      const salesman = db.prepare('SELECT * FROM salesmen WHERE phone = ?').get(phone);
-      if (salesman) {
-        role = 'salesman';
-        salesman_id = salesman.id;
-        plant_id = salesman.plant_id;
+      if (!user) {
+        const salesman = db.prepare('SELECT * FROM salesmen WHERE phone = ?').get(phone);
+        if (salesman) {
+          role = 'salesman';
+          salesman_id = salesman.id;
+          plant_id = salesman.plant_id;
+        }
       }
     }
     
@@ -513,6 +588,7 @@ router.get('/user/profile', async (req, res) => {
         role,
         plant_id,
         salesman_id,
+        assigned_plants,
         access_level: role === 'super_admin' ? 'all' : role === 'plant_admin' ? 'plant' : 'self'
       }
     });

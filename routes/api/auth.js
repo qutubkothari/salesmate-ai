@@ -57,6 +57,143 @@ router.post('/login', async (req, res) => {
 
         console.log('[AUTH] Login attempt for phone digits:', inputDigits);
 
+        const parseAssignedPlants = (value) => {
+            if (!value) return [];
+            if (Array.isArray(value)) return value.filter(Boolean);
+            const str = String(value).trim();
+            if (!str) return [];
+            try {
+                const parsed = JSON.parse(str);
+                return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+            } catch {
+                return [];
+            }
+        };
+
+        const verifyUserPassword = async (userRow) => {
+            if (userRow?.password_hash) {
+                return bcrypt.compare(String(password), String(userRow.password_hash));
+            }
+            if (userRow?.password) {
+                return String(password) === String(userRow.password);
+            }
+            return false;
+        };
+
+        const phoneFormats = [
+            inputDigits,
+            `${inputDigits}@c.us`
+        ];
+
+        const findUserByPhone = async () => {
+            try {
+                for (const phoneFormat of phoneFormats) {
+                    const { data: directUser, error } = await dbClient
+                        .from('users')
+                        .select('*')
+                        .eq('phone', phoneFormat)
+                        .single();
+
+                    if (directUser && !error) {
+                        return directUser;
+                    }
+                }
+
+                const { data: allUsers } = await dbClient
+                    .from('users')
+                    .select('*');
+
+                if (!Array.isArray(allUsers)) return null;
+
+                const matches = allUsers.filter((u) => {
+                    const digits = normalizePhoneDigits(u.phone);
+                    return digits && (digits === inputDigits || digits.endsWith(inputDigits));
+                });
+
+                if (matches.length === 1) return matches[0];
+                if (matches.length > 1) {
+                    return matches.find((u) => normalizePhoneDigits(u.phone) === inputDigits) || null;
+                }
+            } catch (e) {
+                // Ignore user-table lookup failures and fall back to tenant login
+                console.warn('[AUTH] Users lookup skipped:', e?.message || e);
+            }
+
+            return null;
+        };
+
+        const fsmUser = await findUserByPhone();
+        if (fsmUser) {
+            if (Number(fsmUser.is_active ?? 1) === 0) {
+                return res.status(401).json({
+                    success: false,
+                    error: 'Account is inactive'
+                });
+            }
+
+            const isValid = await verifyUserPassword(fsmUser);
+            if (!isValid) {
+                console.log('[AUTH] Invalid password for FSM user:', inputDigits);
+                return res.status(401).json({
+                    success: false,
+                    error: 'Invalid phone number or password'
+                });
+            }
+
+            let tenant = null;
+            if (fsmUser.tenant_id) {
+                const { data: tenantRow } = await dbClient
+                    .from('tenants')
+                    .select('*')
+                    .eq('id', fsmUser.tenant_id)
+                    .maybeSingle();
+                tenant = tenantRow || null;
+            }
+
+            let salesman = null;
+            try {
+                if (fsmUser.id) {
+                    const { data: salesmanByUser } = await dbClient
+                        .from('salesmen')
+                        .select('*')
+                        .eq('user_id', fsmUser.id)
+                        .maybeSingle();
+                    salesman = salesmanByUser || null;
+                }
+                if (!salesman && fsmUser.phone) {
+                    const { data: salesmanByPhone } = await dbClient
+                        .from('salesmen')
+                        .select('*')
+                        .eq('phone', fsmUser.phone)
+                        .maybeSingle();
+                    salesman = salesmanByPhone || null;
+                }
+            } catch (e) {
+                console.warn('[AUTH] Salesman lookup skipped:', e?.message || e);
+            }
+
+            const assignedPlants = parseAssignedPlants(fsmUser.assigned_plants);
+
+            const session = {
+                tenantId: fsmUser.tenant_id || tenant?.id || null,
+                businessName: tenant?.business_name || tenant?.company_name || tenant?.name || fsmUser.name || inputDigits,
+                phoneNumber: fsmUser.phone || phone,
+                role: fsmUser.role || 'salesman',
+                userId: fsmUser.id,
+                assignedPlants,
+                plantId: salesman?.plant_id || (assignedPlants.length === 1 ? assignedPlants[0] : null),
+                salesmanId: salesman?.id || null,
+                loginTime: new Date().toISOString()
+            };
+
+            res.json({
+                success: true,
+                message: 'Login successful',
+                session
+            });
+            return;
+        }
+
         // Try multiple phone number formats to find tenant
         // Format 1: Just digits (e.g., 919537653927)
         // Format 2: With @c.us suffix (e.g., 919537653927@c.us)

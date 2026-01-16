@@ -88,6 +88,30 @@ CREATE TABLE tenants (
     updated_at TEXT DEFAULT (DATETIME('now'))
 );
 
+-- FSM Users table (branch/admin/salesman logins)
+CREATE TABLE users (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    tenant_id TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    name TEXT NOT NULL,
+    password TEXT,
+    password_hash TEXT,
+    role TEXT DEFAULT 'salesman',
+    email TEXT,
+    assigned_plants TEXT DEFAULT '[]',
+    preferred_language TEXT DEFAULT 'en',
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (DATETIME('now')),
+    updated_at TEXT DEFAULT (DATETIME('now')),
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+    UNIQUE(tenant_id, phone)
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
+
 -- WhatsApp Connections table
 CREATE TABLE whatsapp_connections (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
