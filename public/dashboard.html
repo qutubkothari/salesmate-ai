@@ -7428,6 +7428,13 @@
                 }
                 state.session.tenantId = tenantId;
 
+                // Force Hylite tenant id when business name matches (prevents empty data)
+                const HYLITE_TENANT_ID = '112f12b8-55e9-4de8-9fda-d58e37c75796';
+                const businessName = (state.session.businessName || state.session.business_name || '').toLowerCase();
+                if (businessName.includes('hylite')) {
+                    state.session.tenantId = HYLITE_TENANT_ID;
+                }
+
                 // Normalize optional fields to avoid redirect loops if tenant metadata is incomplete
                 state.session.businessName =
                     state.session.businessName ||
