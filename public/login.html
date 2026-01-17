@@ -267,6 +267,20 @@
     <script>
         let currentTab = 'login';
 
+        // Prefill phone number if provided via query param (e.g., routed from /salesman-login.html)
+        (function prefillPhoneFromQuery() {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const phone = params.get('phone');
+                if (phone) {
+                    const phoneInput = document.getElementById('phone');
+                    if (phoneInput) phoneInput.value = phone;
+                    const passwordInput = document.getElementById('password');
+                    if (passwordInput) passwordInput.focus();
+                }
+            } catch (_) {}
+        })();
+
         // Switch between login and register tabs
         function switchTab(tab) {
             currentTab = tab;

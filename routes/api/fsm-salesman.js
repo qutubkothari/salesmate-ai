@@ -3,6 +3,7 @@ const router = express.Router();
 const Database = require('better-sqlite3');
 const path = require('path');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 
 // Direct SQLite connection
 // __dirname is <repo>/routes/api, so go to repo root for local-database.db
@@ -23,6 +24,27 @@ function dbRun(sql, params = []) {
 
 function getTenantId(req) {
     return req.query.tenant_id || req.body?.tenant_id || req.headers['x-tenant-id'];
+}
+
+function normalizePhoneDigits(value) {
+    if (!value) return '';
+    const withoutSuffix = String(value).replace(/@c\.us$/i, '');
+    return withoutSuffix.replace(/\D/g, '');
+}
+
+function verifyUserPassword(userRow, password) {
+    if (!userRow) return false;
+    if (userRow.password_hash) {
+        try {
+            return bcrypt.compareSync(String(password), String(userRow.password_hash));
+        } catch (_) {
+            return false;
+        }
+    }
+    if (userRow.password) {
+        return String(password) === String(userRow.password);
+    }
+    return false;
 }
 
 function hashToken(token) {
@@ -120,20 +142,90 @@ function authenticateSalesman(req, res, next) {
 // Login (creates a session token)
 router.post('/salesman/login', (req, res) => {
     try {
-        const tenantId = getTenantId(req);
-        const { salesman_id, phone, device_id, device_type, device_name, app_version, platform, fcm_token } = req.body || {};
+        let tenantId = getTenantId(req);
+        let { salesman_id, phone, password, device_id, device_type, device_name, app_version, platform, fcm_token } = req.body || {};
+
+        if (!device_id) return res.status(400).json({ success: false, error: 'device_id is required' });
+
+        // New: allow login via { phone, password } (no tenant/salesman selection)
+        if ((!tenantId || !salesman_id) && phone) {
+            const inputDigits = normalizePhoneDigits(phone);
+            if (!inputDigits) return res.status(400).json({ success: false, error: 'Phone number is invalid' });
+            if (!password) return res.status(400).json({ success: false, error: 'Password is required' });
+
+            let matchedUser = null;
+            try {
+                const allUsers = dbAll('SELECT * FROM users');
+                const matches = allUsers.filter((u) => {
+                    const digits = normalizePhoneDigits(u.phone);
+                    return digits && (digits === inputDigits || digits.endsWith(inputDigits));
+                });
+
+                if (matches.length === 1) matchedUser = matches[0];
+                else if (matches.length > 1) {
+                    matchedUser = matches.find((u) => normalizePhoneDigits(u.phone) === inputDigits) || matches[0] || null;
+                }
+            } catch (e) {
+                console.warn('[FSM_SALESMAN] Users lookup failed:', e?.message || e);
+            }
+
+            if (!matchedUser) {
+                return res.status(401).json({ success: false, error: 'Invalid phone number or password' });
+            }
+            if (Number(matchedUser.is_active ?? 1) === 0) {
+                return res.status(403).json({ success: false, error: 'Account is inactive' });
+            }
+
+            const ok = verifyUserPassword(matchedUser, password);
+            if (!ok) {
+                return res.status(401).json({ success: false, error: 'Invalid phone number or password' });
+            }
+
+            const rawRole = String(matchedUser.role || '').toLowerCase();
+            if (rawRole !== 'salesman') {
+                return res.status(403).json({ success: false, error: 'Not a salesman account. Please use admin login.' });
+            }
+
+            // Resolve salesman record
+            let salesman = null;
+            try {
+                if (matchedUser.id) {
+                    salesman = dbGet('SELECT * FROM salesmen WHERE user_id = ?', [matchedUser.id]) || null;
+                }
+                if (!salesman && matchedUser.phone) {
+                    salesman = dbGet('SELECT * FROM salesmen WHERE phone = ? AND tenant_id = ?', [matchedUser.phone, matchedUser.tenant_id]) || null;
+                }
+                if (!salesman && inputDigits) {
+                    const allSalesmen = dbAll('SELECT * FROM salesmen');
+                    const matches = allSalesmen.filter((s) => {
+                        const digits = normalizePhoneDigits(s.phone);
+                        return digits && (digits === inputDigits || digits.endsWith(inputDigits));
+                    });
+                    salesman = matches.find((s) => normalizePhoneDigits(s.phone) === inputDigits) || matches[0] || null;
+                }
+            } catch (e) {
+                console.warn('[FSM_SALESMAN] Salesmen lookup failed:', e?.message || e);
+            }
+
+            if (!salesman) {
+                return res.status(404).json({ success: false, error: 'Salesman not found' });
+            }
+            if (salesman.is_active === 0) return res.status(403).json({ success: false, error: 'Salesman inactive' });
+
+            tenantId = matchedUser.tenant_id || salesman.tenant_id;
+            salesman_id = salesman.id;
+            phone = inputDigits;
+        }
 
         if (!tenantId) return res.status(400).json({ success: false, error: 'tenant_id is required' });
         if (!salesman_id) return res.status(400).json({ success: false, error: 'salesman_id is required' });
-        if (!device_id) return res.status(400).json({ success: false, error: 'device_id is required' });
 
         const salesman = dbGet('SELECT * FROM salesmen WHERE id = ? AND tenant_id = ?', [salesman_id, tenantId]);
         if (!salesman) return res.status(404).json({ success: false, error: 'Salesman not found' });
         if (salesman.is_active === 0) return res.status(403).json({ success: false, error: 'Salesman inactive' });
 
-        const normalizePhone = (v) => String(v || '').replace(/\D/g, '');
-        const providedPhone = normalizePhone(phone);
-        const dbPhone = normalizePhone(salesman.phone);
+        const providedPhone = normalizePhoneDigits(phone);
+        const dbPhone = normalizePhoneDigits(salesman.phone);
         if (providedPhone && dbPhone && providedPhone !== dbPhone) {
             return res.status(401).json({ success: false, error: 'Phone number does not match' });
         }

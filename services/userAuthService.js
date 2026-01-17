@@ -146,27 +146,81 @@ async function acceptInvitation({ invitationToken, password }) {
 }
 
 /**
- * Login with email and password
+ * Login with phone (preferred) or email and password
  */
-async function loginWithPassword({ email, password }) {
-  // Find user by email
-  const { data: user, error } = await dbClient
-    .from('sales_users')
-    .select('*')
-    .eq('email', email)
-    .eq('status', 'active')
-    .eq('is_active', 1)
-    .single();
-
-  if (error || !user) {
-    throw new Error('Invalid email or password');
+async function loginWithPassword({ email, phone, password }) {
+  if ((!email && !phone) || !password) {
+    throw new Error('Phone (or email) and password are required');
   }
 
-  // Verify password
-  const isValid = await verifyPassword(password, user.password_hash);
+  const normalizePhoneDigits = (value) => {
+    if (!value) return '';
+    const withoutSuffix = String(value).replace(/@c\.us$/i, '');
+    return withoutSuffix.replace(/\D/g, '');
+  };
 
+  let user = null;
+
+  if (email) {
+    const { data: byEmail, error } = await dbClient
+      .from('sales_users')
+      .select('*')
+      .eq('email', String(email).trim().toLowerCase())
+      .eq('status', 'active')
+      .eq('is_active', 1)
+      .maybeSingle();
+
+    if (!error && byEmail) user = byEmail;
+  }
+
+  if (!user && phone) {
+    const inputDigits = normalizePhoneDigits(phone);
+    if (!inputDigits) throw new Error('Invalid phone or password');
+
+    try {
+      // Fast path: direct match
+      const { data: direct } = await dbClient
+        .from('sales_users')
+        .select('*')
+        .eq('phone', inputDigits)
+        .eq('status', 'active')
+        .eq('is_active', 1)
+        .maybeSingle();
+
+      if (direct) user = direct;
+    } catch (_) {
+      // ignore
+    }
+
+    if (!user) {
+      const { data: allUsers } = await dbClient
+        .from('sales_users')
+        .select('*')
+        .eq('status', 'active')
+        .eq('is_active', 1);
+
+      if (Array.isArray(allUsers)) {
+        const matches = allUsers.filter((u) => {
+          const digits = normalizePhoneDigits(u.phone);
+          return digits && (digits === inputDigits || digits.endsWith(inputDigits));
+        });
+
+        if (matches.length === 1) user = matches[0];
+        else if (matches.length > 1) {
+          // Fail closed if ambiguous
+          throw new Error('Multiple accounts match this phone number');
+        }
+      }
+    }
+  }
+
+  if (!user) {
+    throw new Error('Invalid phone or password');
+  }
+
+  const isValid = await verifyPassword(password, user.password_hash);
   if (!isValid) {
-    throw new Error('Invalid email or password');
+    throw new Error('Invalid phone or password');
   }
 
   // Create session

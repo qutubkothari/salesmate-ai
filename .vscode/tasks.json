@@ -63,6 +63,20 @@
 				"Auto-deploy: salesman auth + offline sync + notifications"
 			],
 			"isBackground": false
+		},
+		{
+			"label": "Deploy to Hostinger VPS (auto)",
+			"type": "shell",
+			"command": "powershell.exe",
+			"args": [
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}/deploy-salesmate-hostinger.ps1",
+				"-Message",
+				"Auto-deploy: all logins phone+password"
+			],
+			"isBackground": false
 		}
 	],
 	"inputs": [

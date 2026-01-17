@@ -192,14 +192,14 @@
         
         <form id="login-form">
             <div class="form-group">
-                <label for="email">Email Address</label>
+                <label for="phone">Phone Number</label>
                 <input 
-                    type="email" 
-                    id="email" 
-                    name="email"
-                    placeholder="your@email.com"
+                    type="tel" 
+                    id="phone" 
+                    name="phone"
+                    placeholder="e.g. 971501234567"
                     required
-                    autocomplete="email"
+                    autocomplete="tel"
                 >
             </div>
             
@@ -246,7 +246,7 @@
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const email = document.getElementById('email').value;
+            const phone = document.getElementById('phone').value;
             const password = document.getElementById('password').value;
             
             // Clear previous error
@@ -262,7 +262,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ email, password })
+                    body: JSON.stringify({ phone, password })
                 });
                 
                 const data = await response.json();

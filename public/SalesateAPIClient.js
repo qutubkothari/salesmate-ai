@@ -62,10 +62,10 @@ class SalesateAPIClient {
   // ========== AUTHENTICATION ==========
 
   /**
-   * Login with email and password
+   * Login with phone and password
    */
-  async login(email, password) {
-    return this.request('POST', '/api/auth/login', { email, password });
+  async login(phone, password) {
+    return this.request('POST', '/api/auth/login', { phone, password });
   }
 
   /**

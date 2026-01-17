@@ -912,6 +912,13 @@ router.get('/user/profile', async (req, res) => {
     let plant_id = null;
     let salesman_id = null;
     let assigned_plants = [];
+    let tenant_id = null;
+    let tenant_business_name = null;
+    let resolved_user_id = null;
+    let resolved_user_name = null;
+    let resolved_salesman_name = null;
+    let ambiguous = false;
+    let candidates = [];
 
     const normalizePhoneDigits = (value) => {
       if (!value) return '';
@@ -929,6 +936,16 @@ router.get('/user/profile', async (req, res) => {
         return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
       } catch {
         return [];
+      }
+    };
+
+    const getTenantBusinessName = (tenantId) => {
+      if (!tenantId) return null;
+      try {
+        const tenantRow = db.prepare('SELECT business_name FROM tenants WHERE id = ?').get(tenantId);
+        return tenantRow?.business_name || null;
+      } catch (e) {
+        return null;
       }
     };
 
@@ -953,7 +970,16 @@ router.get('/user/profile', async (req, res) => {
         if (matches.length === 1) {
           user = matches[0];
         } else if (matches.length > 1) {
-          user = matches.find((u) => normalizePhoneDigits(u.phone) === inputDigits) || null;
+          ambiguous = true;
+          candidates = matches.slice(0, 10).map((u) => ({
+            type: 'user',
+            user_id: u.id,
+            tenant_id: u.tenant_id,
+            name: u.name,
+            role: u.role,
+            phone: u.phone
+          }));
+          user = matches.find((u) => normalizePhoneDigits(u.phone) === inputDigits) || matches[0] || null;
         }
       } catch (e) {
         console.warn('[FSM_API] Users phone lookup failed:', e?.message || e);
@@ -961,6 +987,10 @@ router.get('/user/profile', async (req, res) => {
     }
 
     if (user) {
+      resolved_user_id = user.id || null;
+      resolved_user_name = user.name || null;
+      tenant_id = user.tenant_id || null;
+      tenant_business_name = getTenantBusinessName(tenant_id);
       assigned_plants = parseAssignedPlants(user.assigned_plants);
       const rawRole = String(user.role || '').toLowerCase();
 
@@ -979,6 +1009,11 @@ router.get('/user/profile', async (req, res) => {
         if (salesman) {
           salesman_id = salesman.id;
           plant_id = salesman.plant_id;
+          resolved_salesman_name = salesman.name || null;
+          if (!tenant_id) {
+            tenant_id = salesman.tenant_id || null;
+            tenant_business_name = getTenantBusinessName(tenant_id);
+          }
         }
       } else if (role === 'plant_admin' && assigned_plants.length > 0) {
         plant_id = assigned_plants[0];
@@ -988,11 +1023,49 @@ router.get('/user/profile', async (req, res) => {
     if (phone) {
       // Check if this phone belongs to a salesman
       if (!user) {
-        const salesman = db.prepare('SELECT * FROM salesmen WHERE phone = ?').get(phone);
+        const inputDigits = normalizePhoneDigits(phone);
+        let salesman = null;
+        try {
+          salesman = db.prepare('SELECT * FROM salesmen WHERE phone = ?').get(phone) || null;
+        } catch (_) {
+          salesman = null;
+        }
+
+        if (!salesman && inputDigits) {
+          try {
+            const allSalesmen = db.prepare('SELECT * FROM salesmen').all();
+            const matches = allSalesmen.filter((s) => {
+              const digits = normalizePhoneDigits(s.phone);
+              return digits && (digits === inputDigits || digits.endsWith(inputDigits));
+            });
+            if (matches.length > 0) {
+              if (matches.length > 1) {
+                ambiguous = true;
+                candidates = candidates.concat(
+                  matches.slice(0, 10).map((s) => ({
+                    type: 'salesman',
+                    salesman_id: s.id,
+                    tenant_id: s.tenant_id,
+                    name: s.name,
+                    phone: s.phone,
+                    plant_id: s.plant_id
+                  }))
+                );
+              }
+              salesman = matches.find((s) => normalizePhoneDigits(s.phone) === inputDigits) || matches[0] || null;
+            }
+          } catch (e) {
+            console.warn('[FSM_API] Salesmen phone lookup failed:', e?.message || e);
+          }
+        }
+
         if (salesman) {
           role = 'salesman';
           salesman_id = salesman.id;
           plant_id = salesman.plant_id;
+          resolved_salesman_name = salesman.name || null;
+          tenant_id = salesman.tenant_id || null;
+          tenant_business_name = getTenantBusinessName(tenant_id);
         }
       }
     }
@@ -1003,7 +1076,14 @@ router.get('/user/profile', async (req, res) => {
         role,
         plant_id,
         salesman_id,
+        salesman_name: resolved_salesman_name,
+        user_id: resolved_user_id,
+        user_name: resolved_user_name,
+        tenant_id,
+        tenant_business_name,
         assigned_plants,
+        ambiguous,
+        candidates,
         access_level: role === 'super_admin' ? 'all' : role === 'plant_admin' ? 'plant' : 'self'
       }
     });
