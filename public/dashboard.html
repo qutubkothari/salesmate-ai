@@ -9400,22 +9400,25 @@
             const result = await response.json();
             const targets = result.data || [];
             
-            // Update stats
-            document.getElementById('totalTargetsCount').textContent = targets.length;
+            // Update stats (with null checks)
+            const totalTargetsEl = document.getElementById('totalTargetsCount');
+            if (totalTargetsEl) totalTargetsEl.textContent = targets.length;
             
             const achieved = targets.filter(t => {
                 const visitProgress = t.target_visits > 0 ? (t.achieved_visits / t.target_visits * 100) : 0;
                 const orderProgress = t.target_orders > 0 ? (t.achieved_orders / t.target_orders * 100) : 0;
                 return visitProgress >= 100 && orderProgress >= 100;
             }).length;
-            document.getElementById('achievedTargetsCount').textContent = achieved;
+            const achievedEl = document.getElementById('achievedTargetsCount');
+            if (achievedEl) achievedEl.textContent = achieved;
             
             const inProgress = targets.filter(t => {
                 const visitProgress = t.target_visits > 0 ? (t.achieved_visits / t.target_visits * 100) : 0;
                 const orderProgress = t.target_orders > 0 ? (t.achieved_orders / t.target_orders * 100) : 0;
                 return (visitProgress > 0 && visitProgress < 100) || (orderProgress > 0 && orderProgress < 100);
             }).length;
-            document.getElementById('inProgressTargetsCount').textContent = inProgress;
+            const inProgressEl = document.getElementById('inProgressTargetsCount');
+            if (inProgressEl) inProgressEl.textContent = inProgress;
             
             const avgProgress = targets.length > 0 
                 ? Math.round(targets.reduce((sum, t) => {
@@ -9423,7 +9426,8 @@
                     return sum + visitProgress;
                 }, 0) / targets.length)
                 : 0;
-            document.getElementById('avgAchievementPercent').textContent = avgProgress + '%';
+            const avgProgressEl = document.getElementById('avgAchievementPercent');
+            if (avgProgressEl) avgProgressEl.textContent = avgProgress + '%';
             
             // Populate table
             const tbody = document.getElementById('targetsTableBody');
