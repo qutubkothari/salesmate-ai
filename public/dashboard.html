@@ -2621,6 +2621,7 @@
         if (reportsTab) reportsTab.classList.add('hidden');
         
         content.innerHTML = '<div class="flex justify-center py-20"><div class="loading-spinner"></div></div>';
+        console.log('✅ Content area cleared, loading tab:', tabName);
         
         try {
             switch (tabName) {
@@ -2702,11 +2703,16 @@
                     }
                     break;
                 case 'reports':
+                    console.log('📊 Loading FSM Reports tab...');
                     content.classList.add('hidden');
                     const reportsTab = document.getElementById('reportsTab');
                     if (reportsTab) {
                         reportsTab.classList.remove('hidden');
+                        console.log('📊 Reports tab visible, calling loadFSMReports...');
                         await loadFSMReports();
+                        console.log('✅ loadFSMReports completed');
+                    } else {
+                        console.error('❌ Reports tab element not found');
                     }
                     break;
                 
@@ -9313,11 +9319,10 @@
             } else {
                 showNotification(result.error || 'Failed to delete salesman', 'error');
             }
-        })
-        .catch(err => {
+        } catch (err) {
             console.error('Error deleting salesman:', err);
             showNotification('Error deleting salesman', 'error');
-        });
+        }
     }
     
     async function viewSalesmanDetails(salesmanId) {
@@ -9807,6 +9812,7 @@
 
     // FSM Reports & Analytics
     async function loadFSMReports() {
+        console.log('📈 loadFSMReports() started');
         try {
             const monthInput = document.getElementById('reportMonth');
             if (!monthInput.value) {
@@ -9815,11 +9821,14 @@
             }
             
             const period = monthInput.value;
+            console.log('📅 Report period:', period);
             const [year, month] = period.split('-');
             const startDate = `${year}-${month}-01`;
             const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString().split('T')[0];
+            console.log('📅 Date range:', startDate, 'to', endDate);
             
             // Fetch all required data in parallel
+            console.log('🌐 Fetching FSM data from API...');
             const [visitsResp, salesmenResp, targetsResp, plantsResp] = await Promise.all([
                 fetch(`/api/fsm/visits?start_date=${startDate}&end_date=${endDate}&tenant_id=${encodeURIComponent(state.session?.tenantId || '')}`),
                 fetch(`/api/fsm/salesmen?tenant_id=${encodeURIComponent(state.session?.tenantId || '')}`),
@@ -9836,6 +9845,7 @@
             const salesmen = salesmenData.data || [];
             const targets = targetsData.data || [];
             const plants = plantsData.data || [];
+            console.log('📊 Data loaded - Visits:', visits.length, 'Salesmen:', salesmen.length, 'Targets:', targets.length, 'Plants:', plants.length);
             
             // Calculate summary stats
             const totalVisits = visits.length;
@@ -9853,23 +9863,29 @@
                 : 0;
             
             // Update summary cards
+            console.log('📊 Stats - Total:', totalVisits, 'Avg Duration:', avgDuration, 'Hit Ratio:', hitRatio + '%', 'Achievement:', targetAchievement + '%');
             document.getElementById('reportTotalVisits').textContent = totalVisits;
             document.getElementById('reportAvgDuration').textContent = avgDuration;
             document.getElementById('reportHitRatio').textContent = hitRatio + '%';
             document.getElementById('reportTargetAchievement').textContent = targetAchievement + '%';
             
             // Generate charts
+            console.log('📈 Generating charts...');
             generateVisitTrendChart(visits, startDate, endDate);
             generateVisitTypeChart(visits);
             
             // Generate salesman performance table
+            console.log('👥 Generating salesman performance table...');
             generateSalesmanPerformanceTable(salesmen, visits, targets);
             
             // Generate branch performance table
+            console.log('🏢 Generating branch performance table...');
             generateBranchPerformanceTable(plants, salesmen, visits);
+            console.log('✅ FSM Reports loaded successfully');
             
         } catch (error) {
-            console.error('Error loading FSM reports:', error);
+            console.error('❌ Error loading FSM reports:', error);
+            console.error('Stack trace:', error.stack);
             showNotification('Error loading reports', 'error');
         }
     }
