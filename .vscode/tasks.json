@@ -105,6 +105,20 @@
 				"Auto-deploy: fix salesman phone match"
 			],
 			"isBackground": false
+		},
+		{
+			"label": "Deploy to Hostinger VPS (add salesman pwd tool)",
+			"type": "shell",
+			"command": "powershell.exe",
+			"args": [
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}/deploy-salesmate-hostinger.ps1",
+				"-Message",
+				"Auto-deploy: add salesman password tool"
+			],
+			"isBackground": false
 		}
 	],
 	"inputs": [
