@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salesman Login - Salesmate</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            max-width: 900px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .login-left {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 60px 40px;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .login-left h1 {
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        .login-left p {
+            font-size: 16px;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+
+        .feature-list {
+            list-style: none;
+            margin-top: 30px;
+        }
+
+        .feature-list li {
+            padding: 12px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .feature-list i {
+            font-size: 20px;
+        }
+
+        .login-right {
+            padding: 60px 40px;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .login-header h2 {
+            font-size: 28px;
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+
+        .login-header p {
+            color: #718096;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 8px;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-wrapper i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #a0aec0;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 14px 15px 14px 45px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 15px;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-login:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .alert {
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert.error {
+            background: #fff5f5;
+            color: #c53030;
+            border: 1px solid #feb2b2;
+        }
+
+        .alert.success {
+            background: #f0fff4;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+        }
+
+        .quick-login {
+            margin-top: 25px;
+            padding-top: 25px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .quick-login p {
+            font-size: 13px;
+            color: #718096;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .salesman-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .salesman-btn {
+            padding: 10px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 13px;
+            color: #4a5568;
+        }
+
+        .salesman-btn:hover {
+            border-color: #667eea;
+            background: #f7fafc;
+        }
+
+        @media (max-width: 768px) {
+            .login-container {
+                grid-template-columns: 1fr;
+            }
+
+            .login-left {
+                display: none;
+            }
+
+            .login-right {
+                padding: 40px 30px;
+            }
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-left">
+            <h1><i class="fas fa-rocket"></i> Salesmate FSM</h1>
+            <p>Empower your field sales team with intelligent tools for success</p>
+            
+            <ul class="feature-list">
+                <li><i class="fas fa-check-circle"></i> Real-time visit tracking</li>
+                <li><i class="fas fa-check-circle"></i> Smart route optimization</li>
+                <li><i class="fas fa-check-circle"></i> Target & commission tracking</li>
+                <li><i class="fas fa-check-circle"></i> Offline-first mobile support</li>
+                <li><i class="fas fa-check-circle"></i> Customer insights & analytics</li>
+            </ul>
+        </div>
+
+        <div class="login-right">
+            <div class="login-header">
+                <h2>Welcome Back!</h2>
+                <p>Sign in to access your dashboard</p>
+            </div>
+
+            <div id="alertBox" class="alert"></div>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label>Select Salesman</label>
+                    <div class="input-wrapper">
+                        <i class="fas fa-user"></i>
+                        <select id="salesmanSelect" required>
+                            <option value="">Loading salesmen...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Phone Number</label>
+                    <div class="input-wrapper">
+                        <i class="fas fa-phone"></i>
+                        <input type="tel" id="phoneInput" placeholder="Enter your phone number" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-login" id="loginBtn">
+                    <i class="fas fa-sign-in-alt"></i> Sign In
+                </button>
+            </form>
+
+            <div class="quick-login">
+                <p>Quick Access (Demo)</p>
+                <div class="salesman-grid" id="quickLoginGrid">
+                    <div style="text-align: center; padding: 20px; color: #a0aec0; grid-column: 1 / -1;">
+                        Loading...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tenantId = '101f04af63cbefc2bf8f0a98b9ae1205';
+        let salesmenData = [];
+
+        // Load salesmen on page load
+        async function loadSalesmen() {
+            try {
+                const response = await fetch(`/api/fsm/salesmen?tenant_id=${tenantId}`);
+                const data = await response.json();
+                salesmenData = data.salesmen || [];
+
+                // Populate dropdown
+                const select = document.getElementById('salesmanSelect');
+                select.innerHTML = '<option value="">Select a salesman</option>';
+                salesmenData.forEach(salesman => {
+                    const option = document.createElement('option');
+                    option.value = salesman.id;
+                    option.textContent = `${salesman.name} (${salesman.phone || 'No phone'})`;
+                    option.dataset.phone = salesman.phone || '';
+                    select.appendChild(option);
+                });
+
+                // Populate quick login buttons
+                const grid = document.getElementById('quickLoginGrid');
+                grid.innerHTML = salesmenData.slice(0, 4).map(salesman => `
+                    <button class="salesman-btn" onclick="quickLogin('${salesman.id}', '${salesman.name}')">
+                        ${salesman.name}
+                    </button>
+                `).join('');
+
+            } catch (error) {
+                console.error('Error loading salesmen:', error);
+                showAlert('Failed to load salesmen list', 'error');
+            }
+        }
+
+        // Auto-fill phone when salesman selected
+        document.getElementById('salesmanSelect').addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption.dataset.phone) {
+                document.getElementById('phoneInput').value = selectedOption.dataset.phone;
+            }
+        });
+
+        // Handle login form
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const salesmanId = document.getElementById('salesmanSelect').value;
+            const phone = document.getElementById('phoneInput').value;
+            
+            if (!salesmanId) {
+                showAlert('Please select a salesman', 'error');
+                return;
+            }
+
+            const selectedSalesman = salesmenData.find(s => s.id === salesmanId);
+            if (!selectedSalesman) {
+                showAlert('Invalid salesman selected', 'error');
+                return;
+            }
+
+            // Simple phone validation (in production, use proper authentication)
+            if (phone && selectedSalesman.phone && phone !== selectedSalesman.phone) {
+                showAlert('Phone number does not match', 'error');
+                return;
+            }
+
+            login(salesmanId, selectedSalesman.name);
+        });
+
+        function quickLogin(salesmanId, salesmanName) {
+            login(salesmanId, salesmanName);
+        }
+
+        function login(salesmanId, salesmanName) {
+            // Store in localStorage
+            localStorage.setItem('salesmanId', salesmanId);
+            localStorage.setItem('salesmanName', salesmanName);
+            localStorage.setItem('loginTime', new Date().toISOString());
+
+            // Show success
+            const btn = document.getElementById('loginBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Logging in...';
+
+            showAlert(`Welcome back, ${salesmanName}!`, 'success');
+
+            // Redirect to dashboard
+            setTimeout(() => {
+                window.location.href = '/salesman-app.html';
+            }, 1000);
+        }
+
+        function showAlert(message, type) {
+            const alert = document.getElementById('alertBox');
+            alert.textContent = message;
+            alert.className = `alert ${type}`;
+            alert.style.display = 'block';
+
+            if (type === 'success') {
+                setTimeout(() => {
+                    alert.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        // Load salesmen on page load
+        loadSalesmen();
+    </script>
+</body>
+</html>
