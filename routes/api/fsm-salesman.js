@@ -639,6 +639,84 @@ router.post('/salesman/:id/sync-upload', authenticateSalesman, (req, res) => {
     }
 });
 
+// Get plants/branches for tenant
+router.get('/plants', authenticateSalesman, (req, res) => {
+    try {
+        const tenantId = getTenantId(req);
+        
+        // Get plants from database
+        const plants = dbAll(
+            `SELECT id, name, plant_name, location, address, city, state, pincode, phone, email
+             FROM plants 
+             WHERE tenant_id = ? 
+             ORDER BY name`,
+            [tenantId]
+        );
+
+        res.json({ success: true, data: plants || [] });
+    } catch (error) {
+        console.error('Error fetching plants:', error);
+        res.status(500).json({ success: false, error: error.message, data: [] });
+    }
+});
+
+// Create a new visit
+router.post('/salesman/:id/visits', authenticateSalesman, (req, res) => {
+    try {
+        const { id } = req.params;
+        const { 
+            customer_name, contact_person, email, plant_ids,
+            meeting_types, products_discussed,
+            next_action, next_action_date, potential, competitor_name,
+            can_be_switched, remarks, time_in, gps_latitude, gps_longitude
+        } = req.body;
+        const tenantId = getTenantId(req);
+
+        if (!customer_name) {
+            return res.status(400).json({ success: false, error: 'Customer name is required' });
+        }
+
+        // Create visit ID
+        const visitId = generateId();
+        const visitDate = new Date().toISOString().split('T')[0];
+
+        // Insert visit
+        dbRun(
+            `INSERT INTO visits 
+             (id, tenant_id, salesman_id, customer_name, contact_person, email,
+              visit_type, visit_date, time_in, 
+              meeting_types, products_discussed, plant_ids, next_action, next_action_date,
+              potential, competitor_name, can_be_switched, remarks,
+              gps_latitude, gps_longitude, location_accuracy,
+              synced, created_at, updated_at, checkin_time)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'), ?)`,
+            [
+                visitId, tenantId, id, customer_name, contact_person || null, email || null,
+                (meeting_types && meeting_types.length > 0) ? meeting_types[0] : 'regular',
+                visitDate, time_in || new Date().toISOString(),
+                JSON.stringify(meeting_types || []),
+                JSON.stringify(products_discussed || []),
+                JSON.stringify(plant_ids || []),
+                next_action || null,
+                next_action_date || null,
+                potential || 'Low',
+                competitor_name || null,
+                can_be_switched ? 1 : 0,
+                remarks || null,
+                gps_latitude || 0.0,
+                gps_longitude || 0.0,
+                0.0,
+                time_in || new Date().toISOString()
+            ]
+        );
+
+        res.json({ success: true, visit_id: visitId });
+    } catch (error) {
+        console.error('Error creating visit:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // -------------------- ROUTE PLANNING --------------------
 
 // Get optimal route plan for the day

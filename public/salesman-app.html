@@ -940,6 +940,192 @@
         </main>
     </div>
 
+    <!-- New Visit Modal -->
+    <div id="newVisitModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:9999; overflow-y:auto; padding:20px;">
+        <div style="background:white; border-radius:16px; max-width:600px; width:100%; margin:0 auto; box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+            <div style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding:20px; border-radius:16px 16px 0 0; color:white;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h2 style="margin:0; font-size:24px;">📍 New Visit</h2>
+                    <button onclick="closeNewVisitModal()" style="background:rgba(255,255,255,0.2); border:none; width:36px; height:36px; border-radius:50%; font-size:24px; cursor:pointer; color:white;">&times;</button>
+                </div>
+                <div id="visitTimer" style="margin-top:10px; font-size:14px; opacity:0.9;"></div>
+            </div>
+            
+            <form id="newVisitForm" onsubmit="event.preventDefault(); submitNewVisit();" style="padding:24px;">
+                <!-- Customer Name -->
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; color:#333; font-weight:600; font-size:14px;">Customer Name <span style="color:#e74c3c;">*</span></label>
+                    <input type="text" id="newVisitCustomer" required list="customerList" placeholder="Enter or select customer" style="width:100%; padding:12px; border:2px solid #e0e0e0; border-radius:8px; font-size:14px; transition:border-color 0.3s;" onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e0e0e0'">
+                    <datalist id="customerList"></datalist>
+                </div>
+
+                <!-- Contact Person -->
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; color:#333; font-weight:600; font-size:14px;">Contact Person</label>
+                    <input type="text" id="newVisitContact" placeholder="Enter contact person name" style="width:100%; padding:12px; border:2px solid #e0e0e0; border-radius:8px; font-size:14px; transition:border-color 0.3s;" onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e0e0e0'">
+                </div>
+
+                <!-- Email -->
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; color:#333; font-weight:600; font-size:14px;">Email</label>
+                    <input type="email" id="newVisitEmail" placeholder="customer@example.com" style="width:100%; padding:12px; border:2px solid #e0e0e0; border-radius:8px; font-size:14px; transition:border-color 0.3s;" onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e0e0e0'">
+                </div>
+
+                <!-- Plants/Branches -->
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; color:#333; font-weight:600; font-size:14px;">Plant/Branch</label>
+                    <div id="plants" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:8px;">
+                        <!-- Will be populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Meeting Types -->
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; color:#333; font-weight:600; font-size:14px;">Meeting Type <span style="color:#e74c3c;">*</span></label>
+                    <div id="meetingTypes" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:8px;">
+                        <div class="checkbox-item" data-value="Introduction">Introduction</div>
+                        <div class="checkbox-item" data-value="Enquiry">Enquiry</div>
+                        <div class="checkbox-item" data-value="Demo">Demo</div>
+                        <div class="checkbox-item" data-value="Price Discussion">Price Discussion</div>
+                        <div class="checkbox-item" data-value="Order">Order</div>
+                        <div class="checkbox-item" data-value="Payment">Payment</div>
+                        <div class="checkbox-item" data-value="Follow-up">Follow-up</div>
+                        <div class="checkbox-item" data-value="Meeting">Meeting</div>
+                    </div>
+                </div>
+
+                <!-- Products Discussed - Multi-select Dropdown -->
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; color:#333; font-weight:600; font-size:14px;">Products Discussed</label>
+                    <div style="position:relative;">
+                        <input type="text" id="productSearch" placeholder="Search and select products..." style="width:100%; padding:12px; border:2px solid #e0e0e0; border-radius:8px; font-size:14px;" onfocus="showProductDropdown()" oninput="filterProducts()">
+                        <div id="productDropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:2px solid #e0e0e0; border-top:none; border-radius:0 0 8px 8px; max-height:250px; overflow-y:auto; z-index:1000; box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
+                    </div>
+                    <div id="selectedProducts" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;"></div>
+                </div>
+
+                <!-- Next Action -->
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; color:#333; font-weight:600; font-size:14px;">Next Action</label>
+                    <div id="nextActions" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:8px;">
+                        <div class="checkbox-item" data-value="Call">Call</div>
+                        <div class="checkbox-item" data-value="Meeting">Meeting</div>
+                        <div class="checkbox-item" data-value="Demo">Demo</div>
+                        <div class="checkbox-item" data-value="Send Quote">Send Quote</div>
+                        <div class="checkbox-item" data-value="Visit">Visit</div>
+                    </div>
+                </div>
+
+                <!-- Next Action Date -->
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; color:#333; font-weight:600; font-size:14px;">Next Action Date</label>
+                    <input type="date" id="nextActionDate" style="width:100%; padding:12px; border:2px solid #e0e0e0; border-radius:8px; font-size:14px;">
+                </div>
+
+                <!-- Potential -->
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; color:#333; font-weight:600; font-size:14px;">Potential <span style="color:#e74c3c;">*</span></label>
+                    <div id="potential" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px;">
+                        <div class="radio-item" data-value="High">🔥 High</div>
+                        <div class="radio-item" data-value="Medium">⚡ Medium</div>
+                        <div class="radio-item selected" data-value="Low">💧 Low</div>
+                    </div>
+                </div>
+
+                <!-- Competitor -->
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; color:#333; font-weight:600; font-size:14px;">Competitor Name (if any)</label>
+                    <input type="text" id="competitorName" placeholder="Enter competitor name" style="width:100%; padding:12px; border:2px solid #e0e0e0; border-radius:8px; font-size:14px;">
+                </div>
+
+                <!-- Switchable (shows only if competitor entered) -->
+                <div id="switchableGroup" style="margin-bottom:20px; display:none;">
+                    <label style="display:block; margin-bottom:8px; color:#333; font-weight:600; font-size:14px;">Can be switched?</label>
+                    <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:8px;">
+                        <div class="radio-item" data-value="yes">✅ Yes</div>
+                        <div class="radio-item" data-value="no">❌ No</div>
+                    </div>
+                </div>
+
+                <!-- Remarks -->
+                <div style="margin-bottom:24px;">
+                    <label style="display:block; margin-bottom:8px; color:#333; font-weight:600; font-size:14px;">Remarks / Notes</label>
+                    <textarea id="remarks" rows="4" placeholder="Any additional notes..." style="width:100%; padding:12px; border:2px solid #e0e0e0; border-radius:8px; font-size:14px; resize:vertical;"></textarea>
+                </div>
+
+                <!-- Submit Buttons -->
+                <div style="display:flex; gap:12px; justify-content:flex-end;">
+                    <button type="button" onclick="closeNewVisitModal()" style="padding:12px 24px; border:2px solid #e0e0e0; background:white; border-radius:8px; cursor:pointer; font-weight:600; color:#666;">Cancel</button>
+                    <button type="submit" id="submitVisitBtn" style="padding:12px 24px; border:none; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; border-radius:8px; cursor:pointer; font-weight:600; box-shadow:0 4px 12px rgba(102,126,234,0.4);">📍 Submit Visit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <style>
+        .checkbox-item, .radio-item {
+            padding: 10px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .checkbox-item:hover, .radio-item:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        .checkbox-item.selected, .radio-item.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 2px 8px rgba(102,126,234,0.3);
+        }
+        .product-dropdown-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .product-dropdown-item:hover {
+            background: #f8f9ff;
+        }
+        .product-dropdown-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        .selected-product-tag {
+            padding: 6px 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 20px;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .selected-product-tag button {
+            background: rgba(255,255,255,0.3);
+            border: none;
+            color: white;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+        }
+    </style>
+
     <script>
         const DEFAULT_TENANT_ID = '101f04af63cbefc2bf8f0a98b9ae1205';
 
@@ -1411,8 +1597,235 @@
             loadDashboard();
         }
 
-        function newVisit() {
-            alert('New visit feature coming soon!');
+        let selectedProductsList = new Set();
+        let allProducts = [
+            'Hex Bolts', 'Carriage Bolts', 'U-Bolts', 'Eye Bolts', 'Anchor Bolts',
+            'Hex Nuts', 'Lock Nuts', 'Wing Nuts', 'Cap Nuts', 'Flange Nuts',
+            'Flat Washers', 'Spring Washers', 'Lock Washers', 'Fender Washers',
+            'Wood Screws', 'Machine Screws', 'Self-Tapping Screws', 'Sheet Metal Screws', 'Drywall Screws',
+            'Expansion Anchors', 'Wedge Anchors', 'Drop-In Anchors', 'Sleeve Anchors',
+            'Threaded Rods', 'Studs', 'Dowel Pins', 'Cotter Pins', 'Clevis Pins',
+            'Rivets', 'Clamps', 'Brackets', 'Hinges', 'Latches'
+        ];
+
+        function showProductDropdown() {
+            const dropdown = document.getElementById('productDropdown');
+            dropdown.style.display = 'block';
+            filterProducts();
+        }
+
+        function hideProductDropdown() {
+            setTimeout(() => {
+                document.getElementById('productDropdown').style.display = 'none';
+            }, 200);
+        }
+
+        function filterProducts() {
+            const searchTerm = document.getElementById('productSearch').value.toLowerCase();
+            const dropdown = document.getElementById('productDropdown');
+            
+            const filtered = allProducts.filter(p => 
+                p.toLowerCase().includes(searchTerm) && !selectedProductsList.has(p)
+            );
+            
+            dropdown.innerHTML = filtered.map(product => `
+                <div class="product-dropdown-item" onclick="toggleProduct('${product}', this)">
+                    <input type="checkbox" ${selectedProductsList.has(product) ? 'checked' : ''}>
+                    <span>${product}</span>
+                </div>
+            `).join('');
+        }
+
+        function toggleProduct(product, element) {
+            if (selectedProductsList.has(product)) {
+                selectedProductsList.delete(product);
+            } else {
+                selectedProductsList.add(product);
+            }
+            updateSelectedProducts();
+            filterProducts();
+        }
+
+        function removeProduct(product) {
+            selectedProductsList.delete(product);
+            updateSelectedProducts();
+            filterProducts();
+        }
+
+        function updateSelectedProducts() {
+            const container = document.getElementById('selectedProducts');
+            container.innerHTML = Array.from(selectedProductsList).map(product => `
+                <span class="selected-product-tag">
+                    ${product}
+                    <button onclick="removeProduct('${product}')" type="button">×</button>
+                </span>
+            `).join('');
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const searchBox = document.getElementById('productSearch');
+            const dropdown = document.getElementById('productDropdown');
+            if (searchBox && !searchBox.contains(e.target) && !dropdown.contains(e.target)) {
+                hideProductDropdown();
+            }
+        });
+
+        async function newVisit() {
+            // Load customers and plants
+            try {
+                const data = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/customers?tenant_id=${encodeURIComponent(tenantId)}`);
+                if (!data.success) throw new Error(data.error);
+                
+                const customers = data.data || [];
+                const customerList = document.getElementById('customerList');
+                customerList.innerHTML = customers.map(c => `<option value="${c.business_name || c.name}">`).join('');
+                
+                // Load plants/branches
+                const plantsResp = await apiFetch(`/api/fsm/plants?tenant_id=${encodeURIComponent(tenantId)}`);
+                if (plantsResp.success && plantsResp.data) {
+                    const plantsContainer = document.getElementById('plants');
+                    plantsContainer.innerHTML = plantsResp.data.map(p => 
+                        `<div class="checkbox-item" data-value="${p.id}">${p.name || p.plant_name}</div>`
+                    ).join('');
+                }
+                
+                // Setup interactive elements
+                setupCheckboxGroups();
+                setupCompetitorField();
+                startVisitTimer();
+                
+                // Clear previous selections
+                selectedProductsList.clear();
+                updateSelectedProducts();
+                document.getElementById('productSearch').value = '';
+                
+                // Show modal
+                document.getElementById('newVisitModal').style.display = 'block';
+            } catch (error) {
+                alert('Error loading customers: ' + error.message);
+            }
+        }
+
+        let visitTimerInterval = null;
+        let visitStartTime = null;
+
+        function startVisitTimer() {
+            visitStartTime = new Date();
+            const timeDisplay = visitStartTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('visitTimer').textContent = `⏱️ Visit started at ${timeDisplay}`;
+            
+            if (visitTimerInterval) clearInterval(visitTimerInterval);
+            visitTimerInterval = setInterval(() => {
+                const mins = Math.floor((Date.now() - visitStartTime) / 60000);
+                document.getElementById('visitTimer').textContent = `⏱️ Visit duration: ${mins} min${mins !== 1 ? 's' : ''}`;
+            }, 60000);
+        }
+
+        function setupCheckboxGroups() {
+            // Multi-select checkboxes (meeting types, next actions, plants)
+            document.querySelectorAll('#meetingTypes .checkbox-item, #nextActions .checkbox-item, #plants .checkbox-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    this.classList.toggle('selected');
+                });
+            });
+
+            // Single-select radio buttons
+            document.querySelectorAll('#potential .radio-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    this.parentElement.querySelectorAll('.radio-item').forEach(i => i.classList.remove('selected'));
+                    this.classList.add('selected');
+                });
+            });
+
+            document.querySelectorAll('#switchableGroup .radio-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    this.parentElement.querySelectorAll('.radio-item').forEach(i => i.classList.remove('selected'));
+                    this.classList.add('selected');
+                });
+            });
+        }
+
+        function setupCompetitorField() {
+            document.getElementById('competitorName').addEventListener('input', function() {
+                const group = document.getElementById('switchableGroup');
+                if (this.value.trim()) {
+                    group.style.display = 'block';
+                } else {
+                    group.style.display = 'none';
+                }
+            });
+        }
+
+        function closeNewVisitModal() {
+            document.getElementById('newVisitModal').style.display = 'none';
+            document.getElementById('newVisitForm').reset();
+            document.querySelectorAll('.checkbox-item, .radio-item').forEach(i => i.classList.remove('selected'));
+            document.getElementById('potential').querySelector('[data-value="Low"]').classList.add('selected');
+            selectedProductsList.clear();
+            updateSelectedProducts();
+            if (visitTimerInterval) clearInterval(visitTimerInterval);
+        }
+
+        async function submitNewVisit() {
+            const customerName = document.getElementById('newVisitCustomer').value.trim();
+            const contactPerson = document.getElementById('newVisitContact').value.trim();
+            const email = document.getElementById('newVisitEmail').value.trim();
+            const meetingTypes = Array.from(document.querySelectorAll('#meetingTypes .checkbox-item.selected')).map(i => i.dataset.value);
+            const products = Array.from(selectedProductsList);
+            const plantIds = Array.from(document.querySelectorAll('#plants .checkbox-item.selected')).map(i => i.dataset.value);
+            const nextAction = document.querySelector('#nextActions .checkbox-item.selected')?.dataset.value;
+            const nextActionDate = document.getElementById('nextActionDate').value;
+            const potential = document.querySelector('#potential .radio-item.selected').dataset.value;
+            const competitorName = document.getElementById('competitorName').value.trim();
+            const canBeSwitched = document.querySelector('#switchableGroup .radio-item.selected')?.dataset.value === 'yes';
+            const remarks = document.getElementById('remarks').value.trim();
+
+            if (!customerName) {
+                alert('Please enter customer name');
+                return;
+            }
+            if (meetingTypes.length === 0) {
+                alert('Please select at least one meeting type');
+                return;
+            }
+
+            const submitBtn = document.getElementById('submitVisitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '📤 Submitting...';
+
+            try {
+                const data = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/visits?tenant_id=${encodeURIComponent(tenantId)}`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        customer_name: customerName,
+                        contact_person: contactPerson,
+                        email: email,
+                        plant_ids: plantIds,
+                        meeting_types: meetingTypes,
+                        products_discussed: products,
+                        next_action: nextAction,
+                        next_action_date: nextActionDate,
+                        potential: potential,
+                        competitor_name: competitorName,
+                        can_be_switched: canBeSwitched,
+                        remarks: remarks,
+                        time_in: visitStartTime.toISOString(),
+                        gps_latitude: 0,
+                        gps_longitude: 0
+                    })
+                });
+
+                if (!data.success) throw new Error(data.error);
+
+                alert('✅ Visit submitted successfully!');
+                closeNewVisitModal();
+                loadDashboard();
+            } catch (error) {
+                alert('Error creating visit: ' + error.message);
+                submitBtn.disabled = false;
+                submitBtn.textContent = '📍 Submit Visit';
+            }
         }
 
         let notificationsTimer = null;
