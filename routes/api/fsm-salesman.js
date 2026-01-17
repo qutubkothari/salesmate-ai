@@ -2,10 +2,113 @@ const express = require('express');
 const router = express.Router();
 const Database = require('better-sqlite3');
 const path = require('path');
+const crypto = require('crypto');
 
 // Direct SQLite connection
-const db = new Database(path.join(__dirname, '../../local-database.db'));
+// __dirname is <repo>/routes/api, so go to repo root for local-database.db
+const db = new Database(path.join(__dirname, '../../../local-database.db'));
 db.pragma('journal_mode = WAL');
+
+function dbAll(sql, params = []) {
+    return db.prepare(sql).all(...params);
+}
+
+function dbGet(sql, params = []) {
+    return db.prepare(sql).get(...params);
+}
+
+function dbRun(sql, params = []) {
+    return db.prepare(sql).run(...params);
+}
+
+function getTenantId(req) {
+    return req.query.tenant_id || req.body?.tenant_id || req.headers['x-tenant-id'];
+}
+
+function hashToken(token) {
+    return crypto.createHash('sha256').update(String(token)).digest('hex');
+}
+
+function ensureSalesmanSessionAuthColumns() {
+    try {
+        const columns = dbAll("PRAGMA table_info('salesman_sessions')");
+        const colNames = new Set(columns.map(c => c.name));
+
+        if (!colNames.has('session_token_hash')) {
+            dbRun("ALTER TABLE salesman_sessions ADD COLUMN session_token_hash TEXT");
+        }
+        if (!colNames.has('session_expires_at')) {
+            dbRun("ALTER TABLE salesman_sessions ADD COLUMN session_expires_at TEXT");
+        }
+        if (!colNames.has('last_seen_at')) {
+            dbRun("ALTER TABLE salesman_sessions ADD COLUMN last_seen_at TEXT");
+        }
+        if (!colNames.has('revoked_at')) {
+            dbRun("ALTER TABLE salesman_sessions ADD COLUMN revoked_at TEXT");
+        }
+
+        dbRun('CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON salesman_sessions(session_token_hash)');
+    } catch (e) {
+        // If salesman_sessions table doesn't exist yet, routes will error naturally.
+        console.warn('[FSM_SALESMAN] Could not ensure auth columns:', e.message);
+    }
+}
+
+ensureSalesmanSessionAuthColumns();
+
+function authenticateSalesman(req, res, next) {
+    try {
+        const tenantId = getTenantId(req);
+        if (!tenantId) {
+            return res.status(400).json({ success: false, error: 'tenant_id is required' });
+        }
+
+        const authHeader = req.headers.authorization || '';
+        const bearer = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7).trim() : null;
+        const token = bearer || req.headers['x-salesman-token'];
+
+        if (!token) {
+            return res.status(401).json({ success: false, error: 'Missing salesman auth token' });
+        }
+
+        const tokenHash = hashToken(token);
+        const session = dbGet(
+            `SELECT * FROM salesman_sessions
+             WHERE tenant_id = ?
+               AND session_token_hash = ?
+               AND revoked_at IS NULL
+               AND (session_expires_at IS NULL OR datetime(session_expires_at) > datetime('now'))
+             ORDER BY datetime(updated_at) DESC
+             LIMIT 1`,
+            [tenantId, tokenHash]
+        );
+
+        if (!session) {
+            return res.status(401).json({ success: false, error: 'Invalid or expired session' });
+        }
+
+        // Optional: enforce salesman id match when route has :id
+        if (req.params?.id && session.salesman_id && req.params.id !== session.salesman_id) {
+            return res.status(403).json({ success: false, error: 'Forbidden' });
+        }
+
+        // Touch last_seen
+        dbRun(
+            `UPDATE salesman_sessions
+             SET last_seen_at = datetime('now'), updated_at = datetime('now'), is_online = 1
+             WHERE id = ?`,
+            [session.id]
+        );
+
+        req.salesmanSession = session;
+        req.salesmanId = session.salesman_id;
+        req.tenantId = tenantId;
+        next();
+    } catch (error) {
+        console.error('[FSM_SALESMAN] Auth error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+}
 
 // ============================================
 // SALESMAN EMPOWERMENT API ROUTES
@@ -14,16 +117,136 @@ db.pragma('journal_mode = WAL');
 
 // -------------------- DASHBOARD --------------------
 
+// Login (creates a session token)
+router.post('/salesman/login', (req, res) => {
+    try {
+        const tenantId = getTenantId(req);
+        const { salesman_id, phone, device_id, device_type, device_name, app_version, platform, fcm_token } = req.body || {};
+
+        if (!tenantId) return res.status(400).json({ success: false, error: 'tenant_id is required' });
+        if (!salesman_id) return res.status(400).json({ success: false, error: 'salesman_id is required' });
+        if (!device_id) return res.status(400).json({ success: false, error: 'device_id is required' });
+
+        const salesman = dbGet('SELECT * FROM salesmen WHERE id = ? AND tenant_id = ?', [salesman_id, tenantId]);
+        if (!salesman) return res.status(404).json({ success: false, error: 'Salesman not found' });
+        if (salesman.is_active === 0) return res.status(403).json({ success: false, error: 'Salesman inactive' });
+
+        const normalizePhone = (v) => String(v || '').replace(/\D/g, '');
+        const providedPhone = normalizePhone(phone);
+        const dbPhone = normalizePhone(salesman.phone);
+        if (providedPhone && dbPhone && providedPhone !== dbPhone) {
+            return res.status(401).json({ success: false, error: 'Phone number does not match' });
+        }
+
+        const token = crypto.randomBytes(32).toString('hex');
+        const tokenHash = hashToken(token);
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+        const existing = dbGet(
+            `SELECT id FROM salesman_sessions
+             WHERE tenant_id = ? AND salesman_id = ? AND device_id = ?
+             ORDER BY datetime(updated_at) DESC LIMIT 1`,
+            [tenantId, salesman_id, device_id]
+        );
+
+        if (existing?.id) {
+            dbRun(
+                `UPDATE salesman_sessions
+                 SET session_token_hash = ?, session_expires_at = ?,
+                     device_type = ?, device_name = ?, app_version = ?, platform = ?, fcm_token = ?,
+                     is_online = 1, last_seen_at = datetime('now'), updated_at = datetime('now')
+                 WHERE id = ?`,
+                [tokenHash, expiresAt,
+                 device_type || 'web', device_name || null, app_version || null, platform || 'web', fcm_token || null,
+                 existing.id]
+            );
+        } else {
+            dbRun(
+                `INSERT INTO salesman_sessions
+                 (tenant_id, salesman_id, device_type, device_id, device_name, app_version, platform, fcm_token,
+                  session_token_hash, session_expires_at, last_seen_at, is_online, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), 1, datetime('now'), datetime('now'))`,
+                [tenantId, salesman_id, device_type || 'web', device_id, device_name || null, app_version || null, platform || 'web', fcm_token || null,
+                 tokenHash, expiresAt]
+            );
+        }
+
+        res.json({
+            success: true,
+            data: {
+                token,
+                expires_at: expiresAt,
+                tenant_id: tenantId,
+                device_id,
+                salesman: { id: salesman.id, name: salesman.name, phone: salesman.phone }
+            }
+        });
+    } catch (error) {
+        console.error('Error logging in salesman:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Logout (revokes token)
+router.post('/salesman/logout', authenticateSalesman, (req, res) => {
+    try {
+        const sessionId = req.salesmanSession?.id;
+        if (sessionId) {
+            dbRun(
+                `UPDATE salesman_sessions
+                 SET revoked_at = datetime('now'), is_online = 0, updated_at = datetime('now')
+                 WHERE id = ?`,
+                [sessionId]
+            );
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error logging out salesman:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Update device/session metadata (FCM token, device info)
+router.post('/salesman/:id/device', authenticateSalesman, (req, res) => {
+    try {
+        const tenantId = getTenantId(req);
+        const { id } = req.params;
+        const { device_name, app_version, platform, fcm_token, device_type } = req.body || {};
+
+        const sessionId = req.salesmanSession?.id;
+        if (!sessionId) return res.status(401).json({ success: false, error: 'No active session' });
+
+        dbRun(
+            `UPDATE salesman_sessions
+             SET device_type = COALESCE(?, device_type),
+                 device_name = COALESCE(?, device_name),
+                 app_version = COALESCE(?, app_version),
+                 platform = COALESCE(?, platform),
+                 fcm_token = COALESCE(?, fcm_token),
+                 last_seen_at = datetime('now'), updated_at = datetime('now')
+             WHERE id = ? AND tenant_id = ? AND salesman_id = ?`,
+            [device_type || null, device_name || null, app_version || null, platform || null, fcm_token || null, sessionId, tenantId, id]
+        );
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating device metadata:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Get salesman dashboard stats (for mobile/desktop home screen)
-router.get('/salesman/:id/dashboard', async (req, res) => {
+router.get('/salesman/:id/dashboard', authenticateSalesman, (req, res) => {
     try {
         const { id } = req.params;
         const { date } = req.query; // optional specific date, defaults to today
         const targetDate = date || new Date().toISOString().split('T')[0];
-        const tenantId = req.query.tenant_id;
+        const tenantId = getTenantId(req);
+
+        const salesman = dbGet('SELECT * FROM salesmen WHERE id = ? AND tenant_id = ?', [id, tenantId]);
 
         // Get today's stats
-        const todayVisits = await db.getAllAsync(
+        const todayVisits = dbAll(
             `SELECT * FROM visits 
              WHERE salesman_id = ? AND tenant_id = ? 
              AND DATE(visit_date) = ?`,
@@ -32,7 +255,7 @@ router.get('/salesman/:id/dashboard', async (req, res) => {
 
         // Get month stats
         const monthStart = targetDate.substring(0, 7) + '-01';
-        const monthVisits = await db.getAllAsync(
+        const monthVisits = dbAll(
             `SELECT * FROM visits 
              WHERE salesman_id = ? AND tenant_id = ? 
              AND strftime('%Y-%m', visit_date) = strftime('%Y-%m', ?)`,
@@ -40,7 +263,7 @@ router.get('/salesman/:id/dashboard', async (req, res) => {
         );
 
         // Get targets
-        const target = await db.getAsync(
+        const target = dbGet(
             `SELECT * FROM salesman_targets 
              WHERE salesman_id = ? AND tenant_id = ? 
              AND period = strftime('%Y-%m', ?)`,
@@ -48,7 +271,7 @@ router.get('/salesman/:id/dashboard', async (req, res) => {
         );
 
         // Get pending visits
-        const pendingVisits = await db.getAllAsync(
+        const pendingVisits = dbAll(
             `SELECT v.*, c.name as customer_name, c.phone, c.address 
              FROM visits v
              LEFT JOIN customers c ON v.customer_id = c.id
@@ -61,7 +284,7 @@ router.get('/salesman/:id/dashboard', async (req, res) => {
         );
 
         // Get recent commissions
-        const commissions = await db.getAllAsync(
+        const commissions = dbAll(
             `SELECT SUM(commission_amount) as total_pending
              FROM salesman_commissions 
              WHERE salesman_id = ? AND tenant_id = ? 
@@ -72,6 +295,7 @@ router.get('/salesman/:id/dashboard', async (req, res) => {
         res.json({
             success: true,
             data: {
+                salesman: salesman ? { id: salesman.id, name: salesman.name, phone: salesman.phone } : null,
                 today: {
                     date: targetDate,
                     visits_completed: todayVisits.filter(v => v.status === 'completed').length,
@@ -103,14 +327,14 @@ router.get('/salesman/:id/dashboard', async (req, res) => {
 // -------------------- SYNC MANAGEMENT --------------------
 
 // Get full sync data (for initial app load or full refresh)
-router.get('/salesman/:id/sync-data', async (req, res) => {
+router.get('/salesman/:id/sync-data', authenticateSalesman, (req, res) => {
     try {
         const { id } = req.params;
         const { last_sync_timestamp } = req.query;
-        const tenantId = req.query.tenant_id;
+        const tenantId = getTenantId(req);
 
         // Get salesman profile
-        const salesman = await db.getAsync(
+        const salesman = dbGet(
             'SELECT * FROM salesmen WHERE id = ? AND tenant_id = ?',
             [id, tenantId]
         );
@@ -120,7 +344,7 @@ router.get('/salesman/:id/sync-data', async (req, res) => {
         }
 
         // Get customers assigned to this salesman
-        const customers = await db.getAllAsync(
+        const customers = dbAll(
             `SELECT c.*, cl.latitude, cl.longitude, cl.address as gps_address
              FROM customers c
              LEFT JOIN customer_locations cl ON c.id = cl.customer_id
@@ -133,7 +357,7 @@ router.get('/salesman/:id/sync-data', async (req, res) => {
         // Get visits (last 30 days + future scheduled)
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const visits = await db.getAllAsync(
+        const visits = dbAll(
             `SELECT * FROM visits 
              WHERE salesman_id = ? AND tenant_id = ? 
              AND (visit_date >= ? OR status = 'scheduled')
@@ -146,13 +370,13 @@ router.get('/salesman/:id/sync-data', async (req, res) => {
 
         // Get current month target
         const currentMonth = new Date().toISOString().substring(0, 7);
-        const target = await db.getAsync(
+        const target = dbGet(
             'SELECT * FROM salesman_targets WHERE salesman_id = ? AND tenant_id = ? AND period = ?',
             [id, tenantId, currentMonth]
         );
 
         // Get products (limited fields for mobile)
-        const products = await db.getAllAsync(
+        const products = dbAll(
             `SELECT id, name, sku, category, price, stock_quantity, image_url, description
              FROM products 
              WHERE tenant_id = ? 
@@ -178,12 +402,12 @@ router.get('/salesman/:id/sync-data', async (req, res) => {
     }
 });
 
-// Upload offline changes (bulk sync from mobile/desktop)
-router.post('/salesman/:id/sync-upload', async (req, res) => {
+// Upload offline changes (bulk sync from mobile/desktop/web)
+router.post('/salesman/:id/sync-upload', authenticateSalesman, (req, res) => {
     try {
         const { id } = req.params;
         const { device_id, changes } = req.body;
-        const tenantId = req.body.tenant_id;
+        const tenantId = getTenantId(req);
 
         const results = {
             success: 0,
@@ -196,19 +420,31 @@ router.post('/salesman/:id/sync-upload', async (req, res) => {
             try {
                 const { entity_type, action, data, client_id } = change;
 
+                // Persist to server-side offline queue for audit/debug
+                try {
+                    dbRun(
+                        `INSERT INTO offline_queue
+                         (tenant_id, salesman_id, device_id, entity_type, entity_id, action, data, client_timestamp, synced, synced_at)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), 0, NULL)`,
+                        [tenantId, id, device_id, entity_type, data?.id || null, action, JSON.stringify(data || {})]
+                    );
+                } catch (e) {
+                    // If offline_queue is missing, continue processing anyway
+                }
+
                 let result;
                 switch (entity_type) {
                     case 'visit':
-                        result = await processVisitChange(action, data, tenantId, id);
+                        result = processVisitChange(action, data, tenantId, id, device_id);
                         break;
                     case 'customer':
-                        result = await processCustomerChange(action, data, tenantId);
+                        result = processCustomerChange(action, data, tenantId);
                         break;
                     case 'note':
-                        result = await processNoteChange(action, data, tenantId, id);
+                        result = processNoteChange(action, data, tenantId, id);
                         break;
                     case 'expense':
-                        result = await processExpenseChange(action, data, tenantId, id);
+                        result = processExpenseChange(action, data, tenantId, id);
                         break;
                     default:
                         throw new Error(`Unknown entity type: ${entity_type}`);
@@ -230,7 +466,7 @@ router.post('/salesman/:id/sync-upload', async (req, res) => {
         }
 
         // Update last sync timestamp for this device
-        await db.runAsync(
+        dbRun(
             `UPDATE salesman_sessions 
              SET last_sync_at = datetime('now') 
              WHERE salesman_id = ? AND device_id = ?`,
@@ -250,15 +486,15 @@ router.post('/salesman/:id/sync-upload', async (req, res) => {
 // -------------------- ROUTE PLANNING --------------------
 
 // Get optimal route plan for the day
-router.get('/salesman/:id/route-plan', async (req, res) => {
+router.get('/salesman/:id/route-plan', authenticateSalesman, (req, res) => {
     try {
         const { id } = req.params;
         const { date } = req.query;
-        const tenantId = req.query.tenant_id;
+        const tenantId = getTenantId(req);
         const targetDate = date || new Date().toISOString().split('T')[0];
 
         // Get scheduled visits for the day
-        const visits = await db.getAllAsync(
+        const visits = dbAll(
             `SELECT v.*, c.name as customer_name, 
                     cl.latitude, cl.longitude, cl.address
              FROM visits v
@@ -271,7 +507,7 @@ router.get('/salesman/:id/route-plan', async (req, res) => {
         );
 
         // Get or create route plan
-        let routePlan = await db.getAsync(
+        let routePlan = dbGet(
             'SELECT * FROM route_plans WHERE salesman_id = ? AND plan_date = ?',
             [id, targetDate]
         );
@@ -281,14 +517,14 @@ router.get('/salesman/:id/route-plan', async (req, res) => {
             const optimizedSequence = optimizeRoute(visits);
             
             const planId = generateId();
-            await db.runAsync(
+            dbRun(
                 `INSERT INTO route_plans 
                  (id, tenant_id, salesman_id, plan_date, customer_sequence, status) 
                  VALUES (?, ?, ?, ?, ?, 'planned')`,
                 [planId, tenantId, id, targetDate, JSON.stringify(optimizedSequence)]
             );
 
-            routePlan = await db.getAsync('SELECT * FROM route_plans WHERE id = ?', [planId]);
+            routePlan = dbGet('SELECT * FROM route_plans WHERE id = ?', [planId]);
         }
 
         res.json({
@@ -305,17 +541,229 @@ router.get('/salesman/:id/route-plan', async (req, res) => {
     }
 });
 
+// -------------------- SALESMAN SCOPED DATA (WEB APP) --------------------
+
+router.get('/salesman/:id/visits', authenticateSalesman, (req, res) => {
+    try {
+        const tenantId = getTenantId(req);
+        const { id } = req.params;
+        const limit = Math.min(parseInt(req.query.limit || '100', 10), 500);
+        const visits = dbAll(
+            `SELECT v.*, c.name as customer_name
+             FROM visits v
+             LEFT JOIN customers c ON c.id = v.customer_id
+             WHERE v.tenant_id = ? AND v.salesman_id = ?
+             ORDER BY v.visit_date DESC, v.created_at DESC
+             LIMIT ?`,
+            [tenantId, id, limit]
+        );
+
+        res.json({ success: true, data: visits, count: visits.length });
+    } catch (error) {
+        console.error('Error getting salesman visits:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.get('/salesman/:id/customers', authenticateSalesman, (req, res) => {
+    try {
+        const tenantId = getTenantId(req);
+        const { id } = req.params;
+        const limit = Math.min(parseInt(req.query.limit || '200', 10), 1000);
+
+        // Derive customer list from visits for this salesman
+        const customers = dbAll(
+            `SELECT
+                c.*,
+                MAX(v.visit_date) as last_visit_date,
+                COUNT(v.id) as total_visits
+             FROM visits v
+             JOIN customers c ON c.id = v.customer_id
+             WHERE v.tenant_id = ? AND v.salesman_id = ?
+             GROUP BY c.id
+             ORDER BY c.name
+             LIMIT ?`,
+            [tenantId, id, limit]
+        );
+
+        res.json({ success: true, data: customers, count: customers.length });
+    } catch (error) {
+        console.error('Error getting salesman customers:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.get('/salesman/:id/targets', authenticateSalesman, (req, res) => {
+    try {
+        const tenantId = getTenantId(req);
+        const { id } = req.params;
+        const limit = Math.min(parseInt(req.query.limit || '12', 10), 120);
+
+        const targets = dbAll(
+            `SELECT st.*, st.period as target_month
+             FROM salesman_targets st
+             WHERE st.tenant_id = ? AND st.salesman_id = ?
+             ORDER BY st.period DESC
+             LIMIT ?`,
+            [tenantId, id, limit]
+        );
+
+        res.json({ success: true, data: targets, count: targets.length });
+    } catch (error) {
+        console.error('Error getting salesman targets:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.get('/salesman/:id/expenses', authenticateSalesman, (req, res) => {
+    try {
+        const tenantId = getTenantId(req);
+        const { id } = req.params;
+        const limit = Math.min(parseInt(req.query.limit || '50', 10), 200);
+
+        const expenses = dbAll(
+            `SELECT * FROM salesman_expenses
+             WHERE tenant_id = ? AND salesman_id = ?
+             ORDER BY expense_date DESC, created_at DESC
+             LIMIT ?`,
+            [tenantId, id, limit]
+        );
+
+        res.json({ success: true, data: expenses, count: expenses.length });
+    } catch (error) {
+        console.error('Error getting expenses:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.post('/salesman/:id/expenses', authenticateSalesman, (req, res) => {
+    try {
+        const tenantId = getTenantId(req);
+        const { id } = req.params;
+        const { expense_date, expense_type, amount, description, receipt_url, visit_id } = req.body || {};
+
+        if (!expense_date || !expense_type || amount === undefined) {
+            return res.status(400).json({ success: false, error: 'expense_date, expense_type, amount are required' });
+        }
+
+        const expenseId = crypto.randomUUID ? crypto.randomUUID() : generateId();
+        dbRun(
+            `INSERT INTO salesman_expenses
+             (id, tenant_id, salesman_id, expense_date, expense_type, amount, description, receipt_url, visit_id, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', datetime('now'), datetime('now'))`,
+            [expenseId, tenantId, id, expense_date, expense_type, Number(amount), description || null, receipt_url || null, visit_id || null]
+        );
+
+        res.json({ success: true, data: { id: expenseId } });
+    } catch (error) {
+        console.error('Error creating expense:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// -------------------- NOTIFICATIONS --------------------
+
+router.get('/salesman/:id/notifications', authenticateSalesman, (req, res) => {
+    try {
+        const tenantId = getTenantId(req);
+        const { id } = req.params;
+        const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
+        const status = req.query.status;
+
+        const rows = status
+            ? dbAll(
+                `SELECT * FROM notification_queue
+                 WHERE tenant_id = ? AND salesman_id = ? AND status = ?
+                 ORDER BY datetime(created_at) DESC
+                 LIMIT ?`,
+                [tenantId, id, status, limit]
+            )
+            : dbAll(
+                `SELECT * FROM notification_queue
+                 WHERE tenant_id = ? AND salesman_id = ?
+                 ORDER BY datetime(created_at) DESC
+                 LIMIT ?`,
+                [tenantId, id, limit]
+            );
+
+        res.json({ success: true, data: rows, count: rows.length });
+    } catch (error) {
+        console.error('Error fetching notifications:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.post('/salesman/:id/notifications/:notificationId/read', authenticateSalesman, (req, res) => {
+    try {
+        const tenantId = getTenantId(req);
+        const { id, notificationId } = req.params;
+
+        dbRun(
+            `UPDATE notification_queue
+             SET read_at = datetime('now'), status = 'read'
+             WHERE id = ? AND tenant_id = ? AND salesman_id = ?`,
+            [notificationId, tenantId, id]
+        );
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error marking notification read:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Admin/system enqueue endpoint (guarded by env key)
+router.post('/notifications/enqueue', (req, res) => {
+    try {
+        const adminKey = process.env.FSM_ADMIN_KEY;
+        if (!adminKey) {
+            return res.status(403).json({ success: false, error: 'FSM_ADMIN_KEY not configured' });
+        }
+        if (req.headers['x-admin-key'] !== adminKey) {
+            return res.status(403).json({ success: false, error: 'Forbidden' });
+        }
+
+        const { tenant_id, salesman_id, notification_type, title, message, data, priority, scheduled_for } = req.body || {};
+        if (!tenant_id || !salesman_id || !notification_type || !title || !message) {
+            return res.status(400).json({ success: false, error: 'tenant_id, salesman_id, notification_type, title, message are required' });
+        }
+
+        const notifId = crypto.randomUUID ? crypto.randomUUID() : generateId();
+        dbRun(
+            `INSERT INTO notification_queue
+             (id, tenant_id, salesman_id, notification_type, title, message, data, priority, scheduled_for, status, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', datetime('now'))`,
+            [
+                notifId,
+                tenant_id,
+                salesman_id,
+                notification_type,
+                title,
+                message,
+                data ? JSON.stringify(data) : null,
+                priority || 'normal',
+                scheduled_for || null
+            ]
+        );
+
+        res.json({ success: true, data: { id: notifId } });
+    } catch (error) {
+        console.error('Error enqueueing notification:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Get nearby customers (for opportunistic visits)
-router.get('/salesman/:id/nearby-customers', async (req, res) => {
+router.get('/salesman/:id/nearby-customers', authenticateSalesman, (req, res) => {
     try {
         const { id } = req.params;
         const { lat, lng, radius } = req.query; // radius in km
-        const tenantId = req.query.tenant_id;
+        const tenantId = getTenantId(req);
 
         const searchRadius = parseFloat(radius) || 5; // default 5km
 
         // Simple distance calculation using Haversine formula
-        const customers = await db.getAllAsync(
+        const customers = dbAll(
             `SELECT c.*, cl.latitude, cl.longitude,
                     (6371 * acos(cos(radians(?)) * cos(radians(cl.latitude)) * 
                      cos(radians(cl.longitude) - radians(?)) + 
@@ -399,11 +847,11 @@ function toRad(degrees) {
     return degrees * (Math.PI / 180);
 }
 
-async function processVisitChange(action, data, tenantId, salesmanId) {
+function processVisitChange(action, data, tenantId, salesmanId, deviceId) {
     const id = data.id || generateId();
     
     if (action === 'create') {
-        await db.runAsync(
+        dbRun(
             `INSERT INTO visits 
              (id, tenant_id, salesman_id, customer_id, visit_date, visit_type, 
               checkin_time, checkin_latitude, checkin_longitude,
@@ -414,10 +862,10 @@ async function processVisitChange(action, data, tenantId, salesmanId) {
              data.checkin_time, data.checkin_latitude, data.checkin_longitude,
              data.checkout_time, data.checkout_latitude, data.checkout_longitude,
              data.duration_minutes, data.potential, data.status, data.notes, 
-             data.outcome, data.order_value, data.device_id]
+             data.outcome, data.order_value, deviceId || data.device_id || null]
         );
     } else if (action === 'update') {
-        await db.runAsync(
+        dbRun(
             `UPDATE visits SET 
              checkout_time = ?, checkout_latitude = ?, checkout_longitude = ?,
              duration_minutes = ?, status = ?, notes = ?, outcome = ?, order_value = ?,
@@ -432,11 +880,11 @@ async function processVisitChange(action, data, tenantId, salesmanId) {
     return { id };
 }
 
-async function processCustomerChange(action, data, tenantId) {
+function processCustomerChange(action, data, tenantId) {
     const id = data.id || generateId();
     
     if (action === 'create') {
-        await db.runAsync(
+        dbRun(
             `INSERT INTO customers 
              (id, tenant_id, name, phone, email, address, city, state, pincode, customer_type) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -446,7 +894,7 @@ async function processCustomerChange(action, data, tenantId) {
         
         // Add location if provided
         if (data.latitude && data.longitude) {
-            await db.runAsync(
+            dbRun(
                 `INSERT INTO customer_locations 
                  (id, tenant_id, customer_id, latitude, longitude, address) 
                  VALUES (?, ?, ?, ?, ?, ?)`,
@@ -458,11 +906,11 @@ async function processCustomerChange(action, data, tenantId) {
     return { id };
 }
 
-async function processNoteChange(action, data, tenantId, salesmanId) {
+function processNoteChange(action, data, tenantId, salesmanId) {
     const id = data.id || generateId();
     
     if (action === 'create') {
-        await db.runAsync(
+        dbRun(
             `INSERT INTO customer_notes 
              (id, tenant_id, customer_id, salesman_id, note_type, note_text, file_url, visit_id) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -474,11 +922,11 @@ async function processNoteChange(action, data, tenantId, salesmanId) {
     return { id };
 }
 
-async function processExpenseChange(action, data, tenantId, salesmanId) {
+function processExpenseChange(action, data, tenantId, salesmanId) {
     const id = data.id || generateId();
     
     if (action === 'create') {
-        await db.runAsync(
+        dbRun(
             `INSERT INTO salesman_expenses 
              (id, tenant_id, salesman_id, expense_date, expense_type, amount, description, receipt_url, visit_id) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,

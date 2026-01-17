@@ -431,21 +431,53 @@
     </div>
 
     <script>
-        // Get salesman ID from URL or localStorage
         const urlParams = new URLSearchParams(window.location.search);
+
+        // Get salesman ID from URL or localStorage
         const salesmanId = urlParams.get('id') || localStorage.getItem('salesmanId') || 'b458cac6-e311-4ad6-9c2e-76792ef8fef8';
-        const tenantId = '101f04af63cbefc2bf8f0a98b9ae1205';
+
+        const DEFAULT_TENANT_ID = '101f04af63cbefc2bf8f0a98b9ae1205';
+
+        function getTenantId() {
+            const urlTenantId = urlParams.get('tenant_id');
+            const storedTenantId = localStorage.getItem('tenantId');
+            return urlTenantId || storedTenantId || DEFAULT_TENANT_ID;
+        }
+
+        const tenantId = getTenantId();
+        localStorage.setItem('tenantId', tenantId);
+
+        const salesmanToken = localStorage.getItem('salesmanToken');
+
+        async function apiFetch(path, options = {}) {
+            const headers = Object.assign({}, options.headers || {});
+            if (salesmanToken) headers['Authorization'] = `Bearer ${salesmanToken}`;
+            headers['X-Tenant-Id'] = tenantId;
+            if (!headers['Content-Type'] && options.body) headers['Content-Type'] = 'application/json';
+
+            const res = await fetch(path, Object.assign({}, options, { headers }));
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || json.success === false) {
+                const msg = json.error || `Request failed (${res.status})`;
+                if (res.status === 401 || res.status === 403) {
+                    window.location.href = `/salesman-login.html?tenant_id=${encodeURIComponent(tenantId)}`;
+                    return;
+                }
+                throw new Error(msg);
+            }
+            return json;
+        }
+
+        // Require auth token
+        if (!salesmanToken) {
+            window.location.href = `/salesman-login.html?tenant_id=${encodeURIComponent(tenantId)}`;
+        }
 
         // Load dashboard data
         async function loadDashboard() {
             try {
-                const response = await fetch(`/api/fsm/salesman/${salesmanId}/dashboard?tenant_id=${tenantId}`);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const data = await response.json();
+                const resp = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/dashboard?tenant_id=${encodeURIComponent(tenantId)}`);
+                const data = resp.data || {};
                 console.log('Dashboard data:', data);
                 
                 // Update salesman info

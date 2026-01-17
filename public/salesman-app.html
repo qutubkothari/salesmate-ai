@@ -175,6 +175,65 @@
             display: flex;
             gap: 15px;
             align-items: center;
+            position: relative;
+        }
+
+        .notif-wrapper {
+            position: relative;
+        }
+
+        .notif-badge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 6px;
+            border-radius: 999px;
+            background: var(--danger);
+            color: white;
+            font-size: 12px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid white;
+        }
+
+        .notif-dropdown {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 10px);
+            width: 360px;
+            max-height: 420px;
+            overflow: auto;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+            display: none;
+            z-index: 50;
+        }
+
+        .notif-dropdown.open {
+            display: block;
+        }
+
+        .notif-dropdown-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .notification-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .notification-item.unread {
+            background: rgba(102, 126, 234, 0.08);
         }
 
         .btn {
@@ -444,6 +503,21 @@
             <div class="top-bar">
                 <h2 class="top-bar-title" id="pageTitle">Dashboard</h2>
                 <div class="top-bar-actions">
+                    <div class="notif-wrapper">
+                        <button class="btn btn-outline" onclick="toggleNotifications(event)" title="Notifications" style="padding: 10px 12px;">
+                            <i class="fas fa-bell"></i>
+                        </button>
+                        <span id="notificationBadge" class="notif-badge">0</span>
+                        <div id="notificationDropdown" class="notif-dropdown">
+                            <div class="notif-dropdown-header">
+                                <span>Notifications</span>
+                                <button class="btn btn-outline" onclick="refreshNotifications()" style="padding: 6px 10px; font-size: 12px;">
+                                    <i class="fas fa-sync"></i>
+                                </button>
+                            </div>
+                            <div id="notificationList"></div>
+                        </div>
+                    </div>
                     <button class="btn btn-outline" onclick="refreshData()">
                         <i class="fas fa-sync"></i>
                         Refresh
@@ -867,14 +941,97 @@
     </div>
 
     <script>
-        const tenantId = '101f04af63cbefc2bf8f0a98b9ae1205';
+        const DEFAULT_TENANT_ID = '101f04af63cbefc2bf8f0a98b9ae1205';
+
+        function getTenantId() {
+            const urlTenantId = new URLSearchParams(window.location.search).get('tenant_id');
+            const storedTenantId = localStorage.getItem('tenantId');
+            return urlTenantId || storedTenantId || DEFAULT_TENANT_ID;
+        }
+
+        const tenantId = getTenantId();
+        localStorage.setItem('tenantId', tenantId);
+
         const salesmanId = localStorage.getItem('salesmanId');
         const salesmanName = localStorage.getItem('salesmanName');
+        const salesmanToken = localStorage.getItem('salesmanToken');
+        const deviceId = localStorage.getItem('deviceId');
+
+        const OFFLINE_QUEUE_KEY = 'salesmanOfflineQueue';
+
+        function getOfflineQueue() {
+            try {
+                return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
+            } catch {
+                return [];
+            }
+        }
+
+        function setOfflineQueue(queue) {
+            localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+        }
+
+        function enqueueOfflineChange(change) {
+            const queue = getOfflineQueue();
+            queue.push(change);
+            setOfflineQueue(queue);
+            return queue.length;
+        }
+
+        async function apiFetch(path, options = {}) {
+            const headers = Object.assign({}, options.headers || {});
+            if (salesmanToken) headers['Authorization'] = `Bearer ${salesmanToken}`;
+            if (!headers['Content-Type'] && options.body) headers['Content-Type'] = 'application/json';
+            headers['X-Tenant-Id'] = tenantId;
+
+            const res = await fetch(path, Object.assign({}, options, { headers }));
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || json.success === false) {
+                if (res.status === 401 || res.status === 403) {
+                    localStorage.removeItem('salesmanToken');
+                    localStorage.removeItem('salesmanTokenExpiresAt');
+                    window.location.href = '/salesman-login.html';
+                    return;
+                }
+                const msg = json.error || `Request failed (${res.status})`;
+                throw new Error(msg);
+            }
+            return json;
+        }
+
+        async function flushOfflineQueue() {
+            const queue = getOfflineQueue();
+            if (!queue.length) return;
+            if (!navigator.onLine) return;
+            if (!salesmanId || !deviceId || !salesmanToken) return;
+
+            try {
+                const payload = { tenant_id: tenantId, device_id: deviceId, changes: queue };
+                const result = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/sync-upload`, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+
+                // On success, clear queue (server returns per-change failures; keep it simple for now)
+                if (result?.results?.failed > 0) {
+                    console.warn('Some offline changes failed to sync:', result.results);
+                } else {
+                    setOfflineQueue([]);
+                }
+            } catch (e) {
+                console.warn('Offline queue flush failed:', e.message);
+            }
+        }
 
         // Check authentication
-        if (!salesmanId) {
+        if (!salesmanId || !salesmanToken) {
             window.location.href = '/salesman-login.html';
         }
+
+        // Flush queued changes when online
+        window.addEventListener('online', () => {
+            flushOfflineQueue();
+        });
 
         // Initialize
         document.getElementById('profileName').textContent = salesmanName || 'Salesman';
@@ -912,13 +1069,16 @@
         // Load dashboard data
         async function loadDashboard() {
             try {
-                const response = await fetch(`/api/fsm/salesman/${salesmanId}/dashboard?tenant_id=${tenantId}`);
-                const data = await response.json();
-                
+                const response = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/dashboard?tenant_id=${encodeURIComponent(tenantId)}`);
+                const data = response.data;
+
                 renderDashboard(data);
                 renderVisitsPage(data);
-                renderCustomersPage();
+                await renderCustomersPage();
                 renderTargetsPage(data);
+
+                await loadRecentExpenses();
+                await flushOfflineQueue();
             } catch (error) {
                 console.error('Error loading dashboard:', error);
             }
@@ -937,9 +1097,8 @@
 
         async function loadAllVisits() {
             try {
-                const response = await fetch(`/api/fsm/visits?tenant_id=${tenantId}&salesman_id=${salesmanId}&limit=50`);
-                const data = await response.json();
-                const visits = data.visits || [];
+                const response = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/visits?tenant_id=${encodeURIComponent(tenantId)}&limit=50`);
+                const visits = response.data || [];
 
                 const tbody = document.getElementById('visitsTableBody');
                 if (visits.length === 0) {
@@ -974,9 +1133,8 @@
 
         async function renderCustomersPage() {
             try {
-                const response = await fetch(`/api/fsm/customers?tenant_id=${tenantId}&salesman_id=${salesmanId}&limit=100`);
-                const data = await response.json();
-                const customers = data.customers || [];
+                const response = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/customers?tenant_id=${encodeURIComponent(tenantId)}&limit=200`);
+                const customers = response.data || [];
 
                 // Update stats
                 document.getElementById('customersTotal').textContent = customers.length;
@@ -1051,9 +1209,8 @@
 
         async function loadTargetHistory() {
             try {
-                const response = await fetch(`/api/fsm/targets?tenant_id=${tenantId}&salesman_id=${salesmanId}&limit=6`);
-                const data = await response.json();
-                const targets = data.targets || [];
+                const response = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/targets?tenant_id=${encodeURIComponent(tenantId)}&limit=6`);
+                const targets = response.data || [];
 
                 const tbody = document.getElementById('targetHistoryBody');
                 if (targets.length === 0) {
@@ -1083,10 +1240,88 @@
             }
         }
 
-        function submitExpense(event) {
+        async function submitExpense(event) {
             event.preventDefault();
-            alert('Expense submitted successfully! Your manager will review it shortly.');
-            event.target.reset();
+
+            const form = event.target;
+            const dateInput = form.querySelector('input[type="date"]');
+            const typeSelect = form.querySelector('select');
+            const amountInput = form.querySelector('input[type="number"]');
+            const descTextarea = form.querySelector('textarea');
+
+            const expense = {
+                expense_date: dateInput?.value,
+                expense_type: typeSelect?.value,
+                amount: amountInput?.value,
+                description: descTextarea?.value
+            };
+
+            if (!expense.expense_date || !expense.expense_type || !expense.amount) {
+                alert('Please fill date, type, and amount.');
+                return;
+            }
+
+            // If offline, enqueue
+            const change = {
+                entity_type: 'expense',
+                action: 'create',
+                data: expense,
+                client_id: (crypto?.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)) + '-' + Date.now(),
+                client_timestamp: new Date().toISOString()
+            };
+
+            try {
+                if (!navigator.onLine) {
+                    const count = enqueueOfflineChange(change);
+                    alert(`Saved offline. Will sync when online. Pending: ${count}`);
+                    form.reset();
+                    return;
+                }
+
+                await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/expenses?tenant_id=${encodeURIComponent(tenantId)}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ tenant_id: tenantId, ...expense })
+                });
+
+                alert('Expense submitted successfully!');
+                form.reset();
+                await loadRecentExpenses();
+            } catch (e) {
+                // If server fails, fall back to offline queue
+                const count = enqueueOfflineChange(change);
+                alert(`Could not submit now. Saved offline to retry. Pending: ${count}`);
+            }
+        }
+
+        async function loadRecentExpenses() {
+            try {
+                const resp = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/expenses?tenant_id=${encodeURIComponent(tenantId)}&limit=10`);
+                const expenses = resp.data || [];
+
+                document.getElementById('expensesTotal').textContent = '₹' + expenses.reduce((s, e) => s + Number(e.amount || 0), 0).toLocaleString();
+                document.getElementById('expensesPending').textContent = expenses.filter(e => (e.status || '').toLowerCase() === 'pending').length;
+                document.getElementById('expensesApproved').textContent = expenses.filter(e => (e.status || '').toLowerCase() === 'approved').length;
+
+                const tbody = document.getElementById('expensesTableBody');
+                if (!tbody) return;
+
+                if (!expenses.length) {
+                    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><i class="fas fa-receipt"></i><p>No expenses yet</p></div></td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = expenses.map(e => `
+                    <tr>
+                        <td>${new Date(e.expense_date).toLocaleDateString()}</td>
+                        <td>${e.expense_type}</td>
+                        <td>₹${Number(e.amount || 0).toLocaleString()}</td>
+                        <td>${e.status || 'pending'}</td>
+                        <td>${e.description || '-'}</td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                console.warn('Failed to load expenses:', e.message);
+            }
         }
 
         function viewVisit(id) {
@@ -1180,15 +1415,132 @@
             alert('New visit feature coming soon!');
         }
 
-        function logout() {
+        let notificationsTimer = null;
+
+        function toggleNotifications(event) {
+            event?.stopPropagation?.();
+            const dropdown = document.getElementById('notificationDropdown');
+            if (!dropdown) return;
+            dropdown.classList.toggle('open');
+            if (dropdown.classList.contains('open')) {
+                refreshNotifications();
+            }
+        }
+
+        function closeNotifications() {
+            const dropdown = document.getElementById('notificationDropdown');
+            if (dropdown) dropdown.classList.remove('open');
+        }
+
+        async function startNotificationsPolling() {
+            if (notificationsTimer) clearInterval(notificationsTimer);
+            await refreshNotifications();
+            notificationsTimer = setInterval(refreshNotifications, 30000);
+        }
+
+        async function refreshNotifications() {
+            try {
+                const resp = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/notifications?tenant_id=${encodeURIComponent(tenantId)}&limit=20`);
+                const notifications = resp.data || [];
+
+                const unread = notifications.filter(n => !n.read_at).length;
+                const badge = document.getElementById('notificationBadge');
+                if (badge) {
+                    badge.textContent = unread;
+                    badge.style.display = unread ? 'inline-flex' : 'none';
+                }
+
+                const list = document.getElementById('notificationList');
+                if (!list) return;
+
+                if (!notifications.length) {
+                    list.innerHTML = '<div class="empty-state" style="padding:16px;"><i class="fas fa-bell"></i><p>No notifications</p></div>';
+                    return;
+                }
+
+                list.innerHTML = notifications.map(n => {
+                    const created = n.created_at ? new Date(n.created_at).toLocaleString() : '';
+                    const isUnread = !n.read_at;
+                    const title = n.title || 'Notification';
+                    const message = n.message || '';
+                    const id = String(n.id ?? '');
+
+                    return `
+                        <div class="notification-item ${isUnread ? 'unread' : ''}">
+                            <div style="display:flex; gap:10px; align-items:flex-start;">
+                                <div style="flex:1;">
+                                    <div style="font-weight:600;">${escapeHtml(title)}</div>
+                                    <div style="opacity:0.9;">${escapeHtml(message)}</div>
+                                    <div style="font-size:12px; opacity:0.7; margin-top:4px;">${escapeHtml(created)}</div>
+                                </div>
+                                ${isUnread ? `<button class="btn btn-outline" style="padding: 6px 10px; font-size: 12px;" onclick="markNotificationRead('${escapeAttr(id)}')">Mark read</button>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.warn('Notifications refresh failed:', e.message);
+            }
+        }
+
+        async function markNotificationRead(notificationId) {
+            try {
+                await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/notifications/${encodeURIComponent(notificationId)}/read?tenant_id=${encodeURIComponent(tenantId)}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ tenant_id: tenantId })
+                });
+                await refreshNotifications();
+            } catch (e) {
+                alert('Failed to mark notification read.');
+            }
+        }
+
+        function escapeHtml(str) {
+            return String(str ?? '').replace(/[&<>'"]/g, (c) => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                "'": '&#39;',
+                '"': '&quot;'
+            }[c]));
+        }
+
+        function escapeAttr(str) {
+            return String(str ?? '')
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'")
+                .replace(/\n/g, '\\n')
+                .replace(/\r/g, '\\r');
+        }
+
+        async function logout() {
+            try {
+                await apiFetch('/api/fsm/salesman/logout', { method: 'POST', body: JSON.stringify({ tenant_id: tenantId }) });
+            } catch (e) {
+                // ignore
+            }
+
             localStorage.removeItem('salesmanId');
             localStorage.removeItem('salesmanName');
             localStorage.removeItem('loginTime');
+            localStorage.removeItem('salesmanToken');
+            localStorage.removeItem('salesmanTokenExpiresAt');
             window.location.href = '/salesman-login.html';
         }
 
         // Load data on startup
         loadDashboard();
+
+        // Notifications
+        startNotificationsPolling();
+
+        // Close notifications on outside click
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('notificationDropdown');
+            const wrapper = document.querySelector('.notif-wrapper');
+            if (!dropdown || !wrapper) return;
+            if (!wrapper.contains(e.target)) closeNotifications();
+        });
 
         // Auto-refresh every 30 seconds
         setInterval(loadDashboard, 30000);
