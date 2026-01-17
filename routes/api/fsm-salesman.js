@@ -430,7 +430,7 @@ router.get('/salesman/:id/dashboard', authenticateSalesman, (req, res) => {
         const pendingVisits = dbAll(
             `SELECT v.*, c.name as customer_name, c.phone, c.address 
              FROM visits v
-             LEFT JOIN customers c ON v.customer_id = c.id
+             LEFT JOIN customers_engaged_new c ON v.customer_id = c.id
              WHERE v.salesman_id = ? AND v.tenant_id = ? 
              AND v.status = 'scheduled' 
              AND DATE(v.visit_date) >= ?
@@ -654,7 +654,7 @@ router.get('/salesman/:id/route-plan', authenticateSalesman, (req, res) => {
             `SELECT v.*, c.name as customer_name, 
                     cl.latitude, cl.longitude, cl.address
              FROM visits v
-             LEFT JOIN customers c ON v.customer_id = c.id
+             LEFT JOIN customers_engaged_new c ON v.customer_id = c.id
              LEFT JOIN customer_locations cl ON c.id = cl.customer_id
              WHERE v.salesman_id = ? AND v.tenant_id = ? 
              AND DATE(v.visit_date) = ?
@@ -707,7 +707,7 @@ router.get('/salesman/:id/visits', authenticateSalesman, (req, res) => {
         const visits = dbAll(
             `SELECT v.*, c.name as customer_name
              FROM visits v
-             LEFT JOIN customers c ON c.id = v.customer_id
+             LEFT JOIN customers_engaged_new c ON c.id = v.customer_id
              WHERE v.tenant_id = ? AND v.salesman_id = ?
              ORDER BY v.visit_date DESC, v.created_at DESC
              LIMIT ?`,
@@ -734,7 +734,7 @@ router.get('/salesman/:id/customers', authenticateSalesman, (req, res) => {
                 MAX(v.visit_date) as last_visit_date,
                 COUNT(v.id) as total_visits
              FROM visits v
-             JOIN customers c ON c.id = v.customer_id
+             JOIN customers_engaged_new c ON c.id = v.customer_id
              WHERE v.tenant_id = ? AND v.salesman_id = ?
              GROUP BY c.id
              ORDER BY c.name
@@ -1041,7 +1041,7 @@ function processCustomerChange(action, data, tenantId) {
     
     if (action === 'create') {
         dbRun(
-            `INSERT INTO customers 
+            `INSERT INTO customers_engaged_new 
              (id, tenant_id, name, phone, email, address, city, state, pincode, customer_type) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [id, tenantId, data.name, data.phone, data.email, data.address, 
