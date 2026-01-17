@@ -483,13 +483,19 @@
                     <div class="max-w-7xl mx-auto px-6 py-4">
                         <div class="flex justify-between items-center mb-6">
                             <h2 class="text-white text-2xl font-bold">Sales Targets</h2>
-                            <button onclick="showAddTargetModal()" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-white">
-                                <i class="fas fa-plus mr-2"></i>Add Target
-                            </button>
+                            <div class="flex gap-3">
+                                <select id="targetSalesmanFilter" onchange="loadTargets()" class="px-4 py-2 rounded-lg bg-white/10 text-white border border-white/20">
+                                    <option value="">All Salesmen</option>
+                                </select>
+                                <input type="month" id="targetMonthFilter" onchange="loadTargets()" class="px-4 py-2 rounded-lg bg-white/10 text-white border border-white/20" />
+                                <button onclick="showAddTargetModal()" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-white">
+                                    <i class="fas fa-plus mr-2"></i>Add Target
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Targets Summary -->
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                             <div class="stat-card p-4 rounded-xl">
                                 <div class="flex items-center justify-between">
                                     <div>
@@ -521,29 +527,64 @@
 
                         <!-- Targets Table -->
                         <div class="glass-effect rounded-xl p-6 overflow-x-auto">
+                            <!-- Table Controls -->
+                            <div class="flex justify-between items-center mb-4">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-white/60 text-sm">Show</span>
+                                    <select id="targetsPageSize" onchange="renderTargetsTable()" class="px-3 py-1 rounded bg-white/10 text-white border border-white/20 text-sm">
+                                        <option value="10">10</option>
+                                        <option value="20">20</option>
+                                        <option value="50">50</option>
+                                    </select>
+                                    <span class="text-white/60 text-sm">entries</span>
+                                </div>
+                                <div id="targetsPageInfo" class="text-white/60 text-sm"></div>
+                            </div>
+                            
                             <table class="w-full">
                                 <thead>
                                     <tr class="text-white/60 text-sm border-b border-white/10">
-                                        <th class="text-left py-3 px-4">Salesman</th>
-                                        <th class="text-left py-3 px-4">Month</th>
-                                        <th class="text-left py-3 px-4">Visit Target</th>
-                                        <th class="text-left py-3 px-4">Achieved Visits</th>
+                                        <th class="text-left py-3 px-4 cursor-pointer hover:text-white" onclick="sortTargetsTable('salesman_name')">
+                                            Salesman <i class="fas fa-sort ml-1"></i>
+                                        </th>
+                                        <th class="text-left py-3 px-4 cursor-pointer hover:text-white" onclick="sortTargetsTable('target_month')">
+                                            Month <i class="fas fa-sort ml-1"></i>
+                                        </th>
+                                        <th class="text-left py-3 px-4 cursor-pointer hover:text-white" onclick="sortTargetsTable('target_visits')">
+                                            Visit Target <i class="fas fa-sort ml-1"></i>
+                                        </th>
+                                        <th class="text-left py-3 px-4 cursor-pointer hover:text-white" onclick="sortTargetsTable('achieved_visits')">
+                                            Achieved Visits <i class="fas fa-sort ml-1"></i>
+                                        </th>
                                         <th class="text-left py-3 px-4">Order Target</th>
                                         <th class="text-left py-3 px-4">Achieved Orders</th>
                                         <th class="text-left py-3 px-4">Revenue Target</th>
                                         <th class="text-left py-3 px-4">Achieved Revenue</th>
-                                        <th class="text-left py-3 px-4">Progress</th>
+                                        <th class="text-left py-3 px-4 cursor-pointer hover:text-white" onclick="sortTargetsTable('progress')">
+                                            Progress <i class="fas fa-sort ml-1"></i>
+                                        </th>
                                         <th class="text-left py-3 px-4">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="targetsTableBody">
                                     <tr>
-                                        <td colspan="9" class="text-center py-8 text-white/60">
+                                        <td colspan="10" class="text-center py-8 text-white/60">
                                             <i class="fas fa-spinner fa-spin mr-2"></i>Loading targets...
                                         </td>
                                     </tr>
                                 </tbody>
                             </table>
+                            
+                            <!-- Pagination -->
+                            <div class="flex justify-between items-center mt-4">
+                                <button id="targetsPrevPage" onclick="changeTargetsPage(-1)" class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded text-white text-sm" disabled>
+                                    <i class="fas fa-chevron-left mr-2"></i>Previous
+                                </button>
+                                <span id="targetsCurrentPage" class="text-white/60 text-sm">Page 1</span>
+                                <button id="targetsNextPage" onclick="changeTargetsPage(1)" class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded text-white text-sm" disabled>
+                                    Next<i class="fas fa-chevron-right ml-2"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

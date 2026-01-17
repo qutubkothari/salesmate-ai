@@ -377,25 +377,33 @@ router.get('/targets', async (req, res) => {
     const tenant_id = req.query.tenant_id || DEFAULT_TENANT_ID;
     const { salesman_id, period, limit = 100 } = req.query;
     
-    let query = 'SELECT * FROM salesman_targets WHERE 1=1';
+    let query = `
+      SELECT 
+        st.*,
+        s.name as salesman_name,
+        st.period as target_month
+      FROM salesman_targets st
+      LEFT JOIN salesmen s ON st.salesman_id = s.id
+      WHERE 1=1
+    `;
     const params = [];
 
     if (tenant_id) {
-      query += ' AND tenant_id = ?';
+      query += ' AND st.tenant_id = ?';
       params.push(tenant_id);
     }
     
     if (salesman_id) {
-      query += ' AND salesman_id = ?';
+      query += ' AND st.salesman_id = ?';
       params.push(salesman_id);
     }
     
     if (period) {
-      query += ' AND period = ?';
+      query += ' AND st.period = ?';
       params.push(period);
     }
     
-    query += ' ORDER BY period DESC, created_at DESC LIMIT ?';
+    query += ' ORDER BY st.period DESC, st.created_at DESC LIMIT ?';
     params.push(parseInt(limit));
     
     const targets = db.prepare(query).all(...params);
