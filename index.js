@@ -1148,6 +1148,10 @@ app.use('/api/products', productsRouter);
 const broadcastRouter = require('./routes/api/broadcast');
 app.use('/api/broadcast', broadcastRouter);
 
+// Admin Management API (Products, Orders, Customers CRUD)
+const adminRouter = require('./routes/api/admin');
+app.use('/api/admin', adminRouter);
+
 // FSM (Field Sales Management) API
 const fsmRouter = require('./routes/api/fsm');
 app.use('/api/fsm', fsmRouter);
