@@ -1670,9 +1670,13 @@
                 const resp = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/expenses?tenant_id=${encodeURIComponent(tenantId)}&limit=10`);
                 const expenses = resp.data || [];
 
-                document.getElementById('expensesTotal').textContent = '₹' + expenses.reduce((s, e) => s + Number(e.amount || 0), 0).toLocaleString();
-                document.getElementById('expensesPending').textContent = expenses.filter(e => (e.status || '').toLowerCase() === 'pending').length;
-                document.getElementById('expensesApproved').textContent = expenses.filter(e => (e.status || '').toLowerCase() === 'approved').length;
+                const totalEl = document.getElementById('expensesTotal');
+                const pendingEl = document.getElementById('expensesPending');
+                const approvedEl = document.getElementById('expensesApproved');
+                
+                if (totalEl) totalEl.textContent = '₹' + expenses.reduce((s, e) => s + Number(e.amount || 0), 0).toLocaleString();
+                if (pendingEl) pendingEl.textContent = expenses.filter(e => (e.status || '').toLowerCase() === 'pending').length;
+                if (approvedEl) approvedEl.textContent = expenses.filter(e => (e.status || '').toLowerCase() === 'approved').length;
 
                 const tbody = document.getElementById('expensesTableBody');
                 if (!tbody) return;
@@ -2242,8 +2246,10 @@
 
                     // Update my rank
                     if (isMe) {
-                        document.getElementById('myRank').textContent = `#${idx + 1}`;
-                        document.getElementById('rankChange').textContent = idx < 3 ? '🔥 Top 3!' : 'Keep pushing!';
+                        const myRankEl = document.getElementById('myRank');
+                        const rankChangeEl = document.getElementById('rankChange');
+                        if (myRankEl) myRankEl.textContent = `#${idx + 1}`;
+                        if (rankChangeEl) rankChangeEl.textContent = idx < 3 ? '🔥 Top 3!' : 'Keep pushing!';
                     }
                 });
 
@@ -2286,8 +2292,10 @@
                 `;
 
                 if (s.isMe) {
-                    document.getElementById('myRank').textContent = `#${idx + 1}`;
-                    document.getElementById('rankChange').textContent = '🔥 Top 3!';
+                    const myRankEl = document.getElementById('myRank');
+                    const rankChangeEl = document.getElementById('rankChange');
+                    if (myRankEl) myRankEl.textContent = `#${idx + 1}`;
+                    if (rankChangeEl) rankChangeEl.textContent = '🔥 Top 3!';
                 }
             });
 
