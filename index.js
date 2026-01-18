@@ -1172,6 +1172,10 @@ app.use('/api/ai-intelligence', aiIntelligenceRouter);
 const analyticsRouter = require('./routes/api/analytics');
 app.use('/api/analytics', analyticsRouter);
 
+// ERP Integrations API (Zoho, Tally, QuickBooks, SAP)
+const erpRouter = require('./routes/api/erp');
+app.use('/api/erp', erpRouter);
+
 // FSM (Field Sales Management) API
 const fsmRouter = require('./routes/api/fsm');
 app.use('/api/fsm', fsmRouter);
