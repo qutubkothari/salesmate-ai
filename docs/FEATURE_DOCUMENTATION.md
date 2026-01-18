@@ -2,17 +2,42 @@
 
 ## Overview
 
-The Salesmate Suite is a comprehensive business sales management platform consisting of three integrated applications:
+The Salesmate Suite is a comprehensive business sales management platform consisting of **three integrated applications**:
 
-1. **Salesmate AI** - WhatsApp-based AI Sales Assistant
-2. **SAK-SMS CRM** - Customer Relationship Management System  
-3. **FSM (Field Sales Management)** - Mobile-first Field Sales App
+### 1. **Admin Dashboard** (`/dashboard.html`)
+Complete business management interface for administrators including:
+- Orders & Conversations Management
+- Product Catalog Management  
+- Customer Relationship Management (CRM)
+- Field Sales Management (FSM) - Salesmen, Visits, Targets
+- Analytics & Reporting
+- Email & Follow-up Management
+- WhatsApp Integration Controls
 
-This document provides complete feature documentation for client reference.
+### 2. **Salesman Web Dashboard** (`/salesman-app.html`)
+Mobile-responsive web application for field salesmen featuring:
+- Daily Dashboard & Performance Metrics
+- Customer Visit Management (Create, Update, Track)
+- Expense Submission & Tracking
+- Target Progress Monitoring
+- AI-powered Recommendations
+- Route Planning & Maps
+- Offline-capable with Auto-sync
+
+### 3. **Salesmate AI - WhatsApp Assistant** (Backend Service)
+Intelligent WhatsApp-based sales assistant powered by AI:
+- 24/7 Automated Customer Support
+- Product Discovery & Recommendations
+- Order Placement via Chat
+- Multi-language Support (English, Hindi, Arabic)
+- Voice Message Processing
+- Image Recognition
 
 ---
 
-## 1. Salesmate AI - WhatsApp Sales Assistant
+## Application Details
+
+## 1. Admin Dashboard - Complete Business Control Center
 
 ### Core Features
 
@@ -47,9 +72,30 @@ This document provides complete feature documentation for client reference.
 
 ---
 
-## 2. SAK-SMS CRM - Lead Management System
+## Application URLs & Access
 
-### Lead Management
+### Production Deployment
+
+| Application | URL | Access Level |
+|-------------|-----|--------------|
+| **Admin Dashboard** | https://salesmate.saksolution.com/dashboard.html | Admin/Manager |
+| **Salesman App** | https://salesmate.saksolution.com/salesman-app.html | Field Salesmen |
+| **WhatsApp AI** | WhatsApp Business Number | Customers |
+
+### Test Credentials
+
+**Salesman Login:**
+- URL: https://salesmate.saksolution.com/salesman-app.html?tenant_id=aaaaaaaa-bbbb-cccc-dddd-000000000001
+- Phone: 8484830022
+- Password: Test@123
+
+---
+
+## Complete Feature List by Application
+
+## 1. Admin Dashboard (`/dashboard.html`)
+
+### Dashboard Overview
 
 | Feature | Description | Status |
 |---------|-------------|--------|
