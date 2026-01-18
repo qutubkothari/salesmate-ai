@@ -2379,7 +2379,7 @@
                 ]);
 
                 // Initialize map after other features load (needs visible container)
-                setTimeout(() => initTerritoryMap(), 300);
+                setTimeout(() => initTerritoryMap(), 800);
             } catch (error) {
                 console.error('Dashboard features error:', error);
             }
@@ -2885,27 +2885,42 @@
 
                 // Force map to recognize its size
                 setTimeout(() => {
-                    territoryMap.invalidateSize();
-                }, 100);
+                    if (territoryMap) {
+                        territoryMap.invalidateSize();
+                        
+                        // Load heat layer after map is fully initialized
+                        setTimeout(async () => {
+                            try {
+                                const data = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/customers/locations?tenant_id=${encodeURIComponent(tenantId)}`);
+                                const locations = data.data || [];
+                                
+                                if (locations.length > 0) {
+                                    updateHeatMapWithData(locations);
+                                } else {
+                                    loadSampleHeatMap();
+                                }
+                            } catch (error) {
+                                console.error('Heat data error:', error);
+                                loadSampleHeatMap();
+                            }
+                        }, 200);
+                    }
+                }, 200);
 
-                // Load customer locations
-                const data = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/customers/locations?tenant_id=${encodeURIComponent(tenantId)}`);
-                
-                const locations = data.data || [];
-                
-                if (locations.length > 0) {
-                    updateHeatMapWithData(locations);
-                } else {
-                    loadSampleHeatMap();
-                }
             } catch (error) {
-                console.error('Map error:', error);
-                loadSampleHeatMap();
+                console.error('Map initialization error:', error);
             }
         }
 
         function loadSampleHeatMap() {
             if (!territoryMap) return;
+
+            // Verify map container has dimensions
+            const container = document.getElementById('territoryMap');
+            if (!container || container.offsetWidth === 0 || container.offsetHeight === 0) {
+                console.log('Map container not ready for heat layer');
+                return;
+            }
 
             // Sample customer locations in India
             const sampleLocations = [
@@ -2919,29 +2934,42 @@
                 [23.0225, 72.5714, 0.5], // Ahmedabad
             ];
 
-            if (heatLayer) territoryMap.removeLayer(heatLayer);
-            
-            heatLayer = L.heatLayer(sampleLocations, {
-                radius: 25,
-                blur: 15,
-                maxZoom: 10,
-                gradient: {0.4: 'blue', 0.65: 'lime', 1: 'red'}
-            }).addTo(territoryMap);
+            try {
+                if (heatLayer) territoryMap.removeLayer(heatLayer);
+                
+                heatLayer = L.heatLayer(sampleLocations, {
+                    radius: 25,
+                    blur: 15,
+                    maxZoom: 10,
+                    gradient: {0.4: 'blue', 0.65: 'lime', 1: 'red'}
+                }).addTo(territoryMap);
 
-            // Add markers
-            sampleLocations.forEach((loc, idx) => {
-                L.circleMarker([loc[0], loc[1]], {
-                    radius: 8,
-                    fillColor: '#667eea',
-                    color: '#fff',
-                    weight: 2,
-                    fillOpacity: 0.8
-                }).bindPopup(`Customer ${idx + 1}`).addTo(territoryMap);
-            });
+                // Add markers
+                sampleLocations.forEach((loc, idx) => {
+                    L.circleMarker([loc[0], loc[1]], {
+                        radius: 8,
+                        fillColor: '#667eea',
+                        color: '#fff',
+                        weight: 2,
+                        fillOpacity: 0.8
+                    }).bindPopup(`Customer ${idx + 1}`).addTo(territoryMap);
+                });
+            } catch (error) {
+                console.error('Heat layer error:', error);
+                // Retry after a delay if canvas not ready
+                setTimeout(() => loadSampleHeatMap(), 500);
+            }
         }
 
         function updateHeatMapWithData(locations) {
             if (!territoryMap) return;
+
+            // Verify map container has dimensions
+            const container = document.getElementById('territoryMap');
+            if (!container || container.offsetWidth === 0 || container.offsetHeight === 0) {
+                console.log('Map container not ready for heat layer data');
+                return;
+            }
 
             const heatData = locations.map(loc => [
                 loc.latitude || loc.lat,
@@ -2954,19 +2982,25 @@
                 return;
             }
 
-            if (heatLayer) territoryMap.removeLayer(heatLayer);
-            
-            heatLayer = L.heatLayer(heatData, {
-                radius: 25,
-                blur: 15,
-                maxZoom: 10,
-                gradient: {0.4: 'blue', 0.65: 'lime', 1: 'red'}
-            }).addTo(territoryMap);
+            try {
+                if (heatLayer) territoryMap.removeLayer(heatLayer);
+                
+                heatLayer = L.heatLayer(heatData, {
+                    radius: 25,
+                    blur: 15,
+                    maxZoom: 10,
+                    gradient: {0.4: 'blue', 0.65: 'lime', 1: 'red'}
+                }).addTo(territoryMap);
 
-            // Center map on data
-            if (heatData.length > 0) {
-                const bounds = L.latLngBounds(heatData.map(d => [d[0], d[1]]));
-                territoryMap.fitBounds(bounds, { padding: [20, 20] });
+                // Center map on data
+                if (heatData.length > 0) {
+                    const bounds = L.latLngBounds(heatData.map(d => [d[0], d[1]]));
+                    territoryMap.fitBounds(bounds, { padding: [20, 20] });
+                }
+            } catch (error) {
+                console.error('Heat layer data error:', error);
+                // Fall back to sample data
+                setTimeout(() => loadSampleHeatMap(), 500);
             }
         }
 
