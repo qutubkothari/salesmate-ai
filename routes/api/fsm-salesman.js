@@ -783,7 +783,8 @@ router.get('/salesman/:id/visits', authenticateSalesman, (req, res) => {
         const { id } = req.params;
         const limit = Math.min(parseInt(req.query.limit || '100', 10), 500);
         const visits = dbAll(
-            `SELECT v.*, c.business_name as customer_name
+            `SELECT v.*, 
+                    COALESCE(c.business_name, v.customer_name) as customer_name
              FROM visits v
              LEFT JOIN customer_profiles_new c ON c.id = v.customer_id
              WHERE v.tenant_id = ? AND v.salesman_id = ?
