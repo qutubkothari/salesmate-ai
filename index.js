@@ -1164,6 +1164,10 @@ app.use('/api/rbac', rbacRouter);
 const pipelineRouter = require('./routes/api/pipeline');
 app.use('/api/pipeline', pipelineRouter);
 
+// AI Intelligence API (Predictive scoring, churn detection, recommendations)
+const aiIntelligenceRouter = require('./routes/api/ai-intelligence');
+app.use('/api/ai-intelligence', aiIntelligenceRouter);
+
 // FSM (Field Sales Management) API
 const fsmRouter = require('./routes/api/fsm');
 app.use('/api/fsm', fsmRouter);
