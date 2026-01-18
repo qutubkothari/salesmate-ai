@@ -1076,11 +1076,8 @@
                                         <th>Value</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <tr><td>Fairdeal corporation</td><td>5</td><td>₹85,000</td></tr>
-                                    <tr><td>XYZ Corporation</td><td>4</td><td>₹62,000</td></tr>
-                                    <tr><td>Patel Enterprises</td><td>3</td><td>₹45,000</td></tr>
-                                    <tr><td>Kumar & Sons</td><td>3</td><td>₹38,000</td></tr>
+                                <tbody id="reportTopCustomersBody">
+                                    <tr><td colspan="3"><div class="empty-state" style="padding:20px;"><i class="fas fa-chart-line"></i><p>Loading top customers...</p></div></td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -1518,6 +1515,9 @@
                 allVisitsData = response.data || [];
                 currentVisitsPage = 1;
                 renderVisitsTable();
+                
+                // Load top customers for reports page
+                loadTopCustomers();
             } catch (error) {
                 console.error('Error loading visits:', error);
                 document.getElementById('visitsTableBody').innerHTML = '<tr><td colspan="6"><div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Error loading visits</h3><p>Please refresh the page</p></div></td></tr>';
@@ -1679,9 +1679,9 @@
 
                     return `
                         <tr>
-                            <td><strong>${customer.name}</strong></td>
-                            <td>${customer.phone || '-'}</td>
-                            <td>${customer.location || '-'}</td>
+                            <td><strong>${customer.business_name || customer.name || 'Unknown'}</strong></td>
+                            <td>${customer.phone || customer.contact_person || '-'}</td>
+                            <td>${customer.city || customer.location || '-'}</td>
                             <td>${lastVisit}</td>
                             <td>${customer.total_orders || 0}</td>
                             <td>
@@ -1761,6 +1761,45 @@
                 }).join('');
             } catch (error) {
                 console.error('Error loading target history:', error);
+            }
+        }
+
+        async function loadTopCustomers() {
+            try {
+                // Get unique customers with visit counts from allVisitsData
+                const customerStats = {};
+                allVisitsData.forEach(visit => {
+                    if (!customerStats[visit.customer_name]) {
+                        customerStats[visit.customer_name] = { visits: 0, name: visit.customer_name };
+                    }
+                    customerStats[visit.customer_name].visits++;
+                });
+
+                // Sort by visit count and take top 4
+                const topCustomers = Object.values(customerStats)
+                    .sort((a, b) => b.visits - a.visits)
+                    .slice(0, 4);
+
+                const tbody = document.getElementById('reportTopCustomersBody');
+                if (topCustomers.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3"><div class="empty-state" style="padding:20px;"><i class="fas fa-users"></i><p>No customer data available</p></div></td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = topCustomers.map(customer => {
+                    // Estimate value based on visits (avg ₹15,000 per visit)
+                    const estimatedValue = customer.visits * 15000;
+                    return `
+                        <tr>
+                            <td>${customer.name}</td>
+                            <td>${customer.visits}</td>
+                            <td>₹${estimatedValue.toLocaleString()}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading top customers:', error);
+                document.getElementById('reportTopCustomersBody').innerHTML = '<tr><td colspan="3"><div class="empty-state" style="padding:20px;"><i class="fas fa-exclamation-triangle"></i><p>Error loading data</p></div></td></tr>';
             }
         }
 
