@@ -230,6 +230,188 @@ router.post('/zoho/retry-failed-syncs', async (req, res) => {
   }
 });
 
+// ========== NEW ADMIN ENDPOINTS FOR MANAGEMENT ==========
+const Database = require('better-sqlite3');
+const path = require('path');
+const db = new Database(path.join(__dirname, '../../local-database.db'));
+db.pragma('journal_mode = WAL');
+
+function dbAll(sql, params = []) {
+    return db.prepare(sql).all(...params);
+}
+
+function dbGet(sql, params = []) {
+    return db.prepare(sql).get(...params);
+}
+
+function dbRun(sql, params = []) {
+    return db.prepare(sql).run(...params);
+}
+
+function generateId() {
+    return require('crypto').randomBytes(16).toString('hex');
+}
+
+// Get all salesmen
+router.get('/salesmen', (req, res) => {
+    try {
+        const tenantId = req.query.tenant_id;
+        if (!tenantId) {
+            return res.status(400).json({ error: 'tenant_id required' });
+        }
+
+        const salesmen = dbAll(
+            `SELECT s.*, 
+                    COUNT(DISTINCT v.id) as visits_today
+             FROM salesmen s
+             LEFT JOIN visits v ON v.salesman_id = s.id AND DATE(v.visit_date) = DATE('now')
+             WHERE s.tenant_id = ?
+             GROUP BY s.id
+             ORDER BY s.name`,
+            [tenantId]
+        );
+
+        res.json({ success: true, salesmen });
+    } catch (error) {
+        console.error('Error fetching salesmen:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create product
+router.post('/products', (req, res) => {
+    try {
+        const { tenant_id, name, category, price, stock_quantity, description, is_active } = req.body;
+
+        if (!tenant_id || !name || !price) {
+            return res.status(400).json({ error: 'tenant_id, name, and price are required' });
+        }
+
+        const id = generateId();
+        dbRun(
+            `INSERT INTO products 
+             (id, tenant_id, name, category, price, stock_quantity, description, is_active, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+            [id, tenant_id, name, category || 'General', price, stock_quantity || 0, description || '', is_active !== undefined ? is_active : 1]
+        );
+
+        res.json({ success: true, product_id: id });
+    } catch (error) {
+        console.error('Error creating product:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update product
+router.put('/products/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, category, price, stock_quantity, description, is_active } = req.body;
+
+        const updates = [];
+        const params = [];
+
+        if (name !== undefined) { updates.push('name = ?'); params.push(name); }
+        if (category !== undefined) { updates.push('category = ?'); params.push(category); }
+        if (price !== undefined) { updates.push('price = ?'); params.push(price); }
+        if (stock_quantity !== undefined) { updates.push('stock_quantity = ?'); params.push(stock_quantity); }
+        if (description !== undefined) { updates.push('description = ?'); params.push(description); }
+        if (is_active !== undefined) { updates.push('is_active = ?'); params.push(is_active); }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        updates.push('updated_at = datetime("now")');
+        params.push(id);
+
+        dbRun(
+            `UPDATE products SET ${updates.join(', ')} WHERE id = ?`,
+            params
+        );
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating product:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete product
+router.delete('/products/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        dbRun('DELETE FROM products WHERE id = ?', [id]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting product:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create order
+router.post('/orders', (req, res) => {
+    try {
+        const { tenant_id, customer_name, phone_number, total_amount, items } = req.body;
+
+        if (!tenant_id || !customer_name || !phone_number) {
+            return res.status(400).json({ error: 'tenant_id, customer_name, and phone_number are required' });
+        }
+
+        const orderId = generateId();
+        const orderNumber = 'ORD-' + Date.now();
+
+        dbRun(
+            `INSERT INTO orders 
+             (id, tenant_id, order_number, customer_name, phone_number, total_amount, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, 'pending', datetime('now'), datetime('now'))`,
+            [orderId, tenant_id, orderNumber, customer_name, phone_number, total_amount || 0]
+        );
+
+        // Insert order items if provided
+        if (items && Array.isArray(items)) {
+            for (const item of items) {
+                const itemId = generateId();
+                dbRun(
+                    `INSERT INTO order_items 
+                     (id, order_id, product_id, product_name, quantity, unit_price, total_price, created_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+                    [itemId, orderId, item.product_id, item.product_name, item.quantity, item.unit_price, item.total_price]
+                );
+            }
+        }
+
+        res.json({ success: true, order_id: orderId, order_number: orderNumber });
+    } catch (error) {
+        console.error('Error creating order:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create customer
+router.post('/customers', (req, res) => {
+    try {
+        const { tenant_id, business_name, phone, contact_person, email, city, state, customer_type } = req.body;
+
+        if (!tenant_id || !business_name || !phone) {
+            return res.status(400).json({ error: 'tenant_id, business_name, and phone are required' });
+        }
+
+        const id = generateId();
+        dbRun(
+            `INSERT INTO customer_profiles_new 
+             (id, tenant_id, business_name, phone, contact_person, email, city, state, customer_type, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', datetime('now'), datetime('now'))`,
+            [id, tenant_id, business_name, phone, contact_person || '', email || '', city || '', state || '', customer_type || 'retail']
+        );
+
+        res.json({ success: true, customer_id: id });
+    } catch (error) {
+        console.error('Error creating customer:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;
 
 
