@@ -1196,10 +1196,6 @@ app.use('/api/performance', performanceRouter);
 const websocketRouter = require('./routes/api/websocket');
 app.use('/api/websocket', websocketRouter);
 
-// Analytics API (Sales Performance, Territory Maps, Customer Segmentation, Reports)
-const analyticsRouter = require('./routes/api/analytics');
-app.use('/api/analytics', analyticsRouter);
-
 // Onboarding API (User guidance, sample data)
 const onboardingRouter = require('./routes/api/onboarding');
 app.use('/api/onboarding', onboardingRouter);
