@@ -1184,6 +1184,10 @@ app.use('/api/documents', documentsRouter);
 const whatsappAIRouter = require('./routes/api/whatsapp-ai');
 app.use('/api/whatsapp-ai', whatsappAIRouter);
 
+// Mobile App Features API (Offline Sync, Push Notifications, Device Management)
+const mobileAppRouter = require('./routes/api/mobile-app');
+app.use('/api/mobile-app', mobileAppRouter);
+
 // FSM (Field Sales Management) API
 const fsmRouter = require('./routes/api/fsm');
 app.use('/api/fsm', fsmRouter);
