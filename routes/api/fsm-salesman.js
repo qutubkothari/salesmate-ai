@@ -806,17 +806,12 @@ router.get('/salesman/:id/customers', authenticateSalesman, (req, res) => {
         const { id } = req.params;
         const limit = Math.min(parseInt(req.query.limit || '200', 10), 1000);
 
-        // Derive customer list from visits for this salesman
+        // Get customers assigned to this salesman
         const customers = dbAll(
-            `SELECT
-                c.*,
-                MAX(v.visit_date) as last_visit_date,
-                COUNT(v.id) as total_visits
-             FROM visits v
-             JOIN customer_profiles_new c ON c.id = v.customer_id
-             WHERE v.tenant_id = ? AND v.salesman_id = ?
-             GROUP BY c.id
-             ORDER BY c.business_name
+            `SELECT *
+             FROM customer_profiles_new
+             WHERE tenant_id = ? AND assigned_salesman_id = ?
+             ORDER BY business_name
              LIMIT ?`,
             [tenantId, id, limit]
         );
