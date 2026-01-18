@@ -1176,6 +1176,10 @@ app.use('/api/analytics', analyticsRouter);
 const erpRouter = require('./routes/api/erp');
 app.use('/api/erp', erpRouter);
 
+// Document Generation API (Invoices, Quotations, Purchase Orders, Reports)
+const documentsRouter = require('./routes/api/documents');
+app.use('/api/documents', documentsRouter);
+
 // FSM (Field Sales Management) API
 const fsmRouter = require('./routes/api/fsm');
 app.use('/api/fsm', fsmRouter);
