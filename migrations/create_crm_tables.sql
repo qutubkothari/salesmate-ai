@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS crm_pipeline_stages (
 CREATE INDEX IF NOT EXISTS idx_crm_users_tenant ON crm_users(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_crm_users_email ON crm_users(email);
 CREATE INDEX IF NOT EXISTS idx_crm_leads_tenant ON crm_leads(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_crm_leads_assigned ON crm_leads(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_crm_leads_user ON crm_leads(assigned_to);
 CREATE INDEX IF NOT EXISTS idx_crm_leads_status ON crm_leads(status);
 CREATE INDEX IF NOT EXISTS idx_crm_activities_lead ON crm_activities(lead_id);
-CREATE INDEX IF NOT EXISTS idx_crm_activities_user ON crm_activities(user_id);
+CREATE INDEX IF NOT EXISTS idx_crm_activities_usr ON crm_activities(user_id);
