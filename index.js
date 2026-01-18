@@ -1188,6 +1188,10 @@ app.use('/api/whatsapp-ai', whatsappAIRouter);
 const mobileAppRouter = require('./routes/api/mobile-app');
 app.use('/api/mobile-app', mobileAppRouter);
 
+// Performance & Scale API (Caching, Query Optimization, Rate Limiting, Health Checks)
+const performanceRouter = require('./routes/api/performance');
+app.use('/api/performance', performanceRouter);
+
 // FSM (Field Sales Management) API
 const fsmRouter = require('./routes/api/fsm');
 app.use('/api/fsm', fsmRouter);
