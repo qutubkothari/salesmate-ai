@@ -10,6 +10,20 @@ const PerformanceService = require('../../services/performance-service');
 // ===== CACHING =====
 
 /**
+ * GET /api/performance/cache/stats
+ * Get cache statistics
+ */
+router.get('/cache/stats', async (req, res) => {
+  try {
+    const stats = PerformanceService.getCacheStats();
+    res.json({ success: true, ...stats });
+  } catch (error) {
+    console.error('Get cache stats error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * GET /api/performance/cache/:key
  * Get cached value
  */
@@ -21,7 +35,7 @@ router.get('/cache/:key', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Cache miss' });
     }
     
-    res.json({ success: true, data: value, source: 'cache' });
+    res.json({ success: true, value, source: 'cache' });
   } catch (error) {
     console.error('Get cache error:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -46,20 +60,6 @@ router.post('/cache', async (req, res) => {
 });
 
 /**
- * DELETE /api/performance/cache/:keyOrPattern
- * Invalidate cache
- */
-router.delete('/cache/:keyOrPattern', async (req, res) => {
-  try {
-    PerformanceService.invalidateCache(req.params.keyOrPattern);
-    res.json({ success: true, message: 'Cache invalidated' });
-  } catch (error) {
-    console.error('Invalidate cache error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
  * POST /api/performance/cache/evict
  * Manually trigger cache eviction
  */
@@ -74,15 +74,15 @@ router.post('/cache/evict', async (req, res) => {
 });
 
 /**
- * GET /api/performance/cache/stats
- * Get cache statistics
+ * DELETE /api/performance/cache/:keyOrPattern
+ * Invalidate cache
  */
-router.get('/cache/stats', async (req, res) => {
+router.delete('/cache/:keyOrPattern', async (req, res) => {
   try {
-    const stats = PerformanceService.getCacheStats();
-    res.json({ success: true, data: stats });
+    PerformanceService.invalidateCache(req.params.keyOrPattern);
+    res.json({ success: true, message: 'Cache invalidated' });
   } catch (error) {
-    console.error('Get cache stats error:', error);
+    console.error('Invalidate cache error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
