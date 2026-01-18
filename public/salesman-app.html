@@ -2375,9 +2375,11 @@
                     loadSmartAlerts(),
                     loadConversionFunnel(),
                     loadCrossSellOpportunities(),
-                    loadBestTimeChart(),
-                    initTerritoryMap()
+                    loadBestTimeChart()
                 ]);
+
+                // Initialize map after other features load (needs visible container)
+                setTimeout(() => initTerritoryMap(), 300);
             } catch (error) {
                 console.error('Dashboard features error:', error);
             }
@@ -2860,13 +2862,31 @@
             const mapContainer = document.getElementById('territoryMap');
             if (!mapContainer) return;
 
+            // Check if container is visible and has dimensions
+            const rect = mapContainer.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) {
+                console.log('Map container not ready, skipping initialization');
+                return;
+            }
+
+            // If map already exists, skip
+            if (territoryMap) return;
+
             try {
                 // Initialize map centered on India
-                territoryMap = L.map('territoryMap').setView([20.5937, 78.9629], 5);
+                territoryMap = L.map('territoryMap', {
+                    preferCanvas: true,
+                    renderer: L.canvas({ tolerance: 3 })
+                }).setView([20.5937, 78.9629], 5);
 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '© OpenStreetMap'
                 }).addTo(territoryMap);
+
+                // Force map to recognize its size
+                setTimeout(() => {
+                    territoryMap.invalidateSize();
+                }, 100);
 
                 // Load customer locations
                 const data = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/customers/locations?tenant_id=${encodeURIComponent(tenantId)}`);
