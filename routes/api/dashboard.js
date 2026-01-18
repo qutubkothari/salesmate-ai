@@ -359,9 +359,9 @@ router.get('/customers/:tenantId', async (req, res) => {
 
         const { data: customers, error } = await dbClient
             .from('customer_profiles_new')
-            .select('id, phone, first_name, last_name, company, total_spent, total_orders, updated_at')
+            .select('id, phone, business_name, contact_person, email, city, status, updated_at')
             .eq('tenant_id', tenantId)
-            .order('total_spent', { ascending: false })
+            .order('updated_at', { ascending: false })
             .limit(100);
 
         if (error) {
@@ -371,10 +371,13 @@ router.get('/customers/:tenantId', async (req, res) => {
 
         const formattedCustomers = (customers || []).map(c => ({
             id: c.id,
-            name: c.company || `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Unknown',
+            name: c.business_name || c.contact_person || 'Unknown',
             phone: c.phone?.replace('@c.us', '') || '',
-            totalOrders: c.total_orders || 0,
-            totalSpent: parseFloat(c.total_spent) || 0,
+            email: c.email || '',
+            city: c.city || '',
+            status: c.status || 'active',
+            totalOrders: 0,
+            totalSpent: 0,
             lastOrder: c.updated_at ? new Date(c.updated_at).toLocaleDateString('en-IN') : 'N/A'
         }));
 
@@ -392,7 +395,6 @@ router.get('/customers/:tenantId', async (req, res) => {
         });
     }
 });
-
 /**
  * GET /api/dashboard/products/:tenantId
  * Get products for a tenant
@@ -403,7 +405,7 @@ router.get('/products/:tenantId', async (req, res) => {
 
         const { data: products, error } = await dbClient
             .from('products')
-            .select('id, name, description, price, stock_quantity, product_type, brand')
+            .select('id, name, description, price, stock_quantity, category, brand, sku, image_url, is_active')
             .eq('tenant_id', tenantId)
             .order('name', { ascending: true })
             .limit(100);
@@ -415,10 +417,14 @@ router.get('/products/:tenantId', async (req, res) => {
 
         const formattedProducts = (products || []).map(p => ({
             id: p.id,
-            name: p.name || p.product_type || 'Unknown Product',
+            name: p.name || p.category || 'Unknown Product',
             description: p.description || (p.brand ? `Brand: ${p.brand}` : 'No description'),
             price: parseFloat(p.price) || 0,
-            stock: p.stock_quantity || 0
+            stock: p.stock_quantity || 0,
+            sku: p.sku || '',
+            category: p.category || '',
+            image_url: p.image_url || '',
+            is_active: p.is_active !== 0
         }));
 
         res.json({
