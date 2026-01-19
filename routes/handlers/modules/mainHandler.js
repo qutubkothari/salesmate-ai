@@ -96,7 +96,7 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
                 }
                 
                 // Update conversation's last_message_at and last_activity_at timestamps
-                await dbClient.from('conversations')
+                await dbClient.from('conversations_new')
                     .update({ 
                         last_message_at: new Date().toISOString(),
                         last_activity_at: new Date().toISOString(),
@@ -133,7 +133,7 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
                     
                     // Check if conversation is not already assigned
                     const { data: convCheck } = await dbClient
-                        .from('conversations')
+                        .from('conversations_new')
                         .select('assigned_to')
                         .eq('id', conversation.id)
                         .single();
@@ -283,7 +283,7 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
                 // Update conversation state
                 const { dbClient } = require('../../../services/config');
                 await dbClient
-                .from('conversations')
+                .from('conversations_new')
                 .update({ state: 'active', metadata: { ...conversation.metadata, pending_shipping_order_id: null } })
                 .eq('id', conversation.id);
                 // Confirmation message
@@ -344,7 +344,7 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
                 if (conversationId) {
                     try {
                         await dbClient
-                            .from('conversations')
+                            .from('conversations_new')
                             .update({ requires_human_attention: true, updated_at: new Date().toISOString() })
                             .eq('id', conversationId);
                     } catch (_) {
@@ -585,7 +585,7 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
 
                         // Clear quoted products after adding
                         await dbClient
-                            .from('conversations')
+                            .from('conversations_new')
                             .update({ last_quoted_products: null })
                             .eq('id', conversation.id);
 
@@ -636,7 +636,7 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
                 
                 // Save clarification context for next message
                 if (conversation?.id) {
-                    await dbClient.from('conversations')
+                    await dbClient.from('conversations_new')
                         .update({
                             metadata: {
                                 ...conversation.metadata,
