@@ -12,36 +12,53 @@ const path = require('path');
 
 const dbg = (...a) => { if (process.env.DEBUG_CONFIG === '1') console.log('[CONFIG]', ...a); };
 
-// ---------- Database Configuration (SQLite only) ----------
-const USE_LOCAL_DB = true;
+// ---------- Database Configuration ----------
+const USE_SUPABASE = process.env.USE_SUPABASE === 'true';
+const USE_LOCAL_DB = !USE_SUPABASE;
 
 let dbClient;
 let db;
 
-// Use local SQLite
-dbg('Database: using LOCAL SQLite');
-
-const Database = require('better-sqlite3');
-const dbPath = process.env.SQLITE_DB_PATH || process.env.DB_PATH || path.join(__dirname, '..', 'local-database.db');
-
-try {
-  db = new Database(dbPath);
-  db.pragma('foreign_keys = ON');
-  console.log('[CONFIG] Local SQLite configured:', dbPath);
-
-  // Ensure required schema exists (non-destructive)
-  try {
-    ensureSqliteSchema(db);
-  } catch (e) {
-    console.warn('[CONFIG] SQLite schema ensure skipped/failed:', e?.message || e);
+if (USE_SUPABASE) {
+  // Use Supabase (production)
+  dbg('Database: using SUPABASE');
+  const { createClient } = require('@supabase/supabase-js');
+  
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
+  
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    throw new Error('[CONFIG] SUPABASE_URL and SUPABASE_SERVICE_KEY required when USE_SUPABASE=true');
   }
+  
+  dbClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+  console.log('[CONFIG] Supabase configured:', SUPABASE_URL);
+} else {
+  // Use local SQLite
+  dbg('Database: using LOCAL SQLite');
 
-  // Create a query-builder wrapper for the local DB
-  dbClient = createLocalDbWrapper(db);
-} catch (error) {
-  console.error('[CONFIG] Failed to initialize SQLite:', error.message);
-  console.error('[CONFIG] Please run: node setup-sqlite-db.js');
-  throw error;
+  const Database = require('better-sqlite3');
+  const dbPath = process.env.SQLITE_DB_PATH || process.env.DB_PATH || path.join(__dirname, '..', 'local-database.db');
+
+  try {
+    db = new Database(dbPath);
+    db.pragma('foreign_keys = ON');
+    console.log('[CONFIG] Local SQLite configured:', dbPath);
+
+    // Ensure required schema exists (non-destructive)
+    try {
+      ensureSqliteSchema(db);
+    } catch (e) {
+      console.warn('[CONFIG] SQLite schema ensure skipped/failed:', e?.message || e);
+    }
+
+    // Create a query-builder wrapper for the local DB
+    dbClient = createLocalDbWrapper(db);
+  } catch (error) {
+    console.error('[CONFIG] Failed to initialize SQLite:', error.message);
+    console.error('[CONFIG] Please run: node setup-sqlite-db.js');
+    throw error;
+  }
 }
 
 // Create a small query-builder wrapper for local SQLite
