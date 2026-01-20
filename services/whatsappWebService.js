@@ -376,7 +376,14 @@ async function initializeClient(tenantId, sessionName = 'default', options = {})
                     // Send captured responses via WhatsApp Web (if any)
                     for (const text of outgoing) {
                         if (typeof text !== 'string' || !text.trim()) continue;
-                        await client.sendMessage(msg.from, text);
+                        try {
+                            console.log(`[WA_WEB] Sending response to ${from}: ${text.substring(0, 50)}...`);
+                            const chatId = `${from}@c.us`;
+                            await client.sendMessage(chatId, text);
+                            console.log(`[WA_WEB] Message sent successfully to ${from}`);
+                        } catch (sendErr) {
+                            console.error(`[WA_WEB] Failed to send message to ${from}:`, sendErr?.message || sendErr);
+                        }
                     }
                 }
             } catch (e) {
