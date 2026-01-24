@@ -16,6 +16,7 @@ $HOSTINGER_USER = "qutubk"
 $KEY_PATH = "$env:USERPROFILE\.ssh\hostinger_ed25519"
 $REMOTE_PATH = "/var/www/salesmate-ai"
 $PM2_PROCESS = "salesmate-ai"
+$USE_SQLITE_MIGRATIONS = $false
 
 # ====== Helper Functions ======
 function Test-SshKey {
@@ -71,38 +72,41 @@ Write-Host "Dependencies updated" -ForegroundColor Green
 
 # ====== STEP 6: Run Migrations (if any) ======
 Write-Host "`n[6/7] Running Database Migrations" -ForegroundColor Yellow
-
-# Check if sqlite3 is installed, install if missing
-Write-Host "  Checking SQLite installation..." -ForegroundColor Gray
-$sqliteCheck = ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $KEY_PATH "$HOSTINGER_USER@$HOSTINGER_IP" "which sqlite3 2>/dev/null || echo 'missing'"
-if ($sqliteCheck -match "missing") {
-    Write-Host "  Installing SQLite..." -ForegroundColor Yellow
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $KEY_PATH "$HOSTINGER_USER@$HOSTINGER_IP" "sudo apt-get update -qq && sudo apt-get install -y sqlite3"
-    Write-Host "  SQLite installed" -ForegroundColor Green
-}
-
-# Run all migrations in order
-$migrations = @(
-    "001_multi_user_support.sql",
-    "002_missing_tables.sql",
-    "003_fix_schema_issues.sql",
-    "004_additional_columns.sql",
-    "005_fix_interactive_schema.sql",
-    "006_conversation_learning.sql",
-    "007_document_management_embeddings.sql",
-    "008_fsm_integration.sql",
-    "009_fix_duplicate_columns.sql",
-    "010_salesman_empowerment.sql",
-    "011_salesman_auth_tokens.sql"
-)
-foreach ($migration in $migrations) {
-    $migrationExists = ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $KEY_PATH "$HOSTINGER_USER@$HOSTINGER_IP" "test -f $REMOTE_PATH/migrations/$migration && echo 'exists' || echo 'missing'"
-    if ($migrationExists -match "exists") {
-        Write-Host "  Applying migration: $migration" -ForegroundColor Gray
-        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $KEY_PATH "$HOSTINGER_USER@$HOSTINGER_IP" "cd $REMOTE_PATH && sqlite3 local-database.db < migrations/$migration 2>&1 || true"
+if ($USE_SQLITE_MIGRATIONS) {
+    # Check if sqlite3 is installed, install if missing
+    Write-Host "  Checking SQLite installation..." -ForegroundColor Gray
+    $sqliteCheck = ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $KEY_PATH "$HOSTINGER_USER@$HOSTINGER_IP" "which sqlite3 2>/dev/null || echo 'missing'"
+    if ($sqliteCheck -match "missing") {
+        Write-Host "  Installing SQLite..." -ForegroundColor Yellow
+        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $KEY_PATH "$HOSTINGER_USER@$HOSTINGER_IP" "sudo apt-get update -qq && sudo apt-get install -y sqlite3"
+        Write-Host "  SQLite installed" -ForegroundColor Green
     }
+
+    # Run all migrations in order
+    $migrations = @(
+        "001_multi_user_support.sql",
+        "002_missing_tables.sql",
+        "003_fix_schema_issues.sql",
+        "004_additional_columns.sql",
+        "005_fix_interactive_schema.sql",
+        "006_conversation_learning.sql",
+        "007_document_management_embeddings.sql",
+        "008_fsm_integration.sql",
+        "009_fix_duplicate_columns.sql",
+        "010_salesman_empowerment.sql",
+        "011_salesman_auth_tokens.sql"
+    )
+    foreach ($migration in $migrations) {
+        $migrationExists = ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $KEY_PATH "$HOSTINGER_USER@$HOSTINGER_IP" "test -f $REMOTE_PATH/migrations/$migration && echo 'exists' || echo 'missing'"
+        if ($migrationExists -match "exists") {
+            Write-Host "  Applying migration: $migration" -ForegroundColor Gray
+            ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $KEY_PATH "$HOSTINGER_USER@$HOSTINGER_IP" "cd $REMOTE_PATH && sqlite3 local-database.db < migrations/$migration 2>&1 || true"
+        }
+    }
+    Write-Host "  All migrations processed" -ForegroundColor Green
+} else {
+    Write-Host "  Skipping SQLite migrations (Supabase in use)" -ForegroundColor Green
 }
-Write-Host "  All migrations processed" -ForegroundColor Green
 
 # ====== STEP 7: Restart PM2 ======
 Write-Host "`n[7/7] Restarting Application" -ForegroundColor Yellow
