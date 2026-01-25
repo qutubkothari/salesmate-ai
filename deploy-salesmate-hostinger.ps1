@@ -109,60 +109,24 @@ if ($USE_SQLITE_MIGRATIONS) {
 }
 
 # ====== STEP 7: Configure Nginx for sak-ai.saksolution.com ======
-Write-Host "`n[7/8] Configuring Nginx for sak-ai.saksolution.com (SSL + Port 8055)" -ForegroundColor Yellow
-$nginxConfig = @'
-server {
-    listen 80;
-    server_name sak-ai.saksolution.com;
-    return 301 https://$host$request_uri;
+Write-Host "`n[7/8] Configuring Nginx for sak-ai.saksolution.com (SCP Method)" -ForegroundColor Yellow
+
+# Copy the local config file to the server (temp location)
+Write-Host "  Uploading nginx config..." -ForegroundColor Gray
+$scpDest = "$HOSTINGER_USER@$HOSTINGER_IP" + ":/tmp/nginx-sak-ai.conf"
+scp -o StrictHostKeyChecking=no -i $KEY_PATH "nginx-sak-ai.conf" $scpDest
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to upload nginx config"
 }
 
-server {
-    listen 443 ssl;
-    server_name sak-ai.saksolution.com;
+# Move to correct location and reload
+Invoke-RemoteCommand "sudo mv /tmp/nginx-sak-ai.conf /etc/nginx/sites-available/sak-ai.saksolution.com"
+Invoke-RemoteCommand "sudo chown root:root /etc/nginx/sites-available/sak-ai.saksolution.com"
+Invoke-RemoteCommand "sudo ln -sf /etc/nginx/sites-available/sak-ai.saksolution.com /etc/nginx/sites-enabled/"
+Invoke-RemoteCommand "sudo nginx -t && sudo systemctl reload nginx"
 
-    ssl_certificate /etc/letsencrypt/live/sak-ai.saksolution.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/sak-ai.saksolution.com/privkey.pem;
-    include /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-
-    location / {
-        proxy_pass http://localhost:8055;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        
-        proxy_connect_timeout 600;
-        proxy_send_timeout 600;
-        proxy_read_timeout 600;
-        send_timeout 600;
-    }
-
-    location /socket.io/ {
-        proxy_pass http://localhost:8055;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1" always;
-    
-    client_max_body_size 50M;
-}
-'@
-
-Invoke-RemoteCommand "echo '$nginxConfig' | sudo tee /etc/nginx/sites-available/sak-ai.saksolution.com > /dev/null"
+Write-Host "Nginx configured for sak-ai.saksolution.com" -ForegroundColor Green
 Invoke-RemoteCommand "sudo ln -sf /etc/nginx/sites-available/sak-ai.saksolution.com /etc/nginx/sites-enabled/"
 Invoke-RemoteCommand "sudo nginx -t && sudo systemctl reload nginx"
 Write-Host "Nginx configured for sak-ai.saksolution.com" -ForegroundColor Green
