@@ -27,28 +27,8 @@ app.use((req, res, next) => {
   const host = req.get('host') || '';
   // Serve UAE/GCC specific landing page
   if (host.includes('sak-ai.saksolution.ae')) {
-      // Serve Arabic version from the new structure
-      if (req.path === '/ar/' || req.path === '/ar') {
-          return res.sendFile(path.join(__dirname, 'public', 'sak-ai-uae', 'ar', 'index.html'));
-      }
-      
-      // Serve shared assets for the Arabic page if referenced relatively
-      // e.g., if /ar/index.html asks for ../styles.css, it might come in as /styles.css
-      if (req.path === '/styles.css') {
-          return res.sendFile(path.join(__dirname, 'public', 'sak-ai-uae', 'styles.css'));
-      }
-      if (req.path === '/script.js') {
-          return res.sendFile(path.join(__dirname, 'public', 'sak-ai-uae', 'script.js'));
-      }
-
-      // Serve index-ae.html for root (The "Real Page")
       if (req.path === '/' || req.path === '/index.html') {
           return res.sendFile(path.join(__dirname, 'public', 'index-ae.html'));
-      }
-      
-      // Allow access to new assets if requested explicitly
-      if (req.path.startsWith('/sak-ai-uae/')) {
-         return next(); 
       }
   }
   next();
