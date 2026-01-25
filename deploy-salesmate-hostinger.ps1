@@ -109,7 +109,7 @@ if ($USE_SQLITE_MIGRATIONS) {
 }
 
 # ====== STEP 7: Configure Nginx for sak-ai.saksolution.com ======
-Write-Host "`n[7/8] Configuring Nginx for sak-ai.saksolution.com (SCP Method)" -ForegroundColor Yellow
+Write-Host "`n[7/10] Configuring Nginx for sak-ai.saksolution.com (SCP Method)" -ForegroundColor Yellow
 
 # Copy the local config file to the server (temp location)
 Write-Host "  Uploading nginx config..." -ForegroundColor Gray
@@ -124,15 +124,32 @@ if ($LASTEXITCODE -ne 0) {
 Invoke-RemoteCommand "sudo mv /tmp/nginx-sak-ai.conf /etc/nginx/sites-available/sak-ai.saksolution.com"
 Invoke-RemoteCommand "sudo chown root:root /etc/nginx/sites-available/sak-ai.saksolution.com"
 Invoke-RemoteCommand "sudo ln -sf /etc/nginx/sites-available/sak-ai.saksolution.com /etc/nginx/sites-enabled/"
-Invoke-RemoteCommand "sudo nginx -t && sudo systemctl reload nginx"
+Invoke-RemoteCommand "sudo nginx -t"
 
 Write-Host "Nginx configured for sak-ai.saksolution.com" -ForegroundColor Green
-Invoke-RemoteCommand "sudo ln -sf /etc/nginx/sites-available/sak-ai.saksolution.com /etc/nginx/sites-enabled/"
-Invoke-RemoteCommand "sudo nginx -t && sudo systemctl reload nginx"
-Write-Host "Nginx configured for sak-ai.saksolution.com" -ForegroundColor Green
 
-# ====== STEP 8: Install SSL Certificate ======
-Write-Host "`n[8/9] Installing SSL Certificate for sak-ai.saksolution.com" -ForegroundColor Yellow
+# ====== STEP 8: Configure Nginx for sak-ai.saksolution.ae ======
+Write-Host "`n[8/10] Configuring Nginx for sak-ai.saksolution.ae (SCP Method)" -ForegroundColor Yellow
+
+# Copy the .ae config file to the server
+Write-Host "  Uploading nginx .ae config..." -ForegroundColor Gray
+$scpDestAe = "$HOSTINGER_USER@$HOSTINGER_IP" + ":/tmp/nginx-sak-ai-ae.conf"
+scp -o StrictHostKeyChecking=no -i $KEY_PATH "nginx-sak-ai-ae.conf" $scpDestAe
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to upload nginx .ae config"
+}
+
+# Move to correct location
+Invoke-RemoteCommand "sudo mv /tmp/nginx-sak-ai-ae.conf /etc/nginx/sites-available/sak-ai.saksolution.ae"
+Invoke-RemoteCommand "sudo chown root:root /etc/nginx/sites-available/sak-ai.saksolution.ae"
+Invoke-RemoteCommand "sudo ln -sf /etc/nginx/sites-available/sak-ai.saksolution.ae /etc/nginx/sites-enabled/"
+Invoke-RemoteCommand "sudo nginx -t && sudo systemctl reload nginx"
+
+Write-Host "Nginx configured for sak-ai.saksolution.ae" -ForegroundColor Green
+
+# ====== STEP 9: Install SSL Certificate for .com ======
+Write-Host "`n[9/10] Installing SSL Certificate for sak-ai.saksolution.com" -ForegroundColor Yellow
 $certbotOutput = ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $KEY_PATH "$HOSTINGER_USER@$HOSTINGER_IP" "sudo certbot --nginx -d sak-ai.saksolution.com --non-interactive --agree-tos --email qutubkothari@gmail.com --redirect 2>&1 || echo 'CERT_ERROR'"
 if ($certbotOutput -match "CERT_ERROR|error") {
     Write-Host "SSL certificate installation skipped or failed (may already exist)" -ForegroundColor Yellow
@@ -140,8 +157,17 @@ if ($certbotOutput -match "CERT_ERROR|error") {
     Write-Host "SSL certificate installed successfully" -ForegroundColor Green
 }
 
-# ====== STEP 9: Restart PM2 ======
-Write-Host "`n[9/9] Restarting Application" -ForegroundColor Yellow
+# ====== STEP 10: Install SSL Certificate for .ae ======
+Write-Host "`n[10/11] Installing SSL Certificate for sak-ai.saksolution.ae" -ForegroundColor Yellow
+$certbotOutputAe = ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $KEY_PATH "$HOSTINGER_USER@$HOSTINGER_IP" "sudo certbot --nginx -d sak-ai.saksolution.ae --non-interactive --agree-tos --email qutubkothari@gmail.com --redirect 2>&1 || echo 'CERT_ERROR'"
+if ($certbotOutputAe -match "CERT_ERROR|error") {
+    Write-Host "SSL certificate installation skipped or failed (may already exist)" -ForegroundColor Yellow
+} else {
+    Write-Host "SSL certificate installed successfully for .ae domain" -ForegroundColor Green
+}
+
+# ====== STEP 11: Restart PM2 ======
+Write-Host "`n[11/11] Restarting Application" -ForegroundColor Yellow
 Invoke-RemoteCommand "cd $REMOTE_PATH; pm2 restart $PM2_PROCESS; sleep 2; pm2 list"
 Write-Host "Application restarted" -ForegroundColor Green
 
@@ -151,6 +177,7 @@ Write-Host "   DEPLOYMENT SUCCESSFUL!" -ForegroundColor Green
 Write-Host "===================================================`n" -ForegroundColor Cyan
 Write-Host "Live at:" -ForegroundColor Cyan
 Write-Host "  - https://salesmate.saksolution.com" -ForegroundColor White
-Write-Host "  - https://sak-ai.saksolution.com (NEW)" -ForegroundColor Green
+Write-Host "  - https://sak-ai.saksolution.com" -ForegroundColor Green
+Write-Host "  - https://sak-ai.saksolution.ae (UAE/GCC)" -ForegroundColor Green
 Write-Host "`nCheck logs: pm2 logs $PM2_PROCESS" -ForegroundColor Gray
 Write-Host ""
