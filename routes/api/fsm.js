@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const Database = require('better-sqlite3');
 const path = require('path');
+const { dbClient, USE_LOCAL_DB } = require('../../services/config');
 
 // Direct SQLite connection for FSM data
 let db;
@@ -19,12 +20,40 @@ try {
   console.warn('[FSM] SQLite init skipped (using Supabase):', err.message);
 }
 
+function isLocalDbReady() {
+  return USE_LOCAL_DB && !!db;
+}
+
 // Get all visits with optional filtering
 router.get('/visits', async (req, res) => {
   try {
     const DEFAULT_TENANT_ID = process.env.FSM_DEFAULT_TENANT_ID || '112f12b8-55e9-4de8-9fda-d58e37c75796';
     const tenant_id = req.query.tenant_id || DEFAULT_TENANT_ID;
     const { salesman_id, plant_id, start_date, end_date, visit_type, limit = 300, role, user_plant_id } = req.query;
+
+    if (!isLocalDbReady()) {
+      let query = dbClient
+        .from('visits')
+        .select('*')
+        .eq('tenant_id', tenant_id)
+        .order('visit_date', { ascending: false })
+        .limit(parseInt(limit));
+
+      if (salesman_id) query = query.eq('salesman_id', salesman_id);
+      if (plant_id) query = query.eq('plant_id', plant_id);
+      if (start_date) query = query.gte('visit_date', start_date);
+      if (end_date) query = query.lte('visit_date', end_date);
+      if (visit_type) query = query.eq('visit_type', visit_type);
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return res.json({
+        success: true,
+        data: data || [],
+        count: data?.length || 0
+      });
+    }
     
     let query = `
       SELECT 
@@ -174,6 +203,28 @@ router.get('/salesmen', async (req, res) => {
     const DEFAULT_TENANT_ID = process.env.FSM_DEFAULT_TENANT_ID || '112f12b8-55e9-4de8-9fda-d58e37c75796';
     const tenant_id = req.query.tenant_id || DEFAULT_TENANT_ID;
     const { is_active, limit = 100 } = req.query;
+
+    if (!isLocalDbReady()) {
+      let query = dbClient
+        .from('salesmen')
+        .select('*')
+        .eq('tenant_id', tenant_id)
+        .order('name', { ascending: true })
+        .limit(parseInt(limit));
+
+      if (is_active !== undefined) {
+        query = query.eq('is_active', is_active === 'true' || is_active === '1');
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return res.json({
+        success: true,
+        data: data || [],
+        count: data?.length || 0
+      });
+    }
     
     let query = 'SELECT * FROM salesmen WHERE 1=1';
     const params = [];
@@ -383,6 +434,27 @@ router.get('/targets', async (req, res) => {
     const DEFAULT_TENANT_ID = process.env.FSM_DEFAULT_TENANT_ID || '112f12b8-55e9-4de8-9fda-d58e37c75796';
     const tenant_id = req.query.tenant_id || DEFAULT_TENANT_ID;
     const { salesman_id, period, limit = 100 } = req.query;
+
+    if (!isLocalDbReady()) {
+      let query = dbClient
+        .from('salesman_targets')
+        .select('*')
+        .eq('tenant_id', tenant_id)
+        .order('period', { ascending: false })
+        .limit(parseInt(limit));
+
+      if (salesman_id) query = query.eq('salesman_id', salesman_id);
+      if (period) query = query.eq('period', period);
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return res.json({
+        success: true,
+        data: data || [],
+        count: data?.length || 0
+      });
+    }
     
     let query = `
       SELECT 
@@ -742,6 +814,28 @@ router.get('/plants', async (req, res) => {
   try {
     const DEFAULT_TENANT_ID = process.env.FSM_DEFAULT_TENANT_ID || '112f12b8-55e9-4de8-9fda-d58e37c75796';
     const tenant_id = req.query.tenant_id || DEFAULT_TENANT_ID;
+
+    if (!isLocalDbReady()) {
+      const { data, error } = await dbClient
+        .from('plants')
+        .select('*')
+        .eq('tenant_id', tenant_id)
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+
+      const mappedPlants = (data || []).map(p => ({
+        ...p,
+        plant_id: p.id,
+        plant_name: p.name
+      }));
+
+      return res.json({
+        success: true,
+        data: mappedPlants,
+        count: mappedPlants.length
+      });
+    }
     
     let query = 'SELECT * FROM plants WHERE 1=1';
     const params = [];
