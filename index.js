@@ -100,8 +100,8 @@ const websiteContentRouter = require('./routes/api/websiteContent');
 
 
 // --- Configuration ---
-// IMPORTANT: Use the PORT environment variable. Default 8056 for Hostinger.
-const PORT = Number(process.env.PORT) || 8056;
+// IMPORTANT: Use the PORT environment variable. Default 8057 for Hostinger.
+const PORT = Number(process.env.PORT) || 8057;
 
 // --- Server Initialization ---
 
