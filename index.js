@@ -1333,9 +1333,12 @@ app.use('/api/fsm', fsmSalesmanRouter);
 const crmRouter = require('./routes/api/crm');
 app.use('/api/crm', crmRouter);
 
-// External Integrations (IndiaMart, GEM, etc.)
+// External Integrations (IndiaMart, Email, GEM, etc.)
 const indiamartRouter = require('./routes/api/integrations/indiamart');
 app.use('/api/integrations/indiamart', indiamartRouter);
+
+const emailIntegrationRouter = require('./routes/api/integrations/email');
+app.use('/api/integrations/email', emailIntegrationRouter);
 
 // WhatsApp Web Standalone API (separate from existing Maytapi system)
 const whatsappWebRouter = require('./routes/api/whatsappWeb');
@@ -1348,6 +1351,10 @@ app.use('/api/salesman-whatsapp', salesmanWhatsappRouter);
 // Salesmate Intelligence Features
 const salesmenRouter = require('./routes/api/salesmen');
 app.use('/api/salesmen', salesmenRouter);
+
+// AI-Powered Assignment Suggestions
+const assignmentSuggestionsRouter = require('./routes/api/assignmentSuggestions');
+app.use('/api/assignment-suggestions', assignmentSuggestionsRouter);
 
 const tasksRouter = require('./routes/api/tasks');
 app.use('/api/tasks', tasksRouter);
