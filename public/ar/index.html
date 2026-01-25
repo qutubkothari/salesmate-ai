@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-site-verification" content="T7ZM8dOYnwbsnXeyMGvCEdOM0HkPz2EwjlwnvrpXApI" />
+    <meta name="author" content="SAK Solutions">
+
+    <!-- Multi-region targeting (hreflang) -->
+    <link rel="alternate" hreflang="en-IN" href="https://sak-ai.saksolution.com/" />
+    <link rel="alternate" hreflang="en-AE" href="https://sak-ai.saksolution.ae/" />
+    <link rel="alternate" hreflang="ar-AE" href="https://sak-ai.saksolution.ae/ar/" />
+    <link rel="alternate" hreflang="ar" href="https://sak-ai.saksolution.ae/ar/" />
+    <link rel="alternate" hreflang="en-SA" href="https://sak-ai.saksolution.ae/" />
+    <link rel="alternate" hreflang="en-KW" href="https://sak-ai.saksolution.ae/" />
+    <link rel="alternate" hreflang="x-default" href="https://sak-ai.saksolution.com/" />
+
+    <!-- Performance: DNS Prefetch & Preconnect -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://www.google-analytics.com">
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com">
+    
+    <!-- Preload critical assets for performance -->
+    <link rel="preload" href="/assets/logo.png" as="image" type="image/png" fetchpriority="high">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-DBD8WWNRHN"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-DBD8WWNRHN', {
+            'anonymize_ip': true,
+            'cookie_flags': 'SameSite=None;Secure'
+        });
+
+        // Custom event tracking helper
+        function trackEvent(category, action, label) {
+            gtag('event', action, {
+                'event_category': category,
+                'event_label': label
+            });
+        }
+    </script>
+
+    <link rel="icon" href="/assets/logo.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/assets/logo.png" />
+    <title>SAK AI: أتمتة مبيعات واتساب وروبوت الطلبات (الإمارات والعالمية)</title>
+    <meta name="description" content="أتمتة عملية المبيعات الكاملة على واتساب مع SAK AI: تسعير فوري، كتالوجات المنتجات، ومعالجة الطلبات تلقائيًا. بدون تطبيقات، بدون تسجيل دخول—مبيعات واتساب فقط.">
+    <meta name="keywords" content="أداة أتمتة واتساب، روبوت مبيعات واتساب، روبوت طلبات واتساب، مساعد مبيعات ذكي، أتمتة واجهة واتساب للأعمال، sak ai، sak solutions، الإمارات، السعودية">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://sak-ai.saksolution.ae/ar/">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="SAK AI: أتمتة مبيعات واتساب وروبوت الطلبات">
+    <meta property="og:description" content="حوّل واتساب إلى مدير مبيعات على مدار الساعة. أتمتة التسعير والكتالوجات والطلبات مع SAK AI.">
+    <meta property="og:url" content="https://sak-ai.saksolution.ae/ar/">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://sak-ai.saksolution.ae/assets/logo.png">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="SAK AI: أتمتة مبيعات واتساب وروبوت الطلبات">
+    <meta name="twitter:description" content="حوّل واتساب إلى مدير مبيعات على مدار الساعة. أتمتة التسعير والكتالوجات والطلبات مع SAK AI.">
+    <meta name="twitter:image" content="https://sak-ai.saksolution.ae/assets/logo.png">
+
+    <!-- Arabic Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        * {
+            font-family: 'Tajawal', sans-serif;
+        }
+        
+        :root {
+            /* Background Colors */
+            --bg-main: #0f0518;
+            --bg-gradient: linear-gradient(135deg, #0f0518 0%, #2d1155 50%, #4a1c6e 100%);
+            --glass-bg: rgba(255, 255, 255, 0.095);
+            --glass-border: rgba(255, 255, 255, 0.18);
+
+            /* Primary Colors */
+            --primary: #a0c4ff;
+            --primary-dark: #7ba3d9;
+
+            /* Status Colors */
+            --success: #00e676;
+            --warning: #ffa726;
+            --danger: #ef5350;
+
+            /* Text */
+            --text: rgba(255, 255, 255, 0.92);
+            --muted: rgba(255, 255, 255, 0.86);
+            --muted-2: rgba(255, 255, 255, 0.76);
+        }
+
+        body {
+            background: var(--bg-main);
+            color: var(--text);
+        }
+
+        /* Watermark overlay per section (renders above section background, stays on scroll) */
+        #app > section {
+            position: relative;
+        }
+
+        #app > section::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: url('/assets/saksolution_logo-removebg-preview.png');
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: clamp(280px, 42vw, 640px);
+            background-attachment: fixed;
+            opacity: 0.14;
+            filter: saturate(1.05) brightness(1.25) contrast(1.05);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        #app > section > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .gradient-bg {
+            background: var(--bg-gradient);
+        }
+
+        .glass {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(12px);
+        }
+
+        .card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(12px);
+            border-radius: 16px;
+            transition: transform 0.25s ease, border-color 0.25s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(160, 196, 255, 0.35);
+        }
+
+        .card p {
+            color: var(--muted);
+        }
+
+        .faq-chevron {
+            transition: transform 0.18s ease;
+        }
+
+        .screenshot-caption {
+            margin-top: 0.6rem;
+            font-size: 0.9rem;
+            color: var(--muted-2);
+        }
+
+        .nav-link {
+            color: var(--text);
+            padding: 0.6rem 0.9rem;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .nav-dropdown {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .nav-dropdown .nav-chevron {
+            line-height: 1;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .menu {
+            position: relative;
+        }
+
+        .menu-panel {
+            display: none;
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            min-width: 520px;
+            z-index: 50;
+            border-radius: 16px;
+            padding: 14px;
+        }
+
+        .menu:hover .menu-panel {
+            display: block;
+        }
+
+        .menu-item {
+            display: block;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid transparent;
+        }
+
+        .menu-item:hover {
+            border-color: rgba(160, 196, 255, 0.28);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .menu-title {
+            font-weight: 800;
+            color: var(--text);
+        }
+
+        .menu-desc {
+            font-size: 0.85rem;
+            color: var(--muted-2);
+            margin-top: 2px;
+        }
+
+        .screenshot-tile {
+            transition: transform 0.18s ease, border-color 0.18s ease;
+            cursor: default;
+            position: relative;
+        }
+
+        .screenshot-tile:hover {
+            transform: scale(1.85);
+            border-color: rgba(160, 196, 255, 0.28);
+            z-index: 60;
+        }
+
+        @media (max-width: 768px) {
+            .screenshot-tile:hover {
+                transform: scale(1.2);
+            }
+        }
+
+
+        .btn-primary {
+            background: var(--primary);
+            color: #0f0518;
+            padding: 0.85rem 2rem;
+            border-radius: 12px;
+            font-weight: 700;
+            transition: transform 0.2s ease, filter 0.2s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.02);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text);
+            padding: 0.85rem 2rem;
+            border-radius: 12px;
+            font-weight: 700;
+            border: 1px solid var(--glass-border);
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.06);
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: #0f0518;
+            padding: 0.85rem 2rem;
+            border-radius: 12px;
+            font-weight: 700;
+            border: 1px solid rgba(0, 230, 118, 0.22);
+            transition: transform 0.2s ease, filter 0.2s ease;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.02);
+        }
+
+        /* Header CTA buttons: compact on smaller desktops (e.g., 1080p) */
+        .top-cta .btn-primary,
+        .top-cta .btn-secondary,
+        .top-cta .btn-success {
+            padding: 0.75rem 1.4rem;
+        }
+
+        @media (max-width: 1280px) {
+            /* Scale everything down slightly on smaller desktops */
+            html {
+                font-size: 15px;
+            }
+
+            .top-cta .btn-primary,
+            .top-cta .btn-secondary,
+            .top-cta .btn-success {
+                padding: 0.65rem 1.05rem;
+                font-size: 0.95rem;
+            }
+
+            .nav-link {
+                padding: 0.5rem 0.7rem;
+                font-size: 0.95rem;
+            }
+
+            .menu-panel {
+                min-width: 480px;
+                padding: 12px;
+            }
+
+            .form-input,
+            .form-textarea {
+                padding: 0.75rem 0.9rem;
+            }
+        }
+
+        @media (max-width: 1100px) {
+            html {
+                font-size: 14.5px;
+            }
+        }
+
+        .form-input,
+        .form-textarea {
+            width: 100%;
+            padding: 0.85rem 1rem;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--glass-border);
+            color: var(--text);
+            outline: none;
+        }
+
+        .form-input::placeholder,
+        .form-textarea::placeholder {
+            color: rgba(240, 243, 255, 0.55);
+        }
+
+        .form-input:focus,
+        .form-textarea:focus {
+            border-color: rgba(0, 230, 118, 0.35);
+        }
+        
+        .feature-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            margin-bottom: 1rem;
+            background: rgba(160, 196, 255, 0.12);
+            border: 1px solid rgba(160, 196, 255, 0.22);
+            color: var(--primary);
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        .float-animation {
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        .muted-2 {
+            color: var(--muted-2);
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.9rem;
+            border-radius: 999px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div id="app">
+        <!-- Hero Section -->
+        <section class="gradient-bg min-h-screen flex items-center relative overflow-hidden">
+            <!-- Animated Background Elements -->
+            <div class="absolute inset-0 opacity-20">
+                <div class="absolute top-16 left-16 w-72 h-72 rounded-full filter blur-3xl" style="background: rgba(160, 196, 255, 0.18);"></div>
+                <div class="absolute bottom-16 right-16 w-96 h-96 rounded-full filter blur-3xl" style="background: rgba(255, 255, 255, 0.08);"></div>
+            </div>
+            
+            <div class="container mx-auto px-6 relative z-10">
+                <!-- Top Nav -->
+                <div class="flex items-center justify-between pt-8 pb-10">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden" style="background: rgba(0, 230, 118, 0.16); border: 1px solid rgba(0, 230, 118, 0.26);">
+                            <img src="/assets/logo.png" alt="SAK logo" class="w-7 h-7 object-contain" />
+                        </div>
+                        <div>
+                            <div class="font-extrabold tracking-tight text-white">SAK</div>
+                            <div class="text-xs muted-2">مساعد مبيعات واتساب الذكي</div>
+                        </div>
+                    </div>
+
+                    <div class="hidden md:flex items-center gap-1 lg:gap-2">
+                        <a href="#" class="nav-link" onclick="return false;">عن المنتج</a>
+
+                        <div class="menu">
+                            <a href="#features" class="nav-link nav-dropdown" aria-haspopup="true" aria-expanded="false" onclick="return false;">
+                                <span>المميزات</span>
+                                <i class="fas fa-chevron-down text-xs nav-chevron" aria-hidden="true"></i>
+                            </a>
+                            <div class="menu-panel glass">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <a class="menu-item" href="/features/ai-assistant.html">
+                                        <div class="menu-title">المساعد الذكي</div>
+                                        <div class="menu-desc">الأسئلة والأجوبة الشائعة</div>
+                                    </a>
+                                    <a class="menu-item" href="/features/orders.html">
+                                        <div class="menu-title">الطلبات</div>
+                                        <div class="menu-desc">إنشاء وإدارة الطلبات</div>
+                                    </a>
+                                    <a class="menu-item" href="/features/products.html">
+                                        <div class="menu-title">المنتجات</div>
+                                        <div class="menu-desc">الكتالوج والتسعير والبحث</div>
+                                    </a>
+                                    <a class="menu-item" href="/features/followups.html">
+                                        <div class="menu-title">المتابعات</div>
+                                        <div class="menu-desc">تتبع العملاء والتذكيرات</div>
+                                    </a>
+                                    <a class="menu-item" href="/features/customers.html">
+                                        <div class="menu-title">العملاء</div>
+                                        <div class="menu-desc">الملفات والعناوين</div>
+                                    </a>
+                                    <a class="menu-item" href="/features/broadcasts.html">
+                                        <div class="menu-title">الرسائل الجماعية</div>
+                                        <div class="menu-desc">حملات التسويق</div>
+                                    </a>
+                                    <a class="menu-item" href="/features/documents.html">
+                                        <div class="menu-title">المستندات</div>
+                                        <div class="menu-desc">قاعدة المعرفة</div>
+                                    </a>
+                                    <a class="menu-item" href="/features/website-indexing.html">
+                                        <div class="menu-title">فهرسة الموقع</div>
+                                        <div class="menu-desc">البحث الدلالي</div>
+                                    </a>
+                                    <a class="menu-item" href="/features/whatsapp-web.html">
+                                        <div class="menu-title">واتساب ويب</div>
+                                        <div class="menu-desc">الاتصال والاستقرار</div>
+                                    </a>
+                                    <a class="menu-item" href="/features/analytics.html">
+                                        <div class="menu-title">التحليلات</div>
+                                        <div class="menu-desc">الأداء والإحصائيات</div>
+                                    </a>
+                                    <a class="menu-item" href="/features/zoho.html">
+                                        <div class="menu-title">تكامل Zoho</div>
+                                        <div class="menu-desc">مزامنة المنتجات والفواتير</div>
+                                    </a>
+                                    <a class="menu-item" href="/login.html">
+                                        <div class="menu-title">تسجيل الدخول</div>
+                                        <div class="menu-desc">الدخول إلى حسابك</div>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="menu">
+                            <a href="#" class="nav-link nav-dropdown" aria-haspopup="true" aria-expanded="false" onclick="return false;">
+                                <span>التكاملات</span>
+                                <i class="fas fa-chevron-down text-xs nav-chevron" aria-hidden="true"></i>
+                            </a>
+                            <div class="menu-panel glass" style="min-width: 360px;">
+                                <div class="grid grid-cols-1 gap-2">
+                                    <a class="menu-item" href="/features/zoho.html">
+                                        <div class="menu-title">Zoho Books</div>
+                                        <div class="menu-desc">مزامنة الطلبات والعملاء</div>
+                                    </a>
+                                    <a class="menu-item" href="#" onclick="return false;">
+                                        <div class="menu-title">OpenAI</div>
+                                        <div class="menu-desc">الردود الذكية</div>
+                                    </a>
+                                    <a class="menu-item" href="#" onclick="return false;">
+                                        <div class="menu-title">Calendly</div>
+                                        <div class="menu-desc">جدولة المكالمات</div>
+                                    </a>
+                                    <a class="menu-item" href="#" onclick="return false;">
+                                        <div class="menu-title">Google Sheets</div>
+                                        <div class="menu-desc">تصدير البيانات</div>
+                                    </a>
+                                    <a class="menu-item" href="#" onclick="return false;">
+                                        <div class="menu-title">Shopify</div>
+                                        <div class="menu-desc">سير عمل المتجر</div>
+                                    </a>
+                                    <a class="menu-item" href="/features/documents.html">
+                                        <div class="menu-title">التخزين السحابي</div>
+                                        <div class="menu-desc">إدارة المستندات</div>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <a href="#pricing" class="nav-link" onclick="scrollToPricing(); return false;">الأسعار</a>
+                        <a href="#" class="nav-link" onclick="return false;">الموارد</a>
+                    </div>
+
+                    <div class="top-cta hidden md:flex items-center justify-end gap-2 lg:gap-3 flex-wrap">
+                        <button onclick="scrollToContact()" class="btn-primary whitespace-nowrap flex-shrink-0">احجز عرض توضيحي</button>
+                        <button onclick="scrollToContact()" class="btn-secondary whitespace-nowrap flex-shrink-0">اتصل بنا</button>
+                        <a href="https://saksolution.ae" target="_blank" rel="noopener" class="btn-success whitespace-nowrap flex-shrink-0">الموقع الرئيسي</a>
+                        <a href="/" class="btn-secondary whitespace-nowrap flex-shrink-0" lang="en" dir="ltr" style="font-family: 'Inter', sans-serif;">English</a>
+                        <button onclick="window.location.href='/login.html'" class="btn-secondary whitespace-nowrap flex-shrink-0">تسجيل الدخول</button>
+                    </div>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-12 items-center">
+                    <!-- Left Column -->
+                    <div class="text-white">
+                        <div class="chip mb-6">
+                            <i class="fab fa-whatsapp" style="color: var(--success);"></i>
+                            <span class="text-sm font-semibold">أتمتة مبيعات واتساب وروبوت الطلبات</span>
+                        </div>
+                        
+                        <h1 class="text-5xl md:text-6xl font-bold mb-6 leading-tight">
+                            حوّل واتساب إلى <span style="color: var(--primary);">مدير مبيعات ذكي يعمل 24/7</span>
+                        </h1>
+                        
+                        <p class="text-xl mb-8 leading-relaxed muted">
+                            <strong class="text-white">SAK AI</strong> يُؤتمت استفسارات العملاء، ويرسل عروض الأسعار الفورية، ويعالج الطلبات مباشرة على واتساب. توقف عن خسارة المبيعات بسبب الردود البطيئة—دع الذكاء الاصطناعي يتولى العمل الروتيني بينما تركز أنت على النمو.
+                        </p>
+
+                        <div class="grid sm:grid-cols-2 gap-3 mb-8 max-w-xl">
+                            <div class="chip"><i class="fas fa-check" style="color: var(--success);"></i><span class="text-sm">ردود ذكية + بحث الكتالوج</span></div>
+                            <div class="chip"><i class="fas fa-check" style="color: var(--success);"></i><span class="text-sm">الطلبات والخصومات</span></div>
+                            <div class="chip"><i class="fas fa-check" style="color: var(--success);"></i><span class="text-sm">الرسائل الجماعية + المتابعات</span></div>
+                            <div class="chip"><i class="fas fa-check" style="color: var(--success);"></i><span class="text-sm">قاعدة معرفة شاملة</span></div>
+                        </div>
+                        
+                        <div class="flex flex-wrap gap-4">
+                            <button onclick="scrollToFeatures()" class="btn-primary">
+                                <i class="fas fa-rocket mr-2"></i>
+                                شاهد المميزات
+                            </button>
+                            <button onclick="scrollToContact()" class="btn-secondary">
+                                <i class="fas fa-envelope mr-2"></i>
+                                اتصل بنا
+                            </button>
+                            <button onclick="window.location.href='/login.html'" class="btn-secondary">
+                                <i class="fas fa-sign-in-alt mr-2"></i>
+                                تسجيل الدخول
+                            </button>
+                        </div>
+                        
+                        <!-- Stats Row -->
+                        <div class="grid grid-cols-3 gap-6 mt-12 pt-12 border-t border-white/20">
+                            <div>
+                                <div class="stat-number">24/7</div>
+                                <div class="muted-2 text-sm">ردود دائمة</div>
+                            </div>
+                            <div>
+                                <div class="stat-number">1</div>
+                                <div class="muted-2 text-sm">لوحة تحكم واحدة</div>
+                            </div>
+                            <div>
+                                <div class="stat-number">AI</div>
+                                <div class="muted-2 text-sm">ذكاء منتج وسياسة</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Right Column - WhatsApp Preview -->
+                    <div class="hidden md:block float-animation">
+                        <div class="glass p-6 rounded-2xl">
+                            <div class="rounded-xl p-6" style="background: rgba(15, 5, 24, 0.55); border: 1px solid rgba(255,255,255,0.08);">
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="flex items-center space-x-3 space-x-reverse">
+                                        <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background: rgba(0, 230, 118, 0.18); border: 1px solid rgba(0, 230, 118, 0.3);">
+                                            <i class="fab fa-whatsapp text-white"></i>
+                                        </div>
+                                        <div>
+                                            <div class="font-semibold text-white">المساعد الذكي</div>
+                                            <div class="text-xs muted-2">متصل</div>
+                                        </div>
+                                    </div>
+                                    <div class="w-3 h-3 rounded-full animate-pulse" style="background: var(--success);"></div>
+                                </div>
+
+                                <div class="text-xs muted-2 mb-2">مدعوم بواتساب للأعمال</div>
+                                
+                                <!-- Mock Chat -->
+                                <div class="space-y-3">
+                                    <div class="flex justify-start">
+                                        <div class="px-4 py-2 rounded-2xl rounded-tr-none max-w-xs" style="background: rgba(160, 196, 255, 0.16); border: 1px solid rgba(160, 196, 255, 0.22); color: var(--text);">
+                                            هل هذا المنتج متوفر؟
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-end">
+                                        <div class="px-4 py-2 rounded-2xl rounded-tl-none max-w-xs" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);">
+                                            <div class="font-semibold text-sm mb-1 text-white">هذه هي التفاصيل</div>
+                                            <div class="text-sm muted">السعر، الحجم، التوفر</div>
+                                            <div class="text-xs muted-2 mt-1">بالإضافة إلى: البدائل والعروض</div>
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-start">
+                                        <div class="px-4 py-2 rounded-2xl rounded-tr-none max-w-xs" style="background: rgba(160, 196, 255, 0.16); border: 1px solid rgba(160, 196, 255, 0.22); color: var(--text);">
+                                            أضف 10 كراتين إلى السلة
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-end">
+                                        <div class="px-4 py-2 rounded-2xl rounded-tl-none max-w-xs" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);">
+                                            <div class="text-sm" style="color: var(--success);">✅ تم تحديث السلة</div>
+                                            <div class="text-sm font-semibold mt-1 text-white">التالي: تأكيد العنوان والدفع</div>
+                                            <button class="mt-2 px-4 py-1 rounded-lg text-xs font-semibold" style="background: var(--success); color: #0f0518;">
+                                                إنشاء طلب
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Trusted By Section -->
+        <section class="py-16" style="background: var(--bg-main);">
+            <div class="container mx-auto px-6">
+                <div class="glass p-8 rounded-2xl border border-white/10 max-w-4xl mx-auto">
+                    <h2 class="text-2xl font-bold text-white mb-4">ما هو SAK AI؟</h2>
+                    <p class="text-lg muted leading-relaxed">
+                        <strong class="text-white">SAK AI</strong> هو منصة أتمتة واتساب احترافية مصممة للشركات ذات الحجم الكبير في الإمارات ودول مجلس التعاون الخليجي. على عكس روبوتات الدردشة الأساسية، يتصل مباشرة بكتالوج منتجاتك للإجابة على استفسارات المخزون، وحساب التسعير المخصص، وتطبيق الخصومات الجماعية، وإتمام الطلبات—كل ذلك داخل واتساب، على مدار الساعة طوال أيام الأسبوع.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Screenshots Carousel -->
+        <section id="screenshots" class="py-20" style="background: var(--bg-main);">
+            <div class="container mx-auto px-6">
+                <div class="text-center mb-10">
+                    <h2 class="text-4xl md:text-5xl font-bold mb-4 text-white">روبوت واتساب الذكي للمبيعات والتفاعل مع العملاء (لقطات الشاشة)</h2>
+                    <p class="text-xl muted">واجهة المستخدم الفعلية من لوحة التحكم وأدوات أتمتة المبيعات والدعم على واتساب.</p>
+                </div>
+
+                <div class="max-w-6xl mx-auto">
+                    <div class="card p-3 md:p-4">
+                        <div class="relative">
+                            <div class="w-full rounded-xl overflow-hidden" style="border: 1px solid rgba(255,255,255,0.10); aspect-ratio: 16 / 9;">
+                                <img id="screenshotCarouselImage" src="/assets/screenshots/dashboard.png" alt="لوحة تحكم لإدارة محادثات واتساب والطلبات" class="w-full h-full object-contain" />
+                            </div>
+
+                            <button id="screenshotPrev" type="button" aria-label="الصورة السابقة" class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl flex items-center justify-center" style="background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.16);">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                            <button id="screenshotNext" type="button" aria-label="الصورة التالية" class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl flex items-center justify-center" style="background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.16);">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                        </div>
+
+                        <div id="screenshotCarouselCaption" class="screenshot-caption text-center">نظرة عامة على العمليات</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Features Section -->
+        <section id="features" class="py-20" style="background: #0f0518;">
+            <div class="container mx-auto px-6">
+                <div class="text-center mb-16">
+                    <h2 class="text-4xl md:text-5xl font-bold mb-4 text-white">أتمتة واتساب للمؤسسات الصغيرة والمتوسطة</h2>
+                    <p class="text-xl muted">نظام واحد: أتمتة الردود + لوحة العمليات</p>
+                </div>
+                
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- Feature Card 1 -->
+                    <a class="card p-8" href="/features/ai-assistant.html">
+                        <div class="feature-icon"><i class="fas fa-robot"></i></div>
+                        <h3 class="text-xl font-bold mb-3 text-white">المساعد الذكي</h3>
+                        <p class="muted">ردود واعية بالسياق، أسئلة وأجوبة عن المنتجات، وإجابات السياسات مدعومة بكتالوجك ومصادر المعرفة.</p>
+                    </a>
+                    
+                    <!-- Feature Card 2 -->
+                    <a class="card p-8" href="/features/orders.html">
+                        <div class="feature-icon"><i class="fas fa-receipt"></i></div>
+                        <h3 class="text-xl font-bold mb-3 text-white">الطلبات</h3>
+                        <p class="muted">حوّل المحادثات إلى طلبات وتتبع دورة حياة الطلب الكاملة من لوحة تحكم واحدة.</p>
+                    </a>
+                    
+                    <!-- Feature Card 3 -->
+                    <a class="card p-8" href="/features/products.html">
+                        <div class="feature-icon"><i class="fas fa-box"></i></div>
+                        <h3 class="text-xl font-bold mb-3 text-white">المنتجات</h3>
+                        <p class="muted">الكتالوج، الفئات، التسعير، الرفع الجماعي، والبحث السريع لعروض الأسعار في المحادثات.</p>
+                    </a>
+                    
+                    <!-- Feature Card 4 -->
+                    <a class="card p-8" href="/features/customers.html">
+                        <div class="feature-icon"><i class="fas fa-users"></i></div>
+                        <h3 class="text-xl font-bold mb-3 text-white">العملاء</h3>
+                        <p class="muted">ملفات العملاء، تفاصيل الضريبة، العناوين، ودعم التسعير حسب نوع العميل.</p>
+                    </a>
+                    
+                    <!-- Feature Card 5 -->
+                    <a class="card p-8" href="/features/followups.html">
+                        <div class="feature-icon"><i class="fas fa-clock"></i></div>
+                        <h3 class="text-xl font-bold mb-3 text-white">المتابعات</h3>
+                        <p class="muted">جدولة المتابعات، تتبع الإكمال، وتحويل المحادثات إلى فرص يمكن لفريقك إغلاقها.</p>
+                    </a>
+                    
+                    <!-- Feature Card 6 -->
+                    <a class="card p-8" href="/features/broadcasts.html">
+                        <div class="feature-icon"><i class="fas fa-bullhorn"></i></div>
+                        <h3 class="text-xl font-bold mb-3 text-white">الرسائل الجماعية</h3>
+                        <p class="muted">إنشاء حملات، إرسال رسائل على نطاق واسع، وتتبع التسليم والنتائج.</p>
+                    </a>
+
+                    <!-- Feature Card 7 -->
+                    <a class="card p-8" href="/features/website-indexing.html">
+                        <div class="feature-icon"><i class="fas fa-globe"></i></div>
+                        <h3 class="text-xl font-bold mb-3 text-white">فهرسة الموقع</h3>
+                        <p class="muted">زحف موقعك حتى يتمكن المساعد من الإجابة من صفحاتك الحقيقية والمعرفة الداخلية.</p>
+                    </a>
+
+                    <!-- Feature Card 8 -->
+                    <a class="card p-8" href="/features/documents.html">
+                        <div class="feature-icon"><i class="fas fa-file-lines"></i></div>
+                        <h3 class="text-xl font-bold mb-3 text-white">المستندات</h3>
+                        <p class="muted">تحميل المستندات حتى يتمكن الروبوت من الإجابة على الأسئلة الشائعة والسياسات بدقة.</p>
+                    </a>
+
+                    <!-- Feature Card 9 -->
+                    <a class="card p-8" href="/features/analytics.html">
+                        <div class="feature-icon"><i class="fas fa-chart-line"></i></div>
+                        <h3 class="text-xl font-bold mb-3 text-white">التحليلات</h3>
+                        <p class="muted">تتبع المحادثات والطلبات والمنتجات والأداء حتى تتمكن من تحسين التحويل.</p>
+                    </a>
+
+                    <!-- Feature Card 10 -->
+                    <a class="card p-8" href="/features/whatsapp-web.html">
+                        <div class="feature-icon"><i class="fab fa-whatsapp"></i></div>
+                        <h3 class="text-xl font-bold mb-3 text-white">واتساب ويب</h3>
+                        <p class="muted">ربط جلسات واتساب، مراقبة الحالة، والحفاظ على استقرار الرسائل.</p>
+                    </a>
+
+                    <!-- Feature Card 11 -->
+                    <a class="card p-8" href="/features/zoho.html">
+                        <div class="feature-icon"><i class="fas fa-sync"></i></div>
+                        <h3 class="text-xl font-bold mb-3 text-white">تكامل Zoho</h3>
+                        <p class="muted">مزامنة المنتجات/العملاء/الطلبات وأتمتة الفواتير باستخدام Zoho Books (اختياري).</p>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- How It Works -->
+        <section class="py-20 gradient-bg">
+            <div class="container mx-auto px-6">
+                <div class="mx-auto">
+                    <div class="text-center mb-12">
+                        <h2 class="text-4xl md:text-5xl font-bold text-white mb-4">أتمتة مبيعات واجهة واتساب للأعمال (كيف يعمل)</h2>
+                        <p class="text-lg muted">سير عمل بسيط يفهمه عملاؤك بالفعل: واتساب.</p>
+                    </div>
+
+                    <div class="grid md:grid-cols-3 gap-6">
+                        <div class="card p-8">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: rgba(160,196,255,0.14); border: 1px solid rgba(160,196,255,0.22); color: var(--primary); font-weight: 800;">1</div>
+                                <h3 class="text-lg font-bold text-white">العميل يراسلك</h3>
+                            </div>
+                            <p class="muted">يسألون عن المنتجات والتسعير والتوفر والشحن أو حالة الطلب كما يفعلون دائمًا.</p>
+                        </div>
+
+                        <div class="card p-8">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: rgba(160,196,255,0.14); border: 1px solid rgba(160,196,255,0.22); color: var(--primary); font-weight: 800;">2</div>
+                                <h3 class="text-lg font-bold text-white">الذكاء الاصطناعي يستجيب ويوجه</h3>
+                            </div>
+                            <p class="muted">يجيب المساعد فورًا ويمكنه بناء سلة، والتوصية بالعناصر، وجمع تفاصيل الطلب.</p>
+                        </div>
+
+                        <div class="card p-8">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: rgba(160,196,255,0.14); border: 1px solid rgba(160,196,255,0.22); color: var(--primary); font-weight: 800;">3</div>
+                                <h3 class="text-lg font-bold text-white">الفريق يدير من لوحة العمليات</h3>
+                            </div>
+                            <p class="muted">تراجع العملاء والطلبات والمتابعات والرسائل الجماعية ومصادر المعرفة من مكان واحد.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Testimonials Section -->
+        <section class="py-20" style="background: #0f0518;">
+            <div class="container mx-auto px-6">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl md:text-5xl font-bold mb-4 text-white">موثوق به من قبل الشركات النامية</h2>
+                    <p class="text-xl muted">اكتشف كيف تقوم الشركات في الإمارات ودول مجلس التعاون الخليجي بأتمتة المبيعات مع SAK AI.</p>
+                </div>
+                
+                <div class="grid md:grid-cols-3 gap-8">
+                    <!-- Review 1 -->
+                    <div class="card p-8">
+                        <div class="flex text-yellow-400 mb-4">
+                            <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                        </div>
+                        <p class="text-lg text-gray-300 mb-6">"أخيرًا أداة أتمتة تفهم منطق التسعير للجملة لدينا. تتعامل مع 80% من استفسارات واتساب تلقائيًا."</p>
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 rounded-full bg-blue-900 flex items-center justify-center text-xl font-bold text-blue-300 mr-4 ml-4">AM</div>
+                            <div>
+                                <h4 class="font-bold text-white">Ahmed Al-Mansoori</h4>
+                                <p class="text-sm muted">Dubai Electronics</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Review 2 -->
+                    <div class="card p-8">
+                        <div class="flex text-yellow-400 mb-4">
+                            <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                        </div>
+                        <p class="text-lg text-gray-300 mb-6">"كنا نفقد العملاء المحتملين لأننا لم نتمكن من الرد بسرعة كافية. SAK AI يستجيب فورًا على مدار الساعة. زادت تحويلاتنا بنسبة 30%."</p>
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 rounded-full bg-green-900 flex items-center justify-center text-xl font-bold text-green-300 mr-4 ml-4">SJ</div>
+                            <div>
+                                <h4 class="font-bold text-white">Sarah Johnson</h4>
+                                <p class="text-sm muted">Real Estate Agent</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Review 3 -->
+                    <div class="card p-8">
+                        <div class="flex text-yellow-400 mb-4">
+                            <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                        </div>
+                        <p class="text-lg text-gray-300 mb-6">"كان الإعداد سهلاً للغاية. قمنا بتحميل كتالوجنا وبدأ الروبوت في الإجابة على أسئلة المنتجات بدقة في دقائق."</p>
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 rounded-full bg-purple-900 flex items-center justify-center text-xl font-bold text-purple-300 mr-4 ml-4">RP</div>
+                            <div>
+                                <h4 class="font-bold text-white">Raj Patel</h4>
+                                <p class="text-sm muted">Mumbai Traders</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA Section -->
+        <section class="py-20" style="background: #0f0518;">
+            <div class="container mx-auto px-6 text-center">
+                <h2 class="text-4xl md:text-5xl font-bold text-white mb-6">صندوق الوارد متعدد الوكلاء وأتمتة سير العمل (لوحة العمليات)</h2>
+                <p class="text-xl muted mb-8 max-w-2xl mx-auto">شاهد المحادثات والعملاء المحتملين والمنتجات والطلبات والرسائل الجماعية والمتابعات وقاعدة المعرفة في مكان واحد.</p>
+                <button onclick="window.location.href='/login.html'" class="btn-primary">
+                    <i class="fas fa-rocket mr-2"></i>
+                    تسجيل الدخول إلى SAK
+                </button>
+            </div>
+        </section>
+
+        <!-- Pricing -->
+        <section class="py-20 gradient-bg" id="pricing">
+            <div class="px-6">
+                <div class="max-w-screen-2xl mx-auto">
+                    <div class="text-center mb-10">
+                        <h2 class="text-4xl md:text-5xl font-bold text-white mb-4">الأسعار</h2>
+
+                        <div class="mt-6 flex flex-col items-center gap-3">
+                            <div class="inline-flex p-1 rounded-xl" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);">
+                                <button id="pricing_toggle_monthly" type="button" class="px-4 py-2 rounded-lg text-sm font-semibold text-white" aria-pressed="true" style="background: rgba(160,196,255,0.16); border: 1px solid rgba(160,196,255,0.22);">شهري</button>
+                                <button id="pricing_toggle_annual" type="button" class="px-4 py-2 rounded-lg text-sm font-semibold muted" aria-pressed="false">سنوي</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="card p-8">
+                            <div class="text-white text-2xl font-bold mb-2">تجربة مجانية</div>
+                            <div class="muted mb-6">جرب كل شيء قبل الشراء.</div>
+
+                            <div class="mb-6">
+                                <div class="text-4xl font-extrabold text-white">مجاني</div>
+                                <div class="muted text-sm mt-1">14 يوم</div>
+                            </div>
+
+                            <ul class="muted space-y-2 mb-8 list-disc pr-5">
+                                <li>كل شيء مشمول في الباقة المميزة</li>
+                                <li>تجربة مجانية لمدة 14 يوم</li>
+                            </ul>
+
+                            <button type="button" class="btn-primary w-full" onclick="window.location.href='/login.html'">تسجيل الدخول</button>
+                        </div>
+
+                        <div class="card p-8">
+                            <div class="text-white text-2xl font-bold mb-2">قياسي</div>
+                            <div class="muted mb-6">للفرق الصغيرة التي تبدأ.</div>
+
+                            <div class="mb-6">
+                                <div class="flex items-end gap-2">
+                                    <div id="price_standard" class="text-4xl font-extrabold text-white">$79</div>
+                                    <div id="price_standard_unit" class="muted text-sm pb-1">/شهر</div>
+                                </div>
+                                <div id="price_standard_sub" class="muted text-sm mt-1">تحصيل شهري</div>
+                            </div>
+
+                            <ul class="muted space-y-2 mb-8 list-disc pr-5">
+                                <li>رقم واتساب واحد متضمن</li>
+                                <li>2 مستخدم: 1 مدير + 1 موظف</li>
+                                <li>ردود ذكية تلقائية</li>
+                                <li>ردود المنتجات والكتالوج + التسعير الأساسي</li>
+                                <li>حملات الرسائل الجماعية + لوحة التحليلات</li>
+                            </ul>
+                        </div>
+
+                        <div class="card p-8" style="border: 1px solid rgba(160,196,255,0.25);">
+                            <div class="flex items-center justify-between gap-3 mb-2">
+                                <div class="text-white text-2xl font-bold">مميز</div>
+                                <div class="chip" style="background: rgba(0, 230, 118, 0.16); border: 1px solid rgba(0, 230, 118, 0.25);">
+                                    <span class="text-sm font-semibold" style="color: var(--success);">الأكثر شعبية</span>
+                                </div>
+                            </div>
+                            <div class="muted mb-6">للفرق التي تتوسع في التحويلات والعمليات.</div>
+
+                            <div class="mb-6">
+                                <div class="flex items-end gap-2">
+                                    <div id="price_premium" class="text-4xl font-extrabold text-white">$219</div>
+                                    <div id="price_premium_unit" class="muted text-sm pb-1">/شهر</div>
+                                </div>
+                                <div id="price_premium_sub" class="muted text-sm mt-1">تحصيل شهري</div>
+                            </div>
+
+                            <ul class="muted space-y-2 mb-8 list-disc pr-5">
+                                <li>كل شيء في القياسي</li>
+                                <li>3 أرقام واتساب متضمنة</li>
+                                <li>حتى 10 أعضاء فريق مع الأدوار</li>
+                                <li>قسم العملاء (الملفات + السجل)</li>
+                                <li>المتابعات (تسجيل العملاء + التذكيرات)</li>
+                                <li>الخصومات وقواعد التسعير حسب نوع العميل</li>
+                                <li>بوابة العملاء + تحليلات متقدمة</li>
+                            </ul>
+                        </div>
+
+                        <div class="card p-8">
+                            <div class="text-white text-2xl font-bold mb-2">مؤسسي</div>
+                            <div class="muted mb-6">للمؤسسات متعددة الفروع وسير العمل المخصص.</div>
+
+                            <div class="mb-6">
+                                <div class="text-3xl font-extrabold text-white">اتصل بنا</div>
+                                <div class="muted text-sm mt-1">تسعير مخصص ونشر</div>
+                            </div>
+
+                            <ul class="muted space-y-2 mb-8 list-disc pr-5">
+                                <li>تكاملات مخصصة (ERP/CRM)</li>
+                                <li>أذونات متقدمة وإعداد جاهز للتدقيق</li>
+                                <li>حدود أعلى + دعم مخصص</li>
+                                <li>بيئة مخصصة اختيارية</li>
+                            </ul>
+
+                            <button type="button" class="btn-secondary w-full" onclick="scrollToContact()">اتصل للتفاصيل</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Contact Us Section -->
+        <section id="contact" class="py-20" style="background: rgba(0,0,0,0.25); border-top: 1px solid rgba(255,255,255,0.08);">
+            <div class="container mx-auto px-6">
+                <div class="max-w-6xl mx-auto">
+                    <div class="text-center">
+                        <h2 class="text-4xl md:text-5xl font-bold text-white mb-4">اتصل بنا</h2>
+                        <p class="text-lg muted mb-10">تحدث إلى فريقنا للتوجيه والعروض التوضيحية والأسعار.</p>
+                    </div>
+
+                    <div class="grid lg:grid-cols-2 gap-8 items-start">
+                        <div class="space-y-6">
+                            <div class="grid md:grid-cols-2 gap-6 text-right">
+                                <div class="card p-8">
+                                    <div class="font-semibold text-white mb-3">الهاتف</div>
+                                    <div class="space-y-4 muted">
+                                        <div>
+                                            <div class="text-white font-semibold">المكتب (الإمارات)</div>
+                                            <a class="hover:text-white" href="tel:+97142250947">+971 42250947</a>
+                                        </div>
+
+                                        <div>
+                                            <div class="text-white font-semibold">المبيعات (الإمارات)</div>
+                                            <a class="hover:text-white" href="tel:+971554408482">+971 554408482</a>
+                                        </div>
+
+                                        <div>
+                                            <div class="text-white font-semibold">الدعم</div>
+                                            <div class="space-y-1">
+                                                <div>
+                                                    <span class="muted-2">الإمارات:</span>
+                                                    <a class="hover:text-white" href="tel:+971507055253">+971 50 705 5253</a>
+                                                </div>
+                                                <div>
+                                                    <span class="muted-2">الكويت:</span>
+                                                    <a class="hover:text-white" href="tel:+96567709452">+965 6770 9452</a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="card p-8">
+                                    <div class="font-semibold text-white mb-3">البريد الإلكتروني</div>
+                                    <div class="space-y-2 muted">
+                                        <div><a class="hover:text-white" href="mailto:sales@saksolution.com">sales@saksolution.com</a></div>
+                                        <div><a class="hover:text-white" href="mailto:sales@saksolution.ae">sales@saksolution.ae</a></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card p-8 text-right">
+                                <div class="font-semibold text-white mb-3">العنوان</div>
+                                <div class="muted">
+                                    Alwael Bldg, M3, Mezzanine Floor, Old Baladiya Street, Alras, Deira, Dubai UAE
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap justify-center lg:justify-start gap-4">
+                                <a class="btn-success" href="https://saksolution.ae" target="_blank" rel="noopener">
+                                    الموقع الرئيسي
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="card p-8 text-right">
+                        <div class="font-semibold text-white mb-1">أرسل لنا رسالة</div>
+                        <div class="muted text-sm mb-6">نرد عادةً خلال يوم عمل واحد.</div>
+
+                        <form id="contactForm" class="space-y-4">
+                            <input type="text" id="contact_hp" name="company_website" autocomplete="off" tabindex="-1" aria-hidden="true" class="hidden" />
+
+                            <div class="grid md:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="contact_name" class="block text-sm font-semibold text-white mb-2">الاسم الكامل *</label>
+                                    <input class="form-input" id="contact_name" name="name" type="text" placeholder="اسمك" required maxlength="120" />
+                                </div>
+                                <div>
+                                    <label for="contact_email" class="block text-sm font-semibold text-white mb-2">البريد الإلكتروني *</label>
+                                    <input class="form-input" id="contact_email" name="email" type="email" placeholder="you@company.com" required maxlength="254" />
+                                </div>
+                            </div>
+
+                            <div class="grid md:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="contact_phone" class="block text-sm font-semibold text-white mb-2">الهاتف</label>
+                                    <input class="form-input" id="contact_phone" name="phone" type="tel" placeholder="اختياري" maxlength="40" />
+                                </div>
+                                <div>
+                                    <label for="contact_company" class="block text-sm font-semibold text-white mb-2">الشركة</label>
+                                    <input class="form-input" id="contact_company" name="company" type="text" placeholder="اختياري" maxlength="120" />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label for="contact_subject" class="block text-sm font-semibold text-white mb-2">الموضوع</label>
+                                <input class="form-input" id="contact_subject" name="subject" type="text" placeholder="عرض توضيحي، الأسعار، التوجيه…" maxlength="160" />
+                            </div>
+
+                            <div>
+                                <label for="contact_message" class="block text-sm font-semibold text-white mb-2">الرسالة *</label>
+                                <textarea class="form-textarea" id="contact_message" name="message" rows="5" placeholder="أخبرنا بما تحتاجه…" required maxlength="5000"></textarea>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-3">
+                                <button id="contact_submit" type="submit" class="btn-primary">
+                                    <i class="fas fa-paper-plane mr-2"></i>
+                                    إرسال الرسالة
+                                </button>
+                                <div id="contact_status" class="muted text-sm"></div>
+                            </div>
+
+                            <div class="muted text-xs">بإرسال هذا النموذج، فإنك توافق على أننا يمكننا الاتصال بك بشأن طلبك.</div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Footer -->
+        <footer class="py-12" style="background: rgba(0,0,0,0.25); border-top: 1px solid rgba(255,255,255,0.08);">
+            <div class="container mx-auto px-6">
+                <div class="grid md:grid-cols-4 gap-8">
+                    <div>
+                        <div class="flex items-center space-x-2 space-x-reverse mb-4">
+                            <i class="fab fa-whatsapp text-2xl" style="color: var(--success);"></i>
+                            <span class="text-xl font-bold">SAK AI</span>
+                        </div>
+                        <p class="muted text-sm">أتمتة مبيعات واتساب مدعومة بالذكاء الاصطناعي مع لوحة عمليات.</p>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-semibold mb-4">المنتج</h4>
+                        <ul class="space-y-2 muted text-sm">
+                            <li><a href="#features" class="hover:text-white">المميزات</a></li>
+                            <li><a href="/login.html" class="hover:text-white">تسجيل الدخول</a></li>
+                            <li><a href="#" class="hover:text-white" onclick="return false;">النشر: محلي/سحابي</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-semibold mb-4">الدعم</h4>
+                        <ul class="space-y-2 muted text-sm">
+                            <li><a href="#" class="hover:text-white" onclick="return false;">الوثائق</a></li>
+                            <li><a href="#" class="hover:text-white" onclick="return false;">API</a></li>
+                            <li><a href="#contact" class="hover:text-white">اتصل</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-semibold mb-4">تواصل معنا</h4>
+                        <div class="flex space-x-4 space-x-reverse">
+                            <a href="https://x.com/saksolutions" target="_blank" rel="noopener" class="muted hover:text-white text-3xl">
+                                <i class="fab fa-twitter"></i>
+                            </a>
+                            <a href="https://www.linkedin.com/company/saksolution/" target="_blank" rel="noopener" class="muted hover:text-white text-3xl">
+                                <i class="fab fa-linkedin"></i>
+                            </a>
+                            <a href="https://www.instagram.com/saksolutions/" target="_blank" rel="noopener" class="muted hover:text-white text-3xl">
+                                <i class="fab fa-instagram"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-8 pt-8 text-center muted text-sm" style="border-top: 1px solid rgba(255,255,255,0.08);">
+                    <p>&copy; 2026 SAK AI (منتج من SAK Solutions).</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+    
+    <script>
+        function scrollToFeatures() {
+            document.getElementById('features').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function scrollToContact() {
+            document.getElementById('contact').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function scrollToPricing() {
+            document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        (function initPricing() {
+            const monthlyBtn = document.getElementById('pricing_toggle_monthly');
+            const annualBtn = document.getElementById('pricing_toggle_annual');
+            const standardEl = document.getElementById('price_standard');
+            const standardUnitEl = document.getElementById('price_standard_unit');
+            const standardSubEl = document.getElementById('price_standard_sub');
+            const premiumEl = document.getElementById('price_premium');
+            const premiumUnitEl = document.getElementById('price_premium_unit');
+            const premiumSubEl = document.getElementById('price_premium_sub');
+
+            if (!monthlyBtn || !annualBtn || !standardEl || !premiumEl) return;
+
+            const prices = {
+                USD: {
+                    monthly: { standard: 79, premium: 219 },
+                    annual: { standard: 699, premium: 2099 },
+                },
+            };
+
+            let billing = 'monthly';
+            let currency = 'USD';
+
+            function formatMoney(amount) {
+                return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
+            }
+
+            function setActive(btn, active) {
+                btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+                btn.classList.toggle('text-white', !!active);
+                btn.classList.toggle('muted', !active);
+                if (active) {
+                    btn.style.background = 'rgba(160,196,255,0.16)';
+                    btn.style.border = '1px solid rgba(160,196,255,0.22)';
+                } else {
+                    btn.style.background = '';
+                    btn.style.border = '';
+                }
+            }
+
+            function render() {
+                const unit = billing === 'annual' ? '/سنة' : '/شهر';
+                const sub = billing === 'annual' ? 'تحصيل سنوي' : 'تحصيل شهري';
+
+                const planPrices = prices[currency]?.[billing];
+                if (!planPrices) return;
+
+                standardEl.textContent = formatMoney(planPrices.standard);
+                premiumEl.textContent = formatMoney(planPrices.premium);
+                if (standardUnitEl) standardUnitEl.textContent = unit;
+                if (premiumUnitEl) premiumUnitEl.textContent = unit;
+                if (standardSubEl) standardSubEl.textContent = sub;
+                if (premiumSubEl) premiumSubEl.textContent = sub;
+
+                setActive(monthlyBtn, billing === 'monthly');
+                setActive(annualBtn, billing === 'annual');
+            }
+
+            monthlyBtn.addEventListener('click', () => {
+                billing = 'monthly';
+                render();
+            });
+
+            annualBtn.addEventListener('click', () => {
+                billing = 'annual';
+                render();
+            });
+
+            render();
+        })();
+
+        (function initLandingScreenshotCarousel() {
+            const imageEl = document.getElementById('screenshotCarouselImage');
+            const captionEl = document.getElementById('screenshotCarouselCaption');
+            const prevBtn = document.getElementById('screenshotPrev');
+            const nextBtn = document.getElementById('screenshotNext');
+
+            if (!imageEl || !captionEl || !prevBtn || !nextBtn) return;
+
+            const screenshots = [
+                { src: '/assets/screenshots/dashboard.png', alt: 'لوحة تحكم لإدارة محادثات واتساب والطلبات', caption: 'نظرة عامة على العمليات' },
+                { src: '/assets/screenshots/products.png', alt: 'لقطة شاشة منتجات SAK', caption: 'إدارة المنتجات' },
+                { src: '/assets/screenshots/followups.png', alt: 'لقطة شاشة متابعات SAK', caption: 'سير عمل المتابعات' },
+                { src: '/assets/screenshots/customers.png', alt: 'لقطة شاشة عملاء SAK', caption: 'العملاء والملفات' },
+                { src: '/assets/screenshots/broadcasts.png', alt: 'لقطة شاشة رسائل جماعية SAK', caption: 'حملات الرسائل' },
+                { src: '/assets/screenshots/connection.png', alt: 'لقطة شاشة اتصال SAK', caption: 'حالة اتصال واتساب' }
+            ];
+
+            let activeIndex = 0;
+            const valid = [];
+            let loadedCount = 0;
+
+            function setSlide(index) {
+                if (!valid.length) return;
+                activeIndex = (index + valid.length) % valid.length;
+                const s = valid[activeIndex];
+                imageEl.src = s.src;
+                imageEl.alt = s.alt;
+                captionEl.textContent = s.caption;
+            }
+
+            screenshots.forEach((s) => {
+                const probe = new Image();
+                probe.onload = () => {
+                    valid.push(s);
+                    loadedCount += 1;
+                    if (s.src.includes('/dashboard.')) {
+                        setSlide(valid.length - 1);
+                    } else if (loadedCount === 1) {
+                        setSlide(0);
+                    }
+                };
+                probe.onerror = () => {
+                    loadedCount += 1;
+                };
+                probe.src = s.src;
+            });
+
+            prevBtn.addEventListener('click', () => setSlide(activeIndex + 1));
+            nextBtn.addEventListener('click', () => setSlide(activeIndex - 1));
+        })();
+
+        (function initContactForm() {
+            const form = document.getElementById('contactForm');
+            if (!form) return;
+
+            const statusEl = document.getElementById('contact_status');
+            const submitBtn = document.getElementById('contact_submit');
+
+            function setStatus(text, tone) {
+                if (!statusEl) return;
+                statusEl.textContent = text || '';
+                statusEl.classList.remove('text-red-300', 'text-green-300', 'muted');
+                if (tone === 'error') statusEl.classList.add('text-red-300');
+                else if (tone === 'success') statusEl.classList.add('text-green-300');
+                else statusEl.classList.add('muted');
+            }
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                setStatus('', '');
+
+                if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
+                    if (typeof form.reportValidity === 'function') form.reportValidity();
+                    setStatus('يرجى تصحيح الحقول المميزة.', 'error');
+                    return;
+                }
+
+                const name = document.getElementById('contact_name')?.value?.trim() || '';
+                const email = document.getElementById('contact_email')?.value?.trim() || '';
+                const phone = document.getElementById('contact_phone')?.value?.trim() || '';
+                const company = document.getElementById('contact_company')?.value?.trim() || '';
+                const subject = document.getElementById('contact_subject')?.value?.trim() || '';
+                const message = document.getElementById('contact_message')?.value?.trim() || '';
+                const hp = document.getElementById('contact_hp')?.value || '';
+
+                if (!name || !email || !message) {
+                    setStatus('يرجى ملء الاسم والبريد الإلكتروني والرسالة.', 'error');
+                    return;
+                }
+
+                if (submitBtn) submitBtn.disabled = true;
+                setStatus('جار الإرسال…', '');
+
+                try {
+                    const resp = await fetch('/api/contact', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name,
+                            email,
+                            phone,
+                            company,
+                            subject,
+                            message,
+                            hp,
+                            page: window.location.href,
+                        }),
+                    });
+
+                    const data = await resp.json().catch(() => ({}));
+                    if (!resp.ok || !data?.ok) {
+                        const msg = data?.error || 'فشل الإرسال. يرجى إرسال بريد إلكتروني إلى sales@saksolution.com.';
+                        setStatus(msg, 'error');
+                        if (typeof trackEvent !== 'undefined') {
+                            trackEvent('Contact Form', 'Submit Failed', msg);
+                        }
+                        return;
+                    }
+
+                    setStatus('تم إرسال الرسالة. سنتواصل معك قريبًا.', 'success');
+                    form.reset();
+                    
+                    if (typeof trackEvent !== 'undefined') {
+                        trackEvent('Contact Form', 'Submit Success', 'Form submitted successfully');
+                    }
+                } catch (err) {
+                    setStatus('فشل الإرسال. يرجى إرسال بريد إلكتروني إلى sales@saksolution.com.', 'error');
+                } finally {
+                    if (submitBtn) submitBtn.disabled = false;
+                }
+            });
+        })();
+    </script>
+</body>
+</html>

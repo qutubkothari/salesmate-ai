@@ -34,6 +34,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// Serve Arabic landing page (any host)
+app.get(['/ar', '/ar/'], (req, res) => {
+  return res.sendFile(path.join(__dirname, 'public', 'ar', 'index.html'));
+});
+
 
 // --- Serve Static Files for Web Dashboard ---
 app.use(express.static(path.join(__dirname, 'public')));
