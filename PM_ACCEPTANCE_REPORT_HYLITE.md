@@ -66,6 +66,12 @@ Date: 2026-01-25
 
 ---
 
+## Live Verification Results (2026-01-25)
+- ✅ FSM data endpoints now working on Supabase (visits, salesmen, plants). This unblocks the FSM Reports dashboard and suggestions panel.
+- ⚠️ CRM lead-create API verification is blocked because login via user-table does not issue the `sak_auth` JWT cookie. CRM endpoints require that JWT. Need tenant login credentials (phone + password from tenants table) or a JWT token to proceed with CRM lead tests.
+
+---
+
 ## Immediate Next Actions (Recommended)
 1) Deploy IndiaMart webhook and manual lead entry UI.  
 2) Deploy KPI suggestions panel.  

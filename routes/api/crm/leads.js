@@ -207,6 +207,87 @@ router.patch('/:leadId', requireCrmAuth, requireCrmFeature(CRM_FEATURES.CRM_LEAD
 });
 
 /**
+ * GET /api/crm/leads/:leadId/timeline
+ * Get activity timeline for a lead (events + messages combined)
+ */
+router.get('/:leadId/timeline', requireCrmAuth, requireCrmFeature(CRM_FEATURES.CRM_LEADS), requireRole(['OWNER', 'ADMIN', 'MANAGER', 'SALESMAN']), async (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const { limit = 50 } = req.query;
+
+    // Verify lead exists and belongs to tenant
+    const { data: lead, error: leadError } = await supabase
+      .from('crm_leads')
+      .select('id, name, phone, email')
+      .eq('tenant_id', req.user.tenantId)
+      .eq('id', leadId)
+      .maybeSingle();
+
+    if (leadError) throw leadError;
+    if (!lead) return res.status(404).json({ success: false, error: 'lead_not_found' });
+
+    // Fetch events
+    const { data: events, error: eventsError } = await supabase
+      .from('crm_lead_events')
+      .select('*, actor_user_id')
+      .eq('tenant_id', req.user.tenantId)
+      .eq('lead_id', leadId)
+      .order('created_at', { ascending: false })
+      .limit(parseInt(limit, 10) || 50);
+
+    if (eventsError) throw eventsError;
+
+    // Fetch messages
+    const { data: messages, error: messagesError } = await supabase
+      .from('crm_messages')
+      .select('*')
+      .eq('tenant_id', req.user.tenantId)
+      .eq('lead_id', leadId)
+      .order('created_at', { ascending: false })
+      .limit(parseInt(limit, 10) || 50);
+
+    if (messagesError) throw messagesError;
+
+    // Combine and sort by timestamp
+    const timeline = [];
+
+    (events || []).forEach(event => {
+      timeline.push({
+        type: 'event',
+        timestamp: event.created_at,
+        eventType: event.event_type,
+        actorUserId: event.actor_user_id,
+        payload: event.event_payload,
+        data: event
+      });
+    });
+
+    (messages || []).forEach(message => {
+      timeline.push({
+        type: 'message',
+        timestamp: message.created_at,
+        direction: message.direction,
+        channel: message.channel,
+        body: message.body,
+        data: message
+      });
+    });
+
+    // Sort by timestamp descending (newest first)
+    timeline.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    return res.json({ 
+      success: true, 
+      lead,
+      timeline,
+      count: timeline.length 
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: 'timeline_failed', details: e?.message || String(e) });
+  }
+});
+
+/**
  * POST /api/crm/leads/:leadId/messages
  * Manual message logging.
  */

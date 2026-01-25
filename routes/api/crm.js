@@ -4,6 +4,7 @@ const router = express.Router();
 const crmAuthRouter = require('./crm/auth');
 const crmUsersRouter = require('./crm/users');
 const crmLeadsRouter = require('./crm/leads');
+const crmLeadMergeRouter = require('./crm/leadMerge');
 const crmIngestRouter = require('./crm/ingest');
 const crmTriageRouter = require('./crm/triage');
 const crmTemplatesRouter = require('./crm/templates');
@@ -15,6 +16,7 @@ const crmFeaturesRouter = require('./crm/features');
 router.use('/auth', crmAuthRouter);
 router.use('/features', crmFeaturesRouter);
 router.use('/users', crmUsersRouter);
+router.use('/leads', crmLeadMergeRouter); // Mount first for /leads/find-duplicates, /leads/merge, /leads/bulk-update
 router.use('/leads', crmLeadsRouter);
 router.use('/ingest', crmIngestRouter);
 router.use('/triage', crmTriageRouter);
