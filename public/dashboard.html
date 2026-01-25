@@ -6956,6 +6956,17 @@
     async function loadLeads() {
         if (!state.session?.tenantId) throw new Error('No tenant session');
 
+        // Load sales team for manual assignment (best-effort)
+        try {
+            const teamRes = await fetch(`/api/sales-team/${state.session.tenantId}`, {
+                headers: { 'Authorization': `Bearer ${state.session.token}` }
+            });
+            const teamData = await teamRes.json();
+            state.data.salesTeam = teamData?.success ? (teamData.users || []) : [];
+        } catch (_) {
+            state.data.salesTeam = [];
+        }
+
         const params = new URLSearchParams();
         if (state.searchQuery) params.append('q', state.searchQuery);
 
@@ -7000,6 +7011,31 @@
         document.getElementById('tabContent').innerHTML = `
             <div class="mb-6">
                 <h2 class="text-white text-2xl font-bold mb-4"><i class="fas fa-user-tag mr-3"></i>Leads</h2>
+
+                <div class="config-card p-6 rounded-xl mb-6">
+                    <div class="flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                            <div class="text-gray-900 font-semibold">Manual Lead Entry</div>
+                            <div class="text-xs text-gray-500">Capture phone or visit leads quickly.</div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-6 gap-3 mt-4">
+                        <input id="manualLeadName" type="text" placeholder="Name" class="search-input px-3 py-2 rounded-xl text-sm" />
+                        <input id="manualLeadPhone" type="text" placeholder="Phone" class="search-input px-3 py-2 rounded-xl text-sm" />
+                        <input id="manualLeadEmail" type="email" placeholder="Email" class="search-input px-3 py-2 rounded-xl text-sm" />
+                        <select id="manualLeadChannel" class="search-input px-3 py-2 rounded-xl text-sm">
+                            <option value="TELEPHONE">Telephone</option>
+                            <option value="VISIT">Personal Visit</option>
+                        </select>
+                        <select id="manualLeadAssignee" class="search-input px-3 py-2 rounded-xl text-sm">
+                            <option value="">Auto/Unassigned</option>
+                            ${(state.data.salesTeam || []).map(u => `<option value="${escapeHtml(u.id)}">${escapeHtml(u.name || u.full_name || u.phone || 'Salesman')}</option>`).join('')}
+                        </select>
+                        <button onclick="createManualLead()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 text-sm">
+                            <i class="fas fa-plus mr-2"></i>Create Lead
+                        </button>
+                    </div>
+                </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div class="config-card p-6 rounded-xl">
@@ -7129,6 +7165,46 @@
                 `}
             </div>
         `;
+    }
+
+    async function createManualLead() {
+        try {
+            if (!state.session?.tenantId) throw new Error('No tenant session');
+
+            const name = document.getElementById('manualLeadName')?.value?.trim();
+            const phone = document.getElementById('manualLeadPhone')?.value?.trim();
+            const email = document.getElementById('manualLeadEmail')?.value?.trim();
+            const channel = document.getElementById('manualLeadChannel')?.value || 'TELEPHONE';
+            const assignedUserId = document.getElementById('manualLeadAssignee')?.value || null;
+
+            if (!name && !phone && !email) {
+                showNotification('Provide at least name, phone, or email.', 'warning');
+                return;
+            }
+
+            const payload = {
+                name: name || null,
+                phone: phone || null,
+                email: email || null,
+                channel,
+                status: 'NEW',
+                heat: 'WARM',
+                assignedUserId: assignedUserId || null
+            };
+
+            const resp = await api.postJSON('/api/crm/leads', payload);
+            if (!resp.success) throw new Error(resp.error || 'Failed to create lead');
+
+            showNotification('Lead created successfully', 'success');
+            document.getElementById('manualLeadName').value = '';
+            document.getElementById('manualLeadPhone').value = '';
+            document.getElementById('manualLeadEmail').value = '';
+            document.getElementById('manualLeadAssignee').value = '';
+
+            await loadLeads();
+        } catch (err) {
+            showNotification(err.message || String(err), 'error');
+        }
     }
 
     async function moveLeadStage(conversationId, stageId) {

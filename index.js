@@ -1311,6 +1311,10 @@ app.use('/api/fsm', fsmSalesmanRouter);
 const crmRouter = require('./routes/api/crm');
 app.use('/api/crm', crmRouter);
 
+// External Integrations (IndiaMart, GEM, etc.)
+const indiamartRouter = require('./routes/api/integrations/indiamart');
+app.use('/api/integrations/indiamart', indiamartRouter);
+
 // WhatsApp Web Standalone API (separate from existing Maytapi system)
 const whatsappWebRouter = require('./routes/api/whatsappWeb');
 app.use('/api/whatsapp-web', whatsappWebRouter);
