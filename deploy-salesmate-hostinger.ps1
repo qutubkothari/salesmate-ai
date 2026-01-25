@@ -108,8 +108,64 @@ if ($USE_SQLITE_MIGRATIONS) {
     Write-Host "  Skipping SQLite migrations (Supabase in use)" -ForegroundColor Green
 }
 
-# ====== STEP 7: Restart PM2 ======
-Write-Host "`n[7/7] Restarting Application" -ForegroundColor Yellow
+# ====== STEP 7: Configure Nginx for sak-ai.saksolution.com ======
+Write-Host "`n[7/8] Configuring Nginx for sak-ai.saksolution.com" -ForegroundColor Yellow
+$nginxConfig = @'
+server {
+    listen 80;
+    server_name sak-ai.saksolution.com;
+
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        
+        proxy_connect_timeout 600;
+        proxy_send_timeout 600;
+        proxy_read_timeout 600;
+        send_timeout 600;
+    }
+
+    location /socket.io/ {
+        proxy_pass http://localhost:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    client_max_body_size 50M;
+}
+'@
+
+Invoke-RemoteCommand "echo '$nginxConfig' | sudo tee /etc/nginx/sites-available/sak-ai.saksolution.com > /dev/null"
+Invoke-RemoteCommand "sudo ln -sf /etc/nginx/sites-available/sak-ai.saksolution.com /etc/nginx/sites-enabled/"
+Invoke-RemoteCommand "sudo nginx -t && sudo systemctl reload nginx"
+Write-Host "Nginx configured for sak-ai.saksolution.com" -ForegroundColor Green
+
+# ====== STEP 8: Install SSL Certificate ======
+Write-Host "`n[8/9] Installing SSL Certificate for sak-ai.saksolution.com" -ForegroundColor Yellow
+$certbotOutput = ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $KEY_PATH "$HOSTINGER_USER@$HOSTINGER_IP" "sudo certbot --nginx -d sak-ai.saksolution.com --non-interactive --agree-tos --email qutubkothari@gmail.com --redirect 2>&1 || echo 'CERT_ERROR'"
+if ($certbotOutput -match "CERT_ERROR|error") {
+    Write-Host "SSL certificate installation skipped or failed (may already exist)" -ForegroundColor Yellow
+} else {
+    Write-Host "SSL certificate installed successfully" -ForegroundColor Green
+}
+
+# ====== STEP 9: Restart PM2 ======
+Write-Host "`n[9/9] Restarting Application" -ForegroundColor Yellow
 Invoke-RemoteCommand "cd $REMOTE_PATH; pm2 restart $PM2_PROCESS; sleep 2; pm2 list"
 Write-Host "Application restarted" -ForegroundColor Green
 
@@ -117,6 +173,8 @@ Write-Host "Application restarted" -ForegroundColor Green
 Write-Host "`n===================================================" -ForegroundColor Cyan
 Write-Host "   DEPLOYMENT SUCCESSFUL!" -ForegroundColor Green
 Write-Host "===================================================`n" -ForegroundColor Cyan
-Write-Host "Live at: https://salesmate.saksolution.com" -ForegroundColor Cyan
-Write-Host "Check logs: pm2 logs $PM2_PROCESS" -ForegroundColor Gray
+Write-Host "Live at:" -ForegroundColor Cyan
+Write-Host "  - https://salesmate.saksolution.com" -ForegroundColor White
+Write-Host "  - https://sak-ai.saksolution.com (NEW)" -ForegroundColor Green
+Write-Host "`nCheck logs: pm2 logs $PM2_PROCESS" -ForegroundColor Gray
 Write-Host ""
