@@ -1,0 +1,106 @@
+/* GLOBAL SETTINGS */
+:root {
+    --primary-color: #25D366; /* WhatsApp Green */
+    --text-color: #333;
+    --bg-color: #f9f9f9;
+    --header-bg: #fff;
+}
+
+body {
+    font-family: 'Inter', sans-serif; /* Default for English */
+    margin: 0;
+    padding: 0;
+    color: var(--text-color);
+    background-color: var(--bg-color);
+    line-height: 1.6;
+}
+
+/* ARABIC OVERRIDE */
+body.arabic-mode {
+    font-family: 'Tajawal', sans-serif; /* Professional Arabic Font */
+}
+
+nav {
+    padding: 1rem 2rem;
+    background: var(--header-bg);
+    display: flex;
+    justify-content: flex-end;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+nav a {
+    text-decoration: none;
+    color: var(--text-color);
+    font-weight: bold;
+}
+
+header {
+    background: var(--header-bg);
+    padding: 4rem 2rem;
+    text-align: start; /* Logical property */
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1.5rem;
+    color: #111;
+}
+
+.aeo-snippet {
+    margin-bottom: 2rem;
+    max-width: 800px;
+}
+
+.aeo-snippet h2 {
+    color: var(--primary-color);
+}
+
+/* LAYOUT LOGIC (The Secret Sauce) */
+/* Instead of "margin-left", use "margin-inline-start" */
+.cta {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 5px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    font-weight: bold;
+    
+    /* This automatically flips margin based on dir="rtl" or "ltr" */
+    margin-inline-start: 15px; 
+}
+
+/* Features Section */
+#features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    padding: 4rem 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.feature {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    border-top: 4px solid var(--primary-color);
+}
+
+.feature h3 {
+    margin-top: 0;
+    color: #111;
+}
+
+@media (max-width: 768px) {
+    header, #features {
+        padding: 2rem 1rem;
+    }
+    h1 {
+        font-size: 2rem;
+    }
+}
