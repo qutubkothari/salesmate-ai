@@ -167,3 +167,8 @@ backups/
 
 # Temporary packaging outputs
 __tmp_salesmate_ai_pack/
+
+# Imported theme sources (local only)
+SAK-Solutions/
+Sak-Solutions/
+Mpaperless-landing/
