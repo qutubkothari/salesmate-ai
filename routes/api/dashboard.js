@@ -1455,35 +1455,8 @@ router.get('/orders/:tenantId', async (req, res) => {
         // In local SQLite mode, schemas can vary; selecting missing columns (e.g. original_amount)
         // causes a hard failure at prepare-time. Use SELECT * to avoid column drift.
         let query = dbClient.from('orders_new');
-        if (USE_LOCAL_DB) {
-            query = query.select('*');
-        } else {
-            query = query.select(`
-                id,
-                tenant_id,
-                actual_amount,
-                original_amount,
-                discount_amount,
-                subtotal_amount,
-                gst_amount,
-                cgst_amount,
-                sgst_amount,
-                igst_amount,
-                shipping_charges,
-                shipping_cartons,
-                shipping_rate_per_carton,
-                shipping_rate_type,
-                free_shipping_applied,
-                customer_name,
-                customer_email,
-                shipping_address,
-                zoho_invoice_id,
-                created_at,
-                conversation_id,
-                status,
-                order_status
-            `);
-        }
+        // Use select('*') to be robust against schema drifts/missing columns
+        query = query.select('*');
 
         query = query.eq('tenant_id', tenantId);
 
@@ -1816,19 +1789,8 @@ router.get('/conversations/:tenantId', async (req, res) => {
         console.log(`Fetching conversations for tenant: ${tenantId}`);
 
         let convQuery = dbClient.from('conversations_new');
-        if (USE_LOCAL_DB) {
-            // Local SQLite schemas can drift; select('*') avoids hard failures on missing columns.
-            convQuery = convQuery.select('*');
-        } else {
-            convQuery = convQuery.select(`
-                id,
-                end_user_phone,
-                status,
-                last_product_discussed,
-                updated_at,
-                created_at
-            `);
-        }
+        // Use select('*') to be robust against schema drifts/missing columns
+        convQuery = convQuery.select('*');
 
         const { data: conversations, error: convError } = await convQuery
             .eq('tenant_id', tenantId)

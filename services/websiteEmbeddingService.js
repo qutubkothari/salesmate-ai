@@ -5,6 +5,7 @@
  */
 
 const { dbClient } = require('./config');
+const crypto = require('crypto');
 const { 
     generateFreeEmbedding, 
     generateFreeEmbeddingsBatch,
@@ -184,6 +185,7 @@ async function processWebsiteContent(crawledData, tenantId) {
 
         // Prepare records for database (compatible with both Postgres and local SQLite)
         const records = chunks.map((chunk, index) => ({
+            id: crypto.randomUUID(),
             tenant_id: tenantId,
             // Legacy/local schema
             content: chunk.text, // local SQLite has NOT NULL content

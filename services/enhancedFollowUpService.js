@@ -323,7 +323,7 @@ const sendDueFollowUpReminders = async () => {
     
     const { data: conversations, error } = await dbClient
       .from('conversations_new')
-      .select('id, tenant_id, end_user_phone, lead_score, follow_up_count, last_follow_up_at, follow_up_at, context_analysis')
+      .select('id, tenant_id, end_user_phone, follow_up_count, last_follow_up_at, follow_up_at, context_analysis')
       .not('follow_up_at', 'is', null)
       .lte('follow_up_at', new Date().toISOString());
 
@@ -333,7 +333,8 @@ const sendDueFollowUpReminders = async () => {
     for (const conv of conversations) {
       const { data: tenant } = await dbClient.from('tenants').select('id, owner_whatsapp_number, bot_language').eq('id', conv.tenant_id).single();
       if (!tenant) continue;
-      const { lead_score, follow_up_count = 0 } = conv;
+      const { follow_up_count = 0 } = conv;
+      const lead_score = 0; // Default score as column missing
       
       // Skip if customer has opted out
       const { data: optOut } = await dbClient

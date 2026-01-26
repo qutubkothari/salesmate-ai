@@ -326,7 +326,7 @@ const acquireProcessingLock = async (processId) => {
             const { error: updateError } = await dbClient
                 .from('broadcast_processing_lock')
                 .update({
-                    is_processing: true,
+                    is_processing: 1,
                     process_id: processId,
                     started_at: now.toISOString(),
                     last_heartbeat: now.toISOString()
@@ -363,7 +363,7 @@ const releaseProcessingLock = async (processId) => {
         const { error } = await dbClient
             .from('broadcast_processing_lock')
             .update({
-                is_processing: false,
+                is_processing: 0,
                 process_id: null,
                 started_at: null,
                 last_heartbeat: null
