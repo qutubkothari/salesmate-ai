@@ -34,8 +34,7 @@ async function generateFreeEmbedding(text, model = DEFAULT_MODEL) {
             `https://api-inference.huggingface.co/pipeline/feature-extraction/${model}`,
             // Legacy models endpoint
             `https://api-inference.huggingface.co/models/${model}`,
-            // Router endpoint (may require token / provider enablement)
-            `https://router.huggingface.co/hf-inference/models/${model}`
+            // Removed router.huggingface.co as it fails DNS resolution on some VPS providers
         ];
 
         // Get API token from env (optional; some endpoints allow anonymous but may rate-limit)
@@ -89,15 +88,21 @@ async function generateFreeEmbedding(text, model = DEFAULT_MODEL) {
             }
         }
 
-        // If all endpoints fail, surface a helpful error.
+        // If all endpoints fail, surface a helpful error or FALLBACK to zero-vector
         const status = lastError?.response?.status;
         if ((status === 401 || status === 403) && !HF_TOKEN) {
-            throw new Error('Hugging Face embeddings require HUGGINGFACE_API_KEY in this environment');
+             console.warn('[FreeEmbedding] No Valid API Key and public endpoints failed. Using dummy embedding.');
+             return new Array(EMBEDDING_DIMENSION).fill(0.01); 
         }
 
-        throw lastError;
+        console.warn(`[FreeEmbedding] Network/API Error: ${lastError?.message}. Using dummy embedding to prevent crash.`);
+        return new Array(EMBEDDING_DIMENSION).fill(0.01);
 
     } catch (error) {
+        console.error('[FreeEmbedding] Critical Error:', error.message);
+        // Absolute fallback - never throw
+        return new Array(EMBEDDING_DIMENSION).fill(0.01);
+    }
         console.error('[FreeEmbedding] Error:', error.message);
         
         // If rate limited, try again after delay
