@@ -103,17 +103,6 @@ async function generateFreeEmbedding(text, model = DEFAULT_MODEL) {
         // Absolute fallback - never throw
         return new Array(EMBEDDING_DIMENSION).fill(0.01);
     }
-        console.error('[FreeEmbedding] Error:', error.message);
-        
-        // If rate limited, try again after delay
-        if (error.response?.status === 429) {
-            console.log('[FreeEmbedding] Rate limited, waiting 5s...');
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            return generateFreeEmbedding(text, model); // Retry
-        }
-        
-        throw error;
-    }
 }
 
 /**
