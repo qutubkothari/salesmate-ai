@@ -142,10 +142,10 @@
           "@context": "https://schema.org",
           "@type": "WebPage",
           "name": "SAK AI WhatsApp Sales Automation",
-          "speakable": {
-            "@type": "SpeakableSpecification",
-            "cssSelector": ["#hero-section", "#features-section", "#pricing-section"]
-          }
+                    "speakable": {
+                        "@type": "SpeakableSpecification",
+                        "cssSelector": ["#hero", "#features", "#pricing"]
+                    }
         }
         </script>
 
@@ -464,6 +464,13 @@
         </script>
 
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/wp-content/themes/customify/style.css">
+    <link rel="stylesheet" href="/wp-content/themes/customify/assets/css/style.css">
+    <link rel="stylesheet" href="/wp-content/themes/customify/assets/css/owl.carousel.min.css">
+    <link rel="stylesheet" href="/wp-content/themes/customify/assets/css/owl.theme.default.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.1/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
@@ -797,9 +804,991 @@
             background: var(--glass-bg);
             border: 1px solid var(--glass-border);
         }
+        #sak-unified {
+            background: transparent;
+        }
+        body > :not(#sak-unified) {
+            display: none !important;
+        }
+        .sak-hero {
+            padding-top: 150px;
+        }
+        .sak-hero .banner-heading {
+            font-size: 52px;
+            line-height: 1.1;
+        }
+        .sak-card {
+            border: 1px solid #ffffff33;
+            border-radius: 16px;
+            padding: 24px;
+            background: rgba(17, 12, 26, 0.75);
+            height: 100%;
+        }
+        .sak-card h4 {
+            margin-bottom: 12px;
+        }
+        .sak-card p {
+            color: rgba(255,255,255,0.8);
+        }
+        .sak-section-title {
+            margin-bottom: 24px;
+        }
+        .sak-table {
+            width: 100%;
+            border-collapse: collapse;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(17, 12, 26, 0.8);
+        }
+        .sak-table th, .sak-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.12);
+            color: #fff;
+            background: rgba(14, 9, 22, 0.7);
+        }
+        .sak-table tr:nth-child(even) td {
+            background: rgba(22, 12, 32, 0.85);
+        }
+        .sak-table th {
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 1px;
+            background: rgba(255, 255, 255, 0.08);
+        }
+        .pricing-card {
+            border: 1px solid #ffffff33;
+            border-radius: 16px;
+            padding: 28px;
+            background: rgba(17, 12, 26, 0.78);
+            height: 100%;
+        }
+        .pricing-card .price {
+            font-size: 36px;
+            font-weight: 700;
+        }
+        .pricing-card ul {
+            padding-left: 18px;
+        }
+        .contact-box {
+            border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 20px;
+            padding: 32px;
+            background: rgba(37, 12, 55, 0.9);
+        }
+        @media (max-width: 992px) {
+            .sak-hero {
+                padding-top: 120px;
+            }
+            .sak-hero .banner-heading {
+                font-size: 38px;
+            }
+        }
+        #sak-unified {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0f0518 0%, #2b0f4f 48%, #3a1a66 100%);
+        }
+        #sak-unified > :not(.sak-homepage) {
+            display: none !important;
+        }
+        .sak-homepage {
+            min-height: 100vh;
+            color: #ffffff;
+        }
+        .sak-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+        .sak-topbar {
+            padding: 18px 0 10px;
+        }
+        .sak-topbar .sak-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+        }
+        .sak-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .sak-logo {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            object-fit: contain;
+            background: rgba(255,255,255,0.1);
+            padding: 6px;
+        }
+        .sak-brand-title {
+            font-weight: 700;
+            font-size: 18px;
+            line-height: 1.1;
+        }
+        .sak-brand-sub {
+            font-size: 12px;
+            color: rgba(255,255,255,0.68);
+        }
+        .sak-nav {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .sak-nav a {
+            color: rgba(255,255,255,0.86);
+            text-decoration: none;
+        }
+        .sak-nav a:hover {
+            color: #ffffff;
+        }
+        .sak-caret {
+            margin-left: 4px;
+            font-size: 10px;
+            opacity: 0.6;
+        }
+        .sak-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .sak-btn {
+            border-radius: 16px;
+            padding: 10px 16px;
+            font-weight: 600;
+            font-size: 13px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border: 1px solid transparent;
+        }
+        .sak-btn-light {
+            background: #a8c8ff;
+            color: #0b1120;
+        }
+        .sak-btn-outline {
+            border-color: rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.05);
+            color: #ffffff;
+        }
+        .sak-btn-green {
+            background: #19d46a;
+            color: #08130d;
+        }
+        .sak-btn-primary {
+            background: #9fb8ff;
+            color: #0b1120;
+        }
+        .sak-btn-small {
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+        .sak-menu-btn {
+            display: none;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.06);
+            color: #ffffff;
+            align-items: center;
+            justify-content: center;
+        }
+        .sak-mobile-menu {
+            display: none;
+            background: rgba(8, 6, 18, 0.95);
+            border-top: 1px solid rgba(255,255,255,0.1);
+            padding: 14px 0 24px;
+        }
+        .sak-mobile-menu.is-open {
+            display: block;
+        }
+        .sak-mobile-menu a {
+            color: #ffffff;
+            text-decoration: none;
+            display: block;
+            padding: 10px 0;
+            font-weight: 600;
+        }
+        .sak-mobile-actions {
+            display: grid;
+            gap: 10px;
+            padding-top: 10px;
+        }
+        .sak-hero {
+            padding: 30px 0 90px;
+        }
+        .sak-hero-grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 42px;
+            align-items: center;
+        }
+        .sak-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.2);
+            font-size: 13px;
+        }
+        .sak-hero h1 {
+            font-size: 56px;
+            font-weight: 800;
+            line-height: 1.05;
+            margin: 18px 0 12px;
+        }
+        .sak-hero h1 span {
+            color: #a8c8ff;
+        }
+        .sak-hero p {
+            color: rgba(255,255,255,0.82);
+            font-size: 16px;
+            line-height: 1.7;
+            max-width: 540px;
+        }
+        .sak-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 22px 0 26px;
+        }
+        .sak-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.18);
+            font-size: 12px;
+            color: rgba(255,255,255,0.85);
+        }
+        .sak-cta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .sak-chat {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 24px;
+            padding: 22px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+        }
+        .sak-chat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            background: rgba(0,0,0,0.2);
+            border-radius: 16px;
+            padding: 14px 16px;
+            margin-bottom: 18px;
+        }
+        .sak-chat-title {
+            font-weight: 700;
+            font-size: 14px;
+        }
+        .sak-chat-sub {
+            font-size: 12px;
+            color: #c7e1ff;
+        }
+        .sak-chat-meta {
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
+            margin-top: 6px;
+        }
+        .sak-dot {
+            width: 10px;
+            height: 10px;
+            background: #28e76a;
+            border-radius: 999px;
+            margin-top: 6px;
+        }
+        .sak-chat-body {
+            display: grid;
+            gap: 12px;
+        }
+        .sak-bubble {
+            max-width: 78%;
+            padding: 12px 14px;
+            border-radius: 16px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            font-size: 12.5px;
+        }
+        .sak-bubble-left {
+            justify-self: start;
+        }
+        .sak-bubble-right {
+            justify-self: end;
+            background: rgba(159,186,255,0.16);
+        }
+        .sak-bubble-success {
+            background: rgba(23,215,106,0.16);
+            border-color: rgba(23,215,106,0.35);
+        }
+        .sak-bubble-title {
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .sak-bubble-text {
+            color: rgba(255,255,255,0.85);
+        }
+        .sak-bubble-sub {
+            color: rgba(255,255,255,0.6);
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .sak-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #28e76a;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        @media (max-width: 1080px) {
+            .sak-nav,
+            .sak-actions {
+                display: none;
+            }
+            .sak-menu-btn {
+                display: inline-flex;
+            }
+            .sak-hero-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        @media (max-width: 768px) {
+            .sak-hero h1 {
+                font-size: 40px;
+            }
+            .sak-container {
+                padding: 0 18px;
+            }
+        }
     </style>
 </head>
 <body class="min-h-screen">
+    <div id="sak-unified">
+        <div class="sak-homepage">
+            <header class="sak-topbar">
+                <div class="sak-container">
+                    <div class="sak-brand">
+                        <img class="sak-logo" src="/assets/logo.png" alt="SAK">
+                        <div>
+                            <div class="sak-brand-title">SAK</div>
+                            <div class="sak-brand-sub">WhatsApp AI Sales Assistant</div>
+                        </div>
+                    </div>
+
+                    <nav class="sak-nav">
+                        <a href="#about">About <span class="sak-caret">▾</span></a>
+                        <a href="#features">Features <span class="sak-caret">▾</span></a>
+                        <a href="#integrations">Integrations <span class="sak-caret">▾</span></a>
+                        <a href="#pricing">Pricing</a>
+                        <a href="#resources">Resources</a>
+                    </nav>
+
+                    <div class="sak-actions">
+                        <a href="#contact" class="sak-btn sak-btn-light">Request demo</a>
+                        <a href="#contact" class="sak-btn sak-btn-outline">Contact Us</a>
+                        <a href="https://saksolution.com" target="_blank" class="sak-btn sak-btn-green">Main website</a>
+                        <a href="/login.html" class="sak-btn sak-btn-outline">Login</a>
+                    </div>
+
+                    <button class="sak-menu-btn" id="sakMenuBtn" aria-label="Open menu">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                </div>
+            </header>
+
+            <div class="sak-mobile-menu" id="sakMobileMenu">
+                <div class="sak-container">
+                    <a href="#about">About</a>
+                    <a href="#features">Features</a>
+                    <a href="#integrations">Integrations</a>
+                    <a href="#pricing">Pricing</a>
+                    <a href="#resources">Resources</a>
+                    <div class="sak-mobile-actions">
+                        <a href="#contact" class="sak-btn sak-btn-light">Request demo</a>
+                        <a href="#contact" class="sak-btn sak-btn-outline">Contact Us</a>
+                        <a href="https://saksolution.com" target="_blank" class="sak-btn sak-btn-green">Main website</a>
+                        <a href="/login.html" class="sak-btn sak-btn-outline">Login</a>
+                    </div>
+                </div>
+            </div>
+
+            <section class="sak-hero" id="about">
+                <div class="sak-container sak-hero-grid">
+                    <div>
+                        <div class="sak-pill">
+                            <i class="fa-brands fa-whatsapp"></i>
+                            WhatsApp Sales Automation &amp; Order Bot
+                        </div>
+                        <h1>
+                            Turn WhatsApp into<br>
+                            Your <span>24/7 Sales Manager</span>
+                        </h1>
+                        <p>
+                            SAK AI automates customer enquiries, sends instant price quotes, and processes orders directly on WhatsApp.
+                            Stop losing sales to slow replies—let AI handle the busy work while you focus on growth.
+                        </p>
+                        <div class="sak-chip-row">
+                            <span class="sak-chip"><i class="fa-solid fa-check"></i> AI replies + catalog search</span>
+                            <span class="sak-chip"><i class="fa-solid fa-check"></i> Orders, carts, discounts</span>
+                            <span class="sak-chip"><i class="fa-solid fa-check"></i> Broadcasts + follow-ups</span>
+                            <span class="sak-chip"><i class="fa-solid fa-check"></i> Website/docs knowledge base</span>
+                        </div>
+                        <div class="sak-cta">
+                            <a href="#features" class="sak-btn sak-btn-primary">See What It Does</a>
+                            <a href="#contact" class="sak-btn sak-btn-outline">Contact Us</a>
+                            <a href="/login.html" class="sak-btn sak-btn-outline">Login</a>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="sak-chat">
+                            <div class="sak-chat-header">
+                                <div>
+                                    <div class="sak-chat-title">AI Assistant</div>
+                                    <div class="sak-chat-sub">Online</div>
+                                    <div class="sak-chat-meta">Powered by WhatsApp Business</div>
+                                </div>
+                                <span class="sak-dot"></span>
+                            </div>
+
+                            <div class="sak-chat-body">
+                                <div class="sak-bubble sak-bubble-left">
+                                    <div class="sak-bubble-title">Here are the details</div>
+                                    <div class="sak-bubble-text">Price, pack size, availability</div>
+                                    <div class="sak-bubble-sub">Plus: alternatives + upsells</div>
+                                </div>
+                                <div class="sak-bubble sak-bubble-right">Do you have this item in stock?</div>
+                                <div class="sak-bubble sak-bubble-right">Add 10 cartons to cart</div>
+                                <div class="sak-bubble sak-bubble-left sak-bubble-success">
+                                    <div class="sak-status"><i class="fa-solid fa-check"></i> Cart updated</div>
+                                    <div class="sak-bubble-text">Next: confirm address &amp; payment</div>
+                                    <div style="margin-top:10px;">
+                                        <a href="#" class="sak-btn sak-btn-green sak-btn-small" onclick="return false;">Create Order</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const btn = document.getElementById('sakMenuBtn');
+                const menu = document.getElementById('sakMobileMenu');
+                if (!btn || !menu) return;
+                btn.addEventListener('click', () => {
+                    menu.classList.toggle('is-open');
+                });
+            });
+        </script>
+        <!-- ================= HEADER START ================= -->
+        <header>
+
+            <!-- ===== Desktop Header ===== -->
+            <section class="sidespace sak-header-sec desktop-header">
+                <div class="row header-row-main">
+
+                    <!-- Logo -->
+                    <div class="col-lg-3">
+                        <div class="logo-div-header">
+                            <a href="/">
+                                <img src="/wp-content/uploads/2025/12/SAK-Logo.png" alt="logo">
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Menu -->
+                    <div class="col-lg-6">
+                        <nav class="header-menu">
+                            <ul class="header-ul">
+                                <li class="header-menu-li"><a href="/">Home</a></li>
+                                <li class="header-menu-li"><a href="#features">Features</a></li>
+                                <li class="header-menu-li"><a href="#pricing">Pricing</a></li>
+                                <li class="header-menu-li"><a href="/blog/">Blogs</a></li>
+                                <li class="header-menu-li"><a href="#contact">Contact Us</a></li>
+                            </ul>
+                        </nav>
+                    </div>
+
+                    <!-- Button -->
+                    <div class="col-lg-3">
+                        <div class="header-btn">
+                            <a href="#contact" class="primary-btn">
+                                Get Demo <i class="fa-solid fa-arrow-down"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- ===== Mobile Header ===== -->
+            <div class="mob-header-main sidespace mobile-header">
+                <div class="logo-toggle">
+
+                    <!-- Mobile Logo -->
+                    <div class="mob-header-logo-div">
+                        <a href="/">
+                            <img src="/wp-content/uploads/2025/12/SAK-Logo.png" alt="logo">
+                        </a>
+                    </div>
+
+                    <!-- WhatsApp + Hamburger -->
+                    <div class="mobile-view">
+                        <a href="https://wa.me/971507055253" class="call">
+                            <i class="fa-brands fa-whatsapp"></i>
+                        </a>
+
+                        <span class="humberger-menu" id="open-nav">
+                            <svg width="24" height="24" viewBox="0 0 24 24">
+                                <path d="M3 6h18M3 12h12M3 18h18"
+                                      stroke="#001233" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </span>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- ===== Mobile Navigation ===== -->
+            <div id="toggle-nav" class="mobile-nav">
+
+                <!-- Close -->
+                <div class="nav-header">
+                    <span id="close-nav" class="btn-menu-close">✕</span>
+                </div>
+
+                <!-- Links -->
+                <div class="side-nav-links">
+                    <ul class="imp-link-menu">
+                        <li><a href="/">Home</a></li>
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#pricing">Pricing</a></li>
+                        <li><a href="/blog/">Blogs</a></li>
+                        <li><a href="#contact">Contact Us</a></li>
+                    </ul>
+                </div>
+
+                <!-- Contact Info -->
+                <div class="side_mobile_footer">
+                    <div class="contact-info">
+                        <p class="location">
+                            <i class="fa-solid fa-location-dot"></i> UAE / KUWAIT
+                        </p>
+
+                        <p class="location">
+                            <i class="fa-solid fa-phone"></i>
+                            <a href="tel:+971507055253">+971 507055253</a> /
+                            <a href="tel:+96567709452">+965 67709452</a>
+                        </p>
+
+                        <p class="location">
+                            <i class="fa-solid fa-envelope"></i>
+                            <a href="mailto:sales@saksolution.com">sales@saksolution.com</a>
+                        </p>
+
+                        <div class="social-media">
+                            <a href="https://www.instagram.com/saksolutions"><i class="fa-brands fa-instagram"></i></a>
+                            <a href="https://www.linkedin.com/company/saksolution"><i class="fa-brands fa-linkedin-in"></i></a>
+                            <a href="https://wa.me/971507055253">
+                                <i class="fa-brands fa-whatsapp"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Copyright -->
+                <div class="copy-right-mob">
+                    <p>
+                        Copyright © 2025, SAK Solutions.
+                        Website Designed & Developed by
+                        <a href="https://graphitiquemedia.com" target="_blank">
+                            Graphitique Media
+                        </a>
+                    </p>
+                </div>
+
+            </div>
+
+        </header>
+
+        <!-- ===== Mobile Menu Script ===== -->
+        <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const openBtn = document.getElementById('open-nav');
+            const closeBtn = document.getElementById('close-nav');
+            const mobileNav = document.getElementById('toggle-nav');
+
+            openBtn?.addEventListener('click', () => {
+                mobileNav.classList.add('is-open');
+            });
+
+            closeBtn?.addEventListener('click', () => {
+                mobileNav.classList.remove('is-open');
+            });
+        });
+        </script>
+        <!-- ================= HEADER END ================= -->
+
+        <section class="sidespace pb-70 sak-hero" id="hero">
+            <div class="row align-items-center">
+                <div class="col-lg-7">
+                    <h1 class="h1-heading banner-heading wt-text mb-20">
+                        WhatsApp Sales Automation <span class="lb-text">Built for UAE & India</span>
+                    </h1>
+                    <p class="mb-30">Convert every inquiry into an order with SAK AI. Automate pricing, product answers, order creation, follow-ups, and customer support directly on WhatsApp—24/7.</p>
+                    <div class="banner-btn">
+                        <a href="#contact" class="primary-btn">Book a Demo <i class="fa-solid fa-arrow-down"></i></a>
+                    </div>
+                </div>
+                <div class="col-lg-5">
+                    <div class="banner-img">
+                        <img src="/wp-content/uploads/2025/12/Homepage-2-03.png" alt="SAK AI hero">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="sidespace pb-70" id="features">
+            <div class="sak-section-title">
+                <h2 class="wt-text">What SAK AI Automates</h2>
+                <p class="mb-30">Everything your sales team does—now done instantly on WhatsApp.</p>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-6 col-lg-4">
+                    <div class="sak-card">
+                        <h4 class="wt-text">Instant Pricing</h4>
+                        <p>Auto-quote based on customer type, discounts, and inventory in real-time.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="sak-card">
+                        <h4 class="wt-text">Order Creation</h4>
+                        <p>Create orders automatically with confirmations and delivery updates.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="sak-card">
+                        <h4 class="wt-text">AI Sales Assistant</h4>
+                        <p>Understand intent, answer FAQs, and guide buyers to purchase.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="sak-card">
+                        <h4 class="wt-text">Catalog Search</h4>
+                        <p>Recommend products instantly with images, specs, and availability.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="sak-card">
+                        <h4 class="wt-text">Follow-up Engine</h4>
+                        <p>Never lose leads—automated reminders and scheduled re-engagements.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="sak-card">
+                        <h4 class="wt-text">Analytics Dashboard</h4>
+                        <p>Track response time, conversions, and revenue by agent and channel.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="sidespace pb-70" id="pricing">
+            <div class="sak-section-title">
+                <h2 class="wt-text">Pricing</h2>
+                <p class="mb-30">Simple plans built for teams at every scale.</p>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-6 col-lg-4">
+                    <div class="pricing-card">
+                        <h4 class="wt-text">Free Trial</h4>
+                        <p class="mb-20">Try everything before you buy.</p>
+                        <div class="price wt-text">Free</div>
+                        <p class="mb-20">14 days</p>
+                        <ul>
+                            <li>Everything in Premium</li>
+                            <li>Full product catalog</li>
+                            <li>Automated order flow</li>
+                        </ul>
+                        <div class="mt-30">
+                            <a href="/login.html" class="primary-btn">Start Trial <i class="fa-solid fa-arrow-down"></i></a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="pricing-card">
+                        <h4 class="wt-text">Standard</h4>
+                        <p class="mb-20">For small teams getting started.</p>
+                        <div class="price wt-text">$79</div>
+                        <p class="mb-20">per month</p>
+                        <ul>
+                            <li>1 WhatsApp number</li>
+                            <li>2 users included</li>
+                            <li>Broadcast campaigns</li>
+                            <li>Analytics dashboard</li>
+                        </ul>
+                        <div class="mt-30">
+                            <a href="/login.html" class="primary-btn">Get Started <i class="fa-solid fa-arrow-down"></i></a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="pricing-card">
+                        <h4 class="wt-text">Premium</h4>
+                        <p class="mb-20">For teams scaling conversions.</p>
+                        <div class="price wt-text">$219</div>
+                        <p class="mb-20">per month</p>
+                        <ul>
+                            <li>3 WhatsApp numbers</li>
+                            <li>Up to 10 team members</li>
+                            <li>Follow-ups + reminders</li>
+                            <li>Customer portal</li>
+                        </ul>
+                        <div class="mt-30">
+                            <a href="/login.html" class="primary-btn">Upgrade <i class="fa-solid fa-arrow-down"></i></a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="sidespace pb-70" id="comparison">
+            <div class="sak-section-title">
+                <h2 class="wt-text">Human vs SAK AI</h2>
+                <p class="mb-30">Why AI is the smarter choice for your business.</p>
+            </div>
+            <div class="table-responsive">
+                <table class="sak-table">
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>Human Agent</th>
+                            <th>SAK AI Bot</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Response Time</td>
+                            <td>20 Minutes</td>
+                            <td>Instant (0s)</td>
+                        </tr>
+                        <tr>
+                            <td>Availability</td>
+                            <td>9 AM - 6 PM</td>
+                            <td>24/7/365</td>
+                        </tr>
+                        <tr>
+                            <td>Cost</td>
+                            <td>High (Salary)</td>
+                            <td>Low (Fixed)</td>
+                        </tr>
+                        <tr>
+                            <td>Language</td>
+                            <td>English Only</td>
+                            <td>English & Arabic</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="sidespace pb-70" id="faqs">
+            <div class="sak-section-title">
+                <h2 class="wt-text">FAQs</h2>
+            </div>
+            <div class="accordion faq-accordion" id="acc">
+                <div class="accordion-item faq-item">
+                    <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#c1">
+                        Can I use my WhatsApp Business number?
+                    </button>
+                    <div id="c1" class="accordion-collapse collapse" data-bs-parent="#acc">
+                        <div class="accordion-body">
+                            Yes. SAK AI works with the WhatsApp Business API so you can keep your existing number.
+                        </div>
+                    </div>
+                </div>
+                <div class="accordion-item faq-item">
+                    <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#c2">
+                        Does it support Arabic?
+                    </button>
+                    <div id="c2" class="accordion-collapse collapse" data-bs-parent="#acc">
+                        <div class="accordion-body">
+                            Yes. SAK AI supports Arabic and English automatically.
+                        </div>
+                    </div>
+                </div>
+                <div class="accordion-item faq-item">
+                    <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#c3">
+                        Can we integrate with ERP/CRM?
+                    </button>
+                    <div id="c3" class="accordion-collapse collapse" data-bs-parent="#acc">
+                        <div class="accordion-body">
+                            We integrate with ERP/CRM systems including SAP, Oracle, Microsoft Dynamics, Zoho, and custom APIs.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="sidespace pb-70" id="contact">
+            <div class="contact-box">
+                <div class="row align-items-center">
+                    <div class="col-lg-8">
+                        <h2 class="wt-text mb-15">Book a Demo</h2>
+                        <p class="mb-30">Tell us about your business and we’ll show you how SAK AI can automate your WhatsApp sales.</p>
+                    </div>
+                    <div class="col-lg-4 text-lg-end">
+                        <a href="https://wa.me/971507055253" class="primary-btn">Chat on WhatsApp <i class="fa-solid fa-arrow-down"></i></a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= FOOTER START ================= -->
+        <footer>
+            <div class="footer-main">
+
+                <div class="footer-part-one">
+                    <div class="footer-big-contact">
+                        <h4 class="no-mb wt-text">
+                            Experience the Difference <br>
+                            Start Your Journey with Us
+                        </h4>
+
+                        <div class="contact-big-div">
+                            <i class="fa-solid fa-phone"></i>
+
+                            <div class="big-number-div">
+                                <p class="no-mb wt-text big-number-text">Contact Here</p>
+
+                                <p class="no-mb wt-text big-numb-footer num-font">
+                                    <a href="tel:+971507055253">+971 507055253</a>
+                                </p>
+
+                                <p class="no-mb wt-text big-numb-footer num-font">
+                                    <a href="tel:+96567709452">+965 67709452</a>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="footer-part-two sidespace">
+                    <div class="row footer-menu-row">
+                        <div class="col-lg-3 sak-footer-menu-col">
+                            <div class="link-block">
+                                <h4 class="wt-text menu-name mb-15">Quick Links</h4>
+                                <ul class="footer-menu-ul">
+                                    <li class="footer-menu-li"><a href="/">Home</a></li>
+                                    <li class="footer-menu-li"><a href="#features">Features</a></li>
+                                    <li class="footer-menu-li"><a href="#pricing">Pricing</a></li>
+                                    <li class="footer-menu-li"><a href="/blog/">Blogs</a></li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-4 sak-footer-menu-col">
+                            <div class="link-block">
+                                <h4 class="wt-text menu-name mb-15">Products</h4>
+                                <ul class="footer-menu-ul">
+                                    <li class="footer-menu-li"><a href="#features">AI Sales Assistant</a></li>
+                                    <li class="footer-menu-li"><a href="#features">WhatsApp Automation</a></li>
+                                    <li class="footer-menu-li"><a href="#pricing">Pricing Plans</a></li>
+                                    <li class="footer-menu-li"><a href="#contact">Book a Demo</a></li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-2 sak-footer-menu-col">
+                            <div class="link-block">
+                                <h4 class="wt-text menu-name mb-15">Resource</h4>
+                                <ul class="footer-menu-ul">
+                                    <li class="footer-menu-li"><a href="/">Home</a></li>
+                                    <li class="footer-menu-li"><a href="/blog/">Blogs</a></li>
+                                    <li class="footer-menu-li"><a href="/privacy.html">Privacy Policy</a></li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-3 sak-footer-menu-col">
+                            <div class="link-block">
+                                <h4 class="wt-text menu-name mb-15">Contact Us</h4>
+
+                                <div class="footer-contact-block">
+                                    <div class="footer-icon-data">
+                                        <i class="fa-solid fa-phone"></i>
+                                        <p class="no-mb wt-text num-font number-footer">
+                                            <a href="tel:+971 507055253">+971 507055253</a> / <a href="tel:+965 67709452">+965 67709452</a>
+                                        </p>
+                                    </div>
+
+                                    <div class="footer-icon-data">
+                                        <i class="fa-solid fa-envelope"></i>
+                                        <p class="no-mb wt-text number-footer">
+                                            <a href="mailto:sales@saksolution.com">sales@saksolution.com</a>
+                                        </p>
+                                    </div>
+
+                                    <div class="footer-icon-data">
+                                        <i class="fa-solid fa-house"></i>
+                                        <p class="no-mb wt-text number-footer">
+                                            UAE & Kuwait
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="footer-part-three sidespace">
+                    <a href="/">
+                        <img src="/wp-content/uploads/2025/12/SAK-Logo.png" alt="sak-logo">
+                    </a>
+
+                    <p class="no-mb">
+                        Copyright © 2026, SAK Solutions.
+                        Website Developed By
+                        <a href="https://graphitiquemedia.com" target="_blank">Graphitique Media</a>
+                    </p>
+
+                    <div class="social-icons">
+                        <a href="https://wa.me/971507055253" target="_blank"><i class="fa-brands fa-whatsapp"></i></a>
+                        <a href="https://www.linkedin.com/company/saksolution" target="_blank"><i class="fa-brands fa-linkedin"></i></a>
+                        <a href="https://www.instagram.com/saksolutions" target="_blank"><i class="fa-brands fa-instagram"></i></a>
+                    </div>
+                </div>
+
+            </div>
+
+            <div>
+                <a href="https://wa.me/971507055253" class="whatsapp-float" target="_blank">
+                    <img src="/wp-content/uploads/2025/12/whatsapp.png" alt="WhatsApp">
+                </a>
+            </div>
+        </footer>
+        <!-- ================= FOOTER END ================= -->
+    </div>
     <div id="app">
         <!-- Hero Section -->
         <section class="gradient-bg min-h-screen flex items-center relative overflow-hidden">
