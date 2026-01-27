@@ -186,6 +186,72 @@ router.post('/login', async (req, res) => {
                 loginTime: new Date().toISOString()
             };
 
+            // Best-effort: ensure CRM user exists and set CRM JWT cookie for /api/crm/* usage
+            try {
+                const tenantId = session.tenantId;
+                console.log('[AUTH] FSM login - creating/updating CRM user for tenant:', tenantId);
+                if (tenantId) {
+                    const normalizePhoneDigits = (value) => {
+                        if (!value) return '';
+                        const withoutSuffix = String(value).replace(/@c\.us$/i, '');
+                        return withoutSuffix.replace(/\D/g, '');
+                    };
+                    const userDigits = normalizePhoneDigits(fsmUser.phone);
+                    const passwordHash = fsmUser.password_hash || bcrypt.hashSync(String(password), 10);
+
+                    const { data: existingCrmUser } = await supabase
+                        .from('crm_users')
+                        .select('id, role, is_active')
+                        .eq('tenant_id', tenantId)
+                        .eq('phone', userDigits)
+                        .maybeSingle();
+
+                    let crmUserId = existingCrmUser?.id;
+                    let crmRole = existingCrmUser?.role || (fsmUser.role === 'super_admin' ? 'OWNER' : 'AGENT');
+
+                    if (crmUserId) {
+                        console.log('[AUTH] Updating existing CRM user:', crmUserId);
+                        await supabase
+                            .from('crm_users')
+                            .update({ password_hash: passwordHash, is_active: true })
+                            .eq('id', crmUserId);
+                    } else {
+                        console.log('[AUTH] Creating new CRM user');
+                        const { data: createdUser, error: createErr } = await supabase
+                            .from('crm_users')
+                            .insert({
+                                tenant_id: tenantId,
+                                role: crmRole,
+                                full_name: fsmUser.name || fsmUser.full_name || `User ${userDigits}`,
+                                email: fsmUser.email || null,
+                                phone: userDigits || null,
+                                is_active: true,
+                                password_hash: passwordHash
+                            })
+                            .select('id, role')
+                            .single();
+
+                        if (!createErr && createdUser?.id) {
+                            crmUserId = createdUser.id;
+                            crmRole = createdUser.role;
+                            console.log('[AUTH] Created CRM user:', crmUserId);
+                        } else {
+                            console.error('[AUTH] Failed to create CRM user:', createErr?.message);
+                        }
+                    }
+
+                    if (crmUserId) {
+                        const token = signToken({ userId: crmUserId, tenantId, role: crmRole });
+                        setAuthCookie(res, token);
+                        console.log('[AUTH] ✅ CRM JWT cookie set for FSM user:', crmUserId);
+                    } else {
+                        console.warn('[AUTH] No CRM user ID available, cookie not set');
+                    }
+                }
+            } catch (e) {
+                console.warn('[AUTH] CRM JWT cookie issuance skipped/failed for FSM user:', e?.message || e);
+            }
+
             res.json({
                 success: true,
                 message: 'Login successful',
