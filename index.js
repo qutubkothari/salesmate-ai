@@ -877,6 +877,21 @@ app.post('/api/waha/webhook', async (req, res) => {
         return res.json({ ok: true, skipped: true, reason: 'tenant_unresolved' });
       }
 
+      // Auto-create/update CRM lead for WhatsApp inbound
+      try {
+        const { createLeadFromWhatsApp } = require('./services/leadAutoCreateService');
+        const senderName = payload?.pushName || body?.me?.pushName || null;
+        await createLeadFromWhatsApp({
+          tenantId,
+          phone: from,
+          name: senderName,
+          messageBody: message,
+          sessionName: session || 'default'
+        });
+      } catch (e) {
+        console.warn('[WAHA] Lead auto-create failed:', e?.message || e);
+      }
+
       // Format request to match existing customer handler
       const formattedReq = {
         body: {

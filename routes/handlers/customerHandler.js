@@ -63,7 +63,7 @@ const handleCustomer = async (req, res) => {
     try {
         // Fetch latest conversation context
         const { data: conversationData, error } = await dbClient
-            .from('conversations')
+            .from('conversations_new')
             .select('*')
             .eq('tenant_id', tenant.id)
             .eq('end_user_phone', from)
@@ -75,7 +75,7 @@ const handleCustomer = async (req, res) => {
             // No conversation found, create a new one
             console.log('[CUSTOMER_HANDLER] No conversation found, creating new one for:', from);
             const { data: newConv, error: createError } = await dbClient
-                .from('conversations')
+                .from('conversations_new')
                 .insert({
                     tenant_id: tenant.id,
                     phone_number: from,
