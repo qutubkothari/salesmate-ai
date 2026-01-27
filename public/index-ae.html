@@ -754,7 +754,7 @@
             
             <div class="container mx-auto px-6 relative z-10">
                 <!-- Top Nav -->
-                <div class="flex items-center justify-between pt-8 pb-10">
+                <div id="glass-nav" class="flex items-center justify-between pt-8 pb-10" style="position: sticky; top: 0; z-index: 9999; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); background: rgba(15, 5, 24, 0.75); border-bottom: 1px solid rgba(255, 255, 255, 0.1); margin-left: -1.5rem; margin-right: -1.5rem; margin-top: -2rem; padding: 2rem 1.5rem 2.5rem; transition: all 0.3s ease;">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden" style="background: rgba(0, 230, 118, 0.16); border: 1px solid rgba(0, 230, 118, 0.26);">
                             <img src="/assets/logo.png" alt="SAK logo" class="w-7 h-7 object-contain" />
@@ -2244,31 +2244,29 @@
 
     <!-- Version Indicator -->
     <div style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: #0f0; padding: 5px 10px; border-radius: 5px; font-size: 11px; z-index: 9999; font-family: monospace;">
-        v2.1-GLASS-FIX-27Jan2026-16:00
+        v2.2-INLINE-27Jan2026-16:10
     </div>
 
     <!-- Glass Header Scroll Effect -->
     <script>
         (function initGlassHeader() {
-            // For index-ae.html, target the top nav div
-            const navElement = document.querySelector('#app > section:first-child > .container > div:first-child');
+            const navElement = document.getElementById('glass-nav');
             if (!navElement) return;
 
-            let scrollThrottle = null;
             function handleScroll() {
-                if (scrollThrottle) return;
-                scrollThrottle = setTimeout(() => {
-                    if (window.scrollY > 20) {
-                        navElement.classList.add('scrolled');
-                    } else {
-                        navElement.classList.remove('scrolled');
-                    }
-                    scrollThrottle = null;
-                }, 50);
+                if (window.scrollY > 20) {
+                    navElement.style.background = 'rgba(15, 5, 24, 0.92)';
+                    navElement.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.3)';
+                    navElement.style.padding = '1.5rem 1.5rem';
+                } else {
+                    navElement.style.background = 'rgba(15, 5, 24, 0.75)';
+                    navElement.style.boxShadow = 'none';
+                    navElement.style.padding = '2rem 1.5rem 2.5rem';
+                }
             }
 
             window.addEventListener('scroll', handleScroll, { passive: true });
-            handleScroll(); // Check initial state
+            handleScroll();
         })();
     </script>
 </body>
