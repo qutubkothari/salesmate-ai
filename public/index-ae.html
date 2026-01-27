@@ -718,6 +718,33 @@
             background: var(--glass-bg);
             border: 1px solid var(--glass-border);
         }
+
+        /* Glass Morphism Header Effect */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            background: rgba(15, 5, 24, 0.85);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        header.scrolled {
+            background: rgba(15, 5, 24, 0.92);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .desktop-header {
+            backdrop-filter: inherit;
+            background: transparent;
+        }
+
+        .mobile-header {
+            backdrop-filter: inherit;
+            background: transparent;
+        }
     </style>
 </head>
 <body class="min-h-screen">
@@ -2217,6 +2244,30 @@
                     if (submitBtn) submitBtn.disabled = false;
                 }
             });
+        })();
+    </script>
+
+    <!-- Glass Header Scroll Effect -->
+    <script>
+        (function initGlassHeader() {
+            const header = document.querySelector('header');
+            if (!header) return;
+
+            let scrollThrottle = null;
+            function handleScroll() {
+                if (scrollThrottle) return;
+                scrollThrottle = setTimeout(() => {
+                    if (window.scrollY > 20) {
+                        header.classList.add('scrolled');
+                    } else {
+                        header.classList.remove('scrolled');
+                    }
+                    scrollThrottle = null;
+                }, 50);
+            }
+
+            window.addEventListener('scroll', handleScroll, { passive: true });
+            handleScroll(); // Check initial state
         })();
     </script>
 </body>

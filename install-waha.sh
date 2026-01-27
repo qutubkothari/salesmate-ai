@@ -49,8 +49,8 @@ sudo docker rm waha 2>/dev/null || echo "No existing container to remove"
 echo ""
 echo "Step 5: Creating data directory..."
 mkdir -p ~/waha-data
-sudo chown -R ubuntu:ubuntu ~/waha-data
-echo "??? Data directory created at ~/waha-data"
+sudo chown -R $USER:$USER ~/waha-data
+echo "✓ Data directory created at ~/waha-data"
 
 # Start Waha container
 echo ""
@@ -58,10 +58,12 @@ echo "Step 6: Starting Waha container..."
 sudo docker run -d \
   --name waha \
   --restart unless-stopped \
-  -p 3000:3000 \
+  -p 3001:3000 \
+  --add-host=host.docker.internal:host-gateway \
   -v ~/waha-data:/app/.sessions \
-  -e WHATSAPP_HOOK_URL=http://localhost:8080/api/waha/webhook \
-  -e WAHA_SECURITY_DISABLED=true \
+  -e WHATSAPP_HOOK_URL=http://host.docker.internal:8057/api/waha/webhook \
+  -e WHATSAPP_HOOK_EVENTS=message,session.status \
+  -e WHATSAPP_API_KEY=waha_salesmate_2024 \
   devlikeapro/waha:latest
 
 # Wait for container to start
@@ -72,19 +74,20 @@ sleep 5
 # Check if container is running
 if sudo docker ps | grep -q waha; then
     echo ""
-    echo "??? WAHA INSTALLED SUCCESSFULLY!"
+    echo "✅ WAHA INSTALLED SUCCESSFULLY!"
     echo ""
     echo "Container Status:"
     sudo docker ps | grep waha
     echo ""
-    echo "Waha API: http://13.235.18.119:3000"
-    echo "Health Check: http://13.235.18.119:3000/health"
+    echo "WAHA API: http://localhost:3001"
+    echo "API Key: waha_salesmate_2024"
+    echo "Webhook: http://host.docker.internal:8057/api/waha/webhook"
     echo ""
-    echo "??????  IMPORTANT: Open port 3000 in AWS Security Group"
+    echo "⚠️  IMPORTANT: Scan QR code at http://<SERVER_IP>:3001/api/default/auth/qr"
     echo ""
 else
     echo ""
-    echo "??? Waha failed to start. Checking logs..."
+    echo "❌ Waha failed to start. Checking logs..."
     sudo docker logs waha
     exit 1
 fi

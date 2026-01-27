@@ -1,0 +1,8 @@
+{
+  "webhooks": [
+    {
+      "url": "http://localhost:8057/webhook",
+      "events": ["message"]
+    }
+  ]
+}

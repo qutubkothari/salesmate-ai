@@ -1,29 +1,35 @@
 #!/bin/bash
-# Restart Waha with security disabled for testing
+# Restart WAHA WhatsApp Bot Container
+# Updated: Jan 27, 2026 - Fixed webhook URL for Docker networking
 
 echo "Stopping existing Waha container..."
 sudo docker stop waha 2>/dev/null
 sudo docker rm waha 2>/dev/null
 
-echo "Starting Waha with security disabled..."
+echo "Starting Waha with proper webhook configuration..."
 sudo docker run -d \
   --name waha \
   --restart unless-stopped \
-  -p 3000:3000 \
+  -p 3001:3000 \
+  --add-host=host.docker.internal:host-gateway \
   -v ~/waha-data:/app/.sessions \
-  -e WHATSAPP_HOOK_URL=http://localhost:8080/api/waha/webhook \
-  -e WHATSAPP_API_KEY=your-secret-key \
-  -e WHATSAPP_API_KEY_IN=header \
+  -e WHATSAPP_HOOK_URL=http://host.docker.internal:8057/api/waha/webhook \
+  -e WHATSAPP_HOOK_EVENTS=message,session.status \
+  -e WHATSAPP_API_KEY=waha_salesmate_2024 \
   devlikeapro/waha:latest
 
-sleep 3
+sleep 5
 
 echo ""
-echo "✅ Waha restarted successfully!"
+echo "✅ WAHA restarted successfully!"
 echo ""
 echo "Container status:"
 sudo docker ps | grep waha
 echo ""
-echo "Waha API: http://13.235.18.119:3000"
-echo "API Key: your-secret-key"
+echo "WAHA API: http://localhost:3001"
+echo "API Key: waha_salesmate_2024"
+echo "Webhook: http://host.docker.internal:8057/api/waha/webhook"
+echo ""
+echo "⚠️  If session shows SCAN_QR_CODE, scan QR at:"
+echo "   http://72.62.192.228:3001/api/default/auth/qr"
 echo ""
