@@ -266,6 +266,7 @@ router.post('/login', async (req, res) => {
 
         // Check if password field exists, if not, fall back to business name
         const storedPassword = getPasswordField(tenant) || getBusinessName(tenant);
+        console.log('[AUTH] Password check - stored:', storedPassword, 'provided:', password);
         if (!storedPassword) {
             console.log('[AUTH] Tenant has no password or business name set:', getTenantId(tenant));
             return res.status(401).json({
