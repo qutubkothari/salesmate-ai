@@ -288,6 +288,7 @@ router.post('/login', async (req, res) => {
         // Best-effort: ensure CRM OWNER user exists and set CRM JWT cookie for /api/crm/* usage.
         try {
             const tenantId = getTenantId(tenant);
+            console.log('[AUTH] Creating/updating CRM user for tenant:', tenantId);
             if (tenantId) {
                 const normalizePhoneDigits = (value) => {
                     if (!value) return '';
@@ -308,11 +309,13 @@ router.post('/login', async (req, res) => {
                 let crmRole = existingUser?.role || 'OWNER';
 
                 if (crmUserId) {
+                    console.log('[AUTH] Updating existing CRM user:', crmUserId);
                     await supabase
                         .from('crm_users')
                         .update({ password_hash: passwordHash, phone: ownerDigits || null, is_active: true })
                         .eq('id', crmUserId);
                 } else {
+                    console.log('[AUTH] Creating new CRM user');
                     const { data: createdUser, error: createErr } = await supabase
                         .from('crm_users')
                         .insert({
@@ -330,12 +333,18 @@ router.post('/login', async (req, res) => {
                     if (!createErr && createdUser?.id) {
                         crmUserId = createdUser.id;
                         crmRole = createdUser.role || 'OWNER';
+                        console.log('[AUTH] Created CRM user:', crmUserId);
+                    } else {
+                        console.error('[AUTH] Failed to create CRM user:', createErr?.message);
                     }
                 }
 
                 if (crmUserId) {
                     const token = signToken({ userId: crmUserId, tenantId, role: crmRole });
                     setAuthCookie(res, token);
+                    console.log('[AUTH] ✅ CRM JWT cookie set for user:', crmUserId);
+                } else {
+                    console.warn('[AUTH] No CRM user ID available, cookie not set');
                 }
             }
         } catch (e) {
