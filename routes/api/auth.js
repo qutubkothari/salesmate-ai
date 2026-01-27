@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { dbClient } = require('../../services/config');
+const supabase = dbClient; // Alias for CRM user management
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
