@@ -208,7 +208,13 @@ router.post('/login', async (req, res) => {
                         .maybeSingle();
 
                     let crmUserId = existingCrmUser?.id;
-                    let crmRole = existingCrmUser?.role || (fsmUser.role === 'super_admin' ? 'OWNER' : 'AGENT');
+                    const roleMap = {
+                        super_admin: 'OWNER',
+                        admin: 'ADMIN',
+                        manager: 'MANAGER',
+                        salesman: 'SALESMAN'
+                    };
+                    let crmRole = existingCrmUser?.role || roleMap[String(fsmUser.role || '').toLowerCase()] || 'SALESMAN';
 
                     if (crmUserId) {
                         console.log('[AUTH] Updating existing CRM user:', crmUserId);
