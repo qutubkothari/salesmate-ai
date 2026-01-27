@@ -396,13 +396,13 @@
         
         :root {
             /* Background Colors */
-            --bg-main: #33003f;
-            --bg-gradient: linear-gradient(90deg, rgba(64,182,232,1) 0%, rgba(110,66,153,1) 80%);
-            --glass-bg: rgba(255, 255, 255, 0.095);
-            --glass-border: rgba(255, 255, 255, 0.18);
+            --bg-main: #1a0033;
+            --bg-gradient: linear-gradient(135deg, #1a0033 0%, #2d0052 100%);
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
 
             /* Primary Colors */
-            --primary: #6e4299;
+            --primary: linear-gradient(90deg, rgba(64,182,232,1) 0%, rgba(110,66,153,1) 80%);
             --primary-dark: #5c3685;
 
             /* Status Colors */
@@ -447,7 +447,7 @@
         }
 
         .gradient-bg {
-            background: var(--bg-gradient);
+            background: var(--bg-main);
         }
 
         .glass {
@@ -566,8 +566,8 @@
 
 
         .btn-primary {
-            background: var(--primary);
-            color: #33003f;
+            background: linear-gradient(90deg, #40b6e8 0%, #6e4299 80%);
+            color: #ffffff;
             padding: 0.85rem 2rem;
             border-radius: 12px;
             font-weight: 700;
