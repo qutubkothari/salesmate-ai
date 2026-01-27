@@ -282,7 +282,7 @@ async function crawlEntireWebsite(startUrl, options = {}, progressCallback = nul
         delayBetweenRequests = 1000,
         contentSelectors = null,
         excludeSelectors = ['script', 'style', 'footer', '.advertisement'], // Removed nav and header
-        excludePatterns = ['/login', '/logout', '/admin', '/cart', '/checkout', '#', 'javascript:'], // URL patterns to skip
+        excludePatterns = ['/login', '/logout', '/admin', '/cart', '/checkout', 'javascript:'], // Removed '#' to allow anchor links
         sameDomainOnly = true
     } = options;
 
