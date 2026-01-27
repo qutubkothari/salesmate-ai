@@ -217,9 +217,18 @@ router.post('/website-content/crawl-all/:tenantId', async (req, res) => {
 
     } catch (error) {
         console.error('[Dashboard] Error in full website crawl:', error);
+        
+        // Log detailed error info
+        console.error('[Dashboard] Error details:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+        });
+        
         res.status(500).json({
             success: false,
-            error: error.message
+            error: error.message || 'Failed to crawl entire website',
+            errorType: error.name || 'UnknownError'
         });
     }
 });

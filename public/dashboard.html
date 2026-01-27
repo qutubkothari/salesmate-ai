@@ -9319,6 +9319,10 @@
         try {
             showNotification('Starting full website crawl... This may take several minutes', 'info');
             
+            // Create abort controller with long timeout (10 minutes)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 min timeout
+            
             const res = await fetch(`/api/dashboard/website-content/crawl-all/${state.session.tenantId}`, {
                 method: 'POST',
                 headers: {
@@ -9333,8 +9337,11 @@
                         useSitemap,
                         delayBetweenRequests: 1000
                     }
-                })
+                }),
+                signal: controller.signal
             });
+            
+            clearTimeout(timeoutId);
 
             const data = await res.json();
             
@@ -9356,7 +9363,16 @@
         } catch (error) {
             console.error('Error crawling entire website:', error);
             progressDiv.classList.add('hidden');
-            showNotification('Failed to crawl entire website', 'error');
+            
+            // Better error messages
+            let errorMessage = 'Failed to crawl entire website';
+            if (error.name === 'AbortError') {
+                errorMessage = 'Crawl timed out after 10 minutes. Try reducing Max Pages or Max Depth.';
+            } else if (error.message) {
+                errorMessage = `Crawl failed: ${error.message}`;
+            }
+            
+            showNotification(errorMessage, 'error');
         }
     }
 
