@@ -2,7 +2,7 @@
 // It must only query the 'conversations' table and never construct objects from customer_profiles or merge in a way that overwrites the id.
 const express = require('express');
 const router = express.Router();
-const { dbClient, USE_LOCAL_DB, db } = require('../../services/config');
+const { dbClient, USE_LOCAL_DB, db, bucket } = require('../../services/config');
 const { sendMessage } = require('../../services/whatsappService');
 const multer = require('multer');
 const DocumentIngestionService = require('../../services/documentIngestionService');
@@ -290,6 +290,154 @@ router.delete('/documents/:tenantId/:documentId', async (req, res) => {
             success: false,
             error: 'Failed to delete document'
         });
+    }
+});
+
+/**
+ * GET /api/dashboard/media/:tenantId
+ * List tenant media assets
+ */
+router.get('/media/:tenantId', async (req, res) => {
+    try {
+        const { tenantId } = req.params;
+
+        const { data: assets, error } = await dbClient
+            .from('tenant_media_assets')
+            .select('id, tenant_id, title, description, category, asset_type, product_code, keywords, file_url, file_path, mime_type, size_bytes, original_name, created_at')
+            .eq('tenant_id', tenantId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        res.json({
+            success: true,
+            assets: assets || []
+        });
+    } catch (error) {
+        console.error('[DASHBOARD_MEDIA] List error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to load media assets'
+        });
+    }
+});
+
+/**
+ * POST /api/dashboard/media/:tenantId/upload
+ * Upload a media asset (image/video/document) to GCS and store metadata
+ */
+router.post('/media/:tenantId/upload', upload.single('file'), async (req, res) => {
+    try {
+        const { tenantId } = req.params;
+
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: 'No file uploaded' });
+        }
+
+        if (!bucket) {
+            return res.status(500).json({ success: false, error: 'GCS not configured' });
+        }
+
+        const originalName = req.file.originalname || 'asset';
+        const mimeType = req.file.mimetype || 'application/octet-stream';
+        const sizeBytes = req.file.size || req.file.buffer?.length || null;
+
+        const title = req.body?.title || originalName;
+        const description = req.body?.description || null;
+        const category = req.body?.category || 'other';
+        const productCode = req.body?.product_code || null;
+        const keywords = req.body?.keywords || null;
+
+        let assetType = 'document';
+        if (mimeType.startsWith('image/')) assetType = 'image';
+        else if (mimeType.startsWith('video/')) assetType = 'video';
+
+        const safeName = originalName.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const filePath = `media/${tenantId}/${category}/${Date.now()}_${safeName}`;
+        const file = bucket.file(filePath);
+
+        await file.save(req.file.buffer, {
+            metadata: {
+                contentType: mimeType,
+                metadata: {
+                    tenantId,
+                    category,
+                    assetType,
+                    productCode: productCode || '',
+                    uploadedAt: new Date().toISOString()
+                }
+            }
+        });
+
+        await file.makePublic();
+
+        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
+
+        const { data: inserted, error } = await dbClient
+            .from('tenant_media_assets')
+            .insert({
+                tenant_id: tenantId,
+                title,
+                description,
+                category,
+                asset_type: assetType,
+                product_code: productCode,
+                keywords,
+                file_url: publicUrl,
+                file_path: filePath,
+                mime_type: mimeType,
+                size_bytes: sizeBytes,
+                original_name: originalName
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json({ success: true, asset: inserted });
+    } catch (error) {
+        console.error('[DASHBOARD_MEDIA] Upload error:', error);
+        res.status(500).json({ success: false, error: 'Failed to upload media asset' });
+    }
+});
+
+/**
+ * DELETE /api/dashboard/media/:tenantId/:assetId
+ * Delete a media asset from GCS and metadata table
+ */
+router.delete('/media/:tenantId/:assetId', async (req, res) => {
+    try {
+        const { tenantId, assetId } = req.params;
+
+        const { data: asset, error: fetchError } = await dbClient
+            .from('tenant_media_assets')
+            .select('file_path')
+            .eq('tenant_id', tenantId)
+            .eq('id', assetId)
+            .maybeSingle();
+
+        if (fetchError) throw fetchError;
+
+        if (asset?.file_path && bucket) {
+            try {
+                await bucket.file(asset.file_path).delete();
+            } catch (e) {
+                console.warn('[DASHBOARD_MEDIA] GCS delete failed:', e?.message || e);
+            }
+        }
+
+        const { error } = await dbClient
+            .from('tenant_media_assets')
+            .delete()
+            .eq('tenant_id', tenantId)
+            .eq('id', assetId);
+
+        if (error) throw error;
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[DASHBOARD_MEDIA] Delete error:', error);
+        res.status(500).json({ success: false, error: 'Failed to delete media asset' });
     }
 });
 

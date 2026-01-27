@@ -37,6 +37,34 @@ const DOCUMENT_TYPES = {
   BROCHURE: 'brochures'
 };
 
+const MEDIA_CATEGORY_MAP = {
+  CATALOG: 'catalog',
+  PRICE_LIST: 'price_list',
+  TECHNICAL: 'technical',
+  PRODUCT_IMAGE: 'product_image',
+  PRODUCT_VIDEO: 'product_video'
+};
+
+async function listTenantMediaAssets({ tenantId, category, productCode, assetTypes = null }) {
+  const query = dbClient
+    .from('tenant_media_assets')
+    .select('id, title, description, category, asset_type, product_code, keywords, file_url, file_path, mime_type, size_bytes, original_name, created_at')
+    .eq('tenant_id', tenantId);
+
+  if (category) query.eq('category', category);
+  if (productCode) query.eq('product_code', productCode);
+  if (Array.isArray(assetTypes) && assetTypes.length) query.in('asset_type', assetTypes);
+
+  const { data, error } = await query.order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+async function getLatestMediaByCategory(tenantId, category) {
+  const assets = await listTenantMediaAssets({ tenantId, category });
+  return assets.length ? assets[0] : null;
+}
+
 /**
  * List all documents in a specific category
  */
@@ -155,6 +183,16 @@ const getSignedDocumentUrl = async (filePath, expiryMinutes = 60) => {
  */
 const getLatestCatalog = async (tenantId) => {
   try {
+    // Prefer tenant media library
+    try {
+      const media = await getLatestMediaByCategory(tenantId, MEDIA_CATEGORY_MAP.CATALOG);
+      if (media?.file_url) {
+        return { success: true, url: media.file_url, expiresIn: 0 };
+      }
+    } catch (_) {
+      // fall through to GCS flow
+    }
+
     // First check if tenant has a specific catalog configured
     const { data: tenantData } = await dbClient
       .from('tenants')
@@ -193,6 +231,16 @@ const getLatestCatalog = async (tenantId) => {
  */
 const getLatestPriceList = async (tenantId) => {
   try {
+    // Prefer tenant media library
+    try {
+      const media = await getLatestMediaByCategory(tenantId, MEDIA_CATEGORY_MAP.PRICE_LIST);
+      if (media?.file_url) {
+        return { success: true, url: media.file_url, expiresIn: 0 };
+      }
+    } catch (_) {
+      // fall through to GCS flow
+    }
+
     // Check for tenant-specific price list
     const { data: tenantData } = await dbClient
       .from('tenants')
@@ -227,8 +275,22 @@ const getLatestPriceList = async (tenantId) => {
 /**
  * Get technical documentation for a product
  */
-const getTechnicalDocs = async (productCode) => {
+const getTechnicalDocs = async (tenantId, productCode) => {
   try {
+    // Prefer tenant media library by product code
+    try {
+      const assets = await listTenantMediaAssets({
+        tenantId,
+        category: MEDIA_CATEGORY_MAP.TECHNICAL,
+        productCode
+      });
+      if (assets.length) {
+        return { success: true, documents: assets.map(a => ({ name: a.title || a.original_name, signedUrl: a.file_url })) };
+      }
+    } catch (_) {
+      // fall through to GCS flow
+    }
+
     const result = await findProductDocuments(productCode, 'TECHNICAL');
 
     if (!result.success || result.documents.length === 0) {
@@ -257,8 +319,23 @@ const getTechnicalDocs = async (productCode) => {
 /**
  * Get product images
  */
-const getProductImages = async (productCode) => {
+const getProductImages = async (tenantId, productCode) => {
   try {
+    // Prefer tenant media library by product code
+    try {
+      const assets = await listTenantMediaAssets({
+        tenantId,
+        category: MEDIA_CATEGORY_MAP.PRODUCT_IMAGE,
+        productCode,
+        assetTypes: ['image', 'video']
+      });
+      if (assets.length) {
+        return { success: true, images: assets.map(a => ({ name: a.title || a.original_name, signedUrl: a.file_url })) };
+      }
+    } catch (_) {
+      // fall through to GCS flow
+    }
+
     const result = await findProductDocuments(productCode, 'PRODUCT_IMAGE');
 
     if (!result.success || result.documents.length === 0) {
@@ -357,7 +434,8 @@ const handleDocumentRequest = async (requestType, productCode, tenantId) => {
       case 'CATALOG':
         result = await getLatestCatalog(tenantId);
         if (result.success) {
-          responseMessage = `📘 *Product Catalog*\n\nHere's our latest catalog:\n\n${result.url}\n\n_Link expires in ${result.expiresIn} minutes_`;
+          const expiryNote = result.expiresIn ? `\n\n_Link expires in ${result.expiresIn} minutes_` : '';
+          responseMessage = `📘 *Product Catalog*\n\nHere's our latest catalog:\n\n${result.url}${expiryNote}`;
         } else {
           responseMessage = '❌ Sorry, catalog is currently unavailable. Please contact us directly.';
         }
@@ -366,7 +444,8 @@ const handleDocumentRequest = async (requestType, productCode, tenantId) => {
       case 'PRICE_LIST':
         result = await getLatestPriceList(tenantId);
         if (result.success) {
-          responseMessage = `💰 *Price List*\n\nHere's our latest price list:\n\n${result.url}\n\n_Link expires in ${result.expiresIn} minutes_`;
+          const expiryNote = result.expiresIn ? `\n\n_Link expires in ${result.expiresIn} minutes_` : '';
+          responseMessage = `💰 *Price List*\n\nHere's our latest price list:\n\n${result.url}${expiryNote}`;
         } else {
           responseMessage = '❌ Sorry, price list is currently unavailable. Please contact us directly.';
         }
@@ -377,7 +456,7 @@ const handleDocumentRequest = async (requestType, productCode, tenantId) => {
           responseMessage = '❌ Please specify the product code. Example: "technical specs for NFF 8x80"';
           break;
         }
-        result = await getTechnicalDocs(productCode);
+        result = await getTechnicalDocs(tenantId, productCode);
         if (result.success && result.documents.length > 0) {
           responseMessage = `📋 *Technical Documentation for ${productCode}*\n\n`;
           result.documents.forEach((doc, index) => {
@@ -394,7 +473,7 @@ const handleDocumentRequest = async (requestType, productCode, tenantId) => {
           responseMessage = '❌ Please specify the product code. Example: "show images of NFF 8x80"';
           break;
         }
-        result = await getProductImages(productCode);
+        result = await getProductImages(tenantId, productCode);
         if (result.success && result.images.length > 0) {
           responseMessage = `📸 *Product Images for ${productCode}*\n\n`;
           result.images.forEach((img, index) => {
