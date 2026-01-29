@@ -419,9 +419,9 @@ async function createLeadFromWhatsApp({
                 if (askedBefore) {
                     const timing = askedBefore.event_payload?.timing || null;
                     const createdAt = askedBefore.created_at ? new Date(askedBefore.created_at) : null;
-                    const within24h = createdAt ? (Date.now() - createdAt.getTime()) < 24 * 60 * 60 * 1000 : false;
+                    const withinWindow = createdAt ? (Date.now() - createdAt.getTime()) < 3 * 60 * 1000 : false;
 
-                    if (timing === 'post_reply' && within24h) {
+                    if (timing === 'post_reply' && withinWindow) {
                         profileMissingDetails = false; // Don't ask again too soon
                         console.log('[LEAD_AUTO_CREATE] Details already requested post-reply (recent)');
                     }

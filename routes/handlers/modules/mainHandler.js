@@ -654,6 +654,14 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
             }
         }
 
+        // STEP 3.6: Direct website request handling (avoid duplicate/ugly AI website replies)
+        if (/(website|web site|site|link|url)\b/i.test(userQuery)) {
+            const websiteUrl = tenant.business_website || 'https://hylite.co.in';
+            const reply = `You can visit our website here: ${websiteUrl}`;
+            await sendAndSaveMessage(from, reply, conversation?.id, tenant.id);
+            return res.status(200).json({ ok: true, type: 'website_reply' });
+        }
+
         // STEP 4: Fallback to AI response WITH WEBSITE CONTEXT
         console.log('[MAIN_HANDLER] STEP 4: AI Fallback with website context');
         const { getAIResponseV2 } = require('../../../services/aiService');
