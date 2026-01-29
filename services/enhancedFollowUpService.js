@@ -203,7 +203,14 @@ const getConversationHistory = async (phone) => {
       .order('created_at', { ascending: true })
       .limit(50);
 
-    if (error) throw error;
+    if (error) {
+      const message = error?.message || '';
+      if (error?.code === '42703' || message.includes('follow_up_at') || message.includes('follow_up_count')) {
+        console.warn('[FOLLOWUP] Skipping enhanced follow-ups due to missing columns:', message);
+        return;
+      }
+      throw error;
+    }
     return messages || [];
   } catch (error) {
     debug.log('enhancedFollowUp', `Error getting conversation history for ${phone}`, error);
