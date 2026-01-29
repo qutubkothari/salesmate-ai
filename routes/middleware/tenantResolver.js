@@ -17,20 +17,52 @@ const tenantResolver = async (req, res, next) => {
 
   const from = message.from;
   const to = message.to;
+  const normalizePhone = (value) => String(value || '')
+    .replace(/@c\.us$/i, '')
+    .replace(/\D/g, '');
+  const toDigits = normalizePhone(to);
 
   try {
     debug.trace(rid, 'tenant.lookup.start', { bot: to });
 
-    let { data: botOwner, error } = await dbClient
-      .from('tenants')
-      .select('*')
-      .eq('bot_phone_number', to)
-      .single();
+    let botOwner = null;
+    let error = null;
+
+    if (to) {
+      const orParts = [
+        `bot_phone_number.eq.${to}`,
+        toDigits ? `bot_phone_number.eq.${toDigits}` : null,
+        toDigits ? `bot_phone_number.eq.${toDigits}@c.us` : null
+      ].filter(Boolean);
+
+      if (orParts.length) {
+        ({ data: botOwner, error } = await dbClient
+          .from('tenants')
+          .select('*')
+          .or(orParts.join(','))
+          .maybeSingle());
+      }
+    }
+
+    // Fallback: try partial match on digits if still not found
+    if (!botOwner && toDigits) {
+      const fallback = await dbClient
+        .from('tenants')
+        .select('*')
+        .ilike('bot_phone_number', `%${toDigits}%`)
+        .limit(1);
+      if (fallback?.data && fallback.data.length) {
+        botOwner = fallback.data[0];
+        error = fallback.error || null;
+      }
+    }
 
     debug.trace(rid, 'tenant.lookup.done', { 
       found: !!botOwner, 
       tenantId: botOwner?.id, 
-      bot: botOwner?.bot_phone_number 
+      bot: botOwner?.bot_phone_number,
+      to,
+      toDigits
     });
 
     // Handle tenant not found (new registration)
