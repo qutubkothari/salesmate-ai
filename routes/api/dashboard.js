@@ -1940,7 +1940,7 @@ router.get('/conversations/:tenantId', async (req, res) => {
         // Use select('*') to be robust against schema drifts/missing columns
         convQuery = convQuery.select('*');
 
-        const { data: conversations, error: convError } = await convQuery
+        const { data: conversationsNew, error: convError } = await convQuery
             .eq('tenant_id', tenantId)
             .order('updated_at', { ascending: false })
             .limit(parseInt(limit));
@@ -1948,6 +1948,23 @@ router.get('/conversations/:tenantId', async (req, res) => {
         if (convError) {
             console.error('Conversations query error:', convError);
             throw convError;
+        }
+
+        let conversations = Array.isArray(conversationsNew) ? conversationsNew : [];
+
+        if (!conversations.length) {
+            const { data: legacyConversations, error: legacyError } = await dbClient
+                .from('conversations')
+                .select('*')
+                .eq('tenant_id', tenantId)
+                .order('updated_at', { ascending: false })
+                .limit(parseInt(limit));
+
+            if (legacyError) {
+                console.warn('Legacy conversations query error:', legacyError);
+            } else {
+                conversations = Array.isArray(legacyConversations) ? legacyConversations : [];
+            }
         }
 
         console.log('[CONV_RAW_DEBUG] Raw conversations from DB:', conversations);
@@ -1961,7 +1978,9 @@ router.get('/conversations/:tenantId', async (req, res) => {
 
         const conversationsWithMessages = await Promise.all(
             conversations.map(async (conv) => {
-                console.log('[CONV_DEBUG] Processing conversation:', conv.id, 'Phone:', conv.end_user_phone);
+                const convPhone = conv.end_user_phone || conv.user_phone || conv.phone || conv.customer_phone || conv.customer_number || '';
+                const convUpdatedAt = conv.updated_at || conv.last_message_at || conv.created_at;
+                console.log('[CONV_DEBUG] Processing conversation:', conv.id, 'Phone:', convPhone);
                 try {
                     const { data: messages, error: msgError } = await dbClient
                         .from('messages')
@@ -1981,10 +2000,10 @@ router.get('/conversations/:tenantId', async (req, res) => {
                             messageCount: 0,
                             hasMessageError: true,
                             // Format for dashboard-enhanced
-                            customerName: conv.end_user_phone || 'Unknown',
-                            phone: conv.end_user_phone || '',
-                            initials: (conv.end_user_phone || 'U').substring(0, 1).toUpperCase(),
-                            lastActivity: getRelativeTime(conv.updated_at)
+                            customerName: convPhone || 'Unknown',
+                            phone: convPhone || '',
+                            initials: (convPhone || 'U').substring(0, 1).toUpperCase(),
+                            lastActivity: getRelativeTime(convUpdatedAt)
                         };
                     }
 
@@ -1993,14 +2012,14 @@ router.get('/conversations/:tenantId', async (req, res) => {
                     const lastCustomerMessage = messageList.find(msg => msg.sender === 'user' || msg.sender === 'customer');
 
                     // Get customer name from customer profile if available
-                    let customerName = conv.end_user_phone || 'Unknown';
-                    let initials = (conv.end_user_phone || 'U').substring(0, 1).toUpperCase();
+                    let customerName = convPhone || 'Unknown';
+                    let initials = (convPhone || 'U').substring(0, 1).toUpperCase();
                     
                     try {
                         const { data: customerProfile } = await dbClient
                             .from('customer_profiles_new')
                             .select('id, company, first_name, last_name')
-                            .eq('phone', conv.end_user_phone)
+                            .eq('phone', convPhone)
                             .eq('tenant_id', tenantId)
                             .maybeSingle();
                         
@@ -2024,9 +2043,9 @@ router.get('/conversations/:tenantId', async (req, res) => {
                                 // Format for dashboard-enhanced
                                 customerName,
                                 customerId: customerProfile.id,
-                                phone: conv.end_user_phone || '',
+                                phone: convPhone || '',
                                 initials,
-                                lastActivity: getRelativeTime(conv.updated_at)
+                                lastActivity: getRelativeTime(convUpdatedAt)
                             };
                             console.log('[CONV_DEBUG] Conversation ID check - conv.id:', conv.id, 'result.id:', result.id, 'customerId:', result.customerId, 'customerName:', result.customerName);
                             return result;
@@ -2045,9 +2064,9 @@ router.get('/conversations/:tenantId', async (req, res) => {
                         hasMessageError: false,
                         // Format for dashboard-enhanced
                         customerName,
-                        phone: conv.end_user_phone || '',
+                        phone: convPhone || '',
                         initials,
-                        lastActivity: getRelativeTime(conv.updated_at)
+                        lastActivity: getRelativeTime(convUpdatedAt)
                     };
 
                 } catch (msgError) {
@@ -2061,10 +2080,10 @@ router.get('/conversations/:tenantId', async (req, res) => {
                         messageCount: 0,
                         hasMessageError: true,
                         // Format for dashboard-enhanced
-                        customerName: conv.end_user_phone || 'Unknown',
-                        phone: conv.end_user_phone || '',
-                        initials: (conv.end_user_phone || 'U').substring(0, 1).toUpperCase(),
-                        lastActivity: getRelativeTime(conv.updated_at)
+                        customerName: convPhone || 'Unknown',
+                        phone: convPhone || '',
+                        initials: (convPhone || 'U').substring(0, 1).toUpperCase(),
+                        lastActivity: getRelativeTime(convUpdatedAt)
                     };
                 }
             })

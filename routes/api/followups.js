@@ -194,7 +194,7 @@ router.get('/:tenantId/leads', async (req, res) => {
 
         const { data: conversations, error } = await dbClient
             .from('conversations_new')
-            .select('id, end_user_phone, created_at, last_message_at, lead_type')
+            .select('*')
             .eq('tenant_id', tenantId)
             .order('last_message_at', { ascending: false })
             .limit(parseInt(limit));
@@ -206,7 +206,8 @@ router.get('/:tenantId/leads', async (req, res) => {
             const computed = computeLeadType(c);
 
             // Best-effort persistence (ignore schema mismatch in non-local deployments)
-            if (c?.id && c.lead_type !== computed) {
+            const hasLeadTypeColumn = c && Object.prototype.hasOwnProperty.call(c, 'lead_type');
+            if (c?.id && hasLeadTypeColumn && c.lead_type !== computed) {
                 try {
                     await dbClient
                         .from('conversations_new')

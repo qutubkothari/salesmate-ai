@@ -323,7 +323,7 @@ const sendDueFollowUpReminders = async () => {
     
     const { data: conversations, error } = await dbClient
       .from('conversations_new')
-      .select('id, tenant_id, end_user_phone, follow_up_count, last_follow_up_at, follow_up_at, context_analysis')
+      .select('*')
       .not('follow_up_at', 'is', null)
       .lte('follow_up_at', new Date().toISOString());
 
