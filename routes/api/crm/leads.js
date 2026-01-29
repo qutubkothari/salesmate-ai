@@ -127,6 +127,55 @@ router.get('/', requireCrmAuth, requireCrmFeature(CRM_FEATURES.CRM_LEADS), requi
       console.warn('[CRM_LEADS] Failed to compute message counts:', countErr?.message || countErr);
     }
 
+    // Fallback message counts from WhatsApp messages -> conversations_new (by phone)
+    try {
+      const leadsNeedingFallback = leads.filter((l) => (l.message_count || 0) === 0 && l.phone);
+      const phones = leadsNeedingFallback.map((l) => String(l.phone).trim()).filter(Boolean);
+
+      if (phones.length > 0) {
+        const { data: convs, error: convErr } = await supabase
+          .from('conversations_new')
+          .select('id, end_user_phone')
+          .eq('tenant_id', req.user.tenantId)
+          .in('end_user_phone', phones);
+
+        if (!convErr && Array.isArray(convs) && convs.length > 0) {
+          const convIds = convs.map((c) => c.id).filter(Boolean);
+          const convPhoneMap = convs.reduce((acc, c) => {
+            if (c.id && c.end_user_phone) acc[c.id] = c.end_user_phone;
+            return acc;
+          }, {});
+
+          if (convIds.length > 0) {
+            const { data: msgRows2, error: msgErr2 } = await supabase
+              .from('messages')
+              .select('conversation_id')
+              .eq('tenant_id', req.user.tenantId)
+              .in('conversation_id', convIds);
+
+            if (!msgErr2 && Array.isArray(msgRows2)) {
+              const phoneCounts = msgRows2.reduce((acc, row) => {
+                const phone = convPhoneMap[row.conversation_id];
+                if (!phone) return acc;
+                acc[phone] = (acc[phone] || 0) + 1;
+                return acc;
+              }, {});
+
+              leads.forEach((lead) => {
+                if ((lead.message_count || 0) > 0) return;
+                const phone = String(lead.phone || '').trim();
+                if (phoneCounts[phone]) {
+                  lead.message_count = phoneCounts[phone];
+                }
+              });
+            }
+          }
+        }
+      }
+    } catch (fallbackErr) {
+      console.warn('[CRM_LEADS] Fallback message count failed:', fallbackErr?.message || fallbackErr);
+    }
+
     return res.json({ success: true, leads });
   } catch (e) {
     return res.status(500).json({ success: false, error: 'list_failed', details: e?.message || String(e) });
