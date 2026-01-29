@@ -2089,11 +2089,24 @@
 
         async fetchData(endpoint) {
             if (!state.session?.tenantId) throw new Error('No tenant session');
-            const response = await fetch(`/api/dashboard/${endpoint}/${state.session.tenantId}`, {
+            const url = `/api/dashboard/${endpoint}/${state.session.tenantId}`;
+            console.log('[DASHBOARD_API] fetchData ->', { endpoint, url, tenantId: state.session.tenantId });
+            const response = await fetch(url, {
                 headers: { ...this.authHeaders() }
             });
-            if (!response.ok) throw new Error(`Failed to fetch ${endpoint}`);
-            return await response.json();
+            if (!response.ok) {
+                let bodyText = '';
+                try {
+                    bodyText = await response.text();
+                } catch (_) {
+                    bodyText = '';
+                }
+                console.error('[DASHBOARD_API] fetchData failed', { endpoint, url, status: response.status, statusText: response.statusText, bodyText });
+                throw new Error(`Failed to fetch ${endpoint}: ${response.status} ${response.statusText}`);
+            }
+            const json = await response.json();
+            console.log('[DASHBOARD_API] fetchData ok', { endpoint, url, keys: Object.keys(json || {}) });
+            return json;
         },
 
         async updateSettings(settingsData) {
@@ -3127,15 +3140,19 @@
 
     async function loadConversations() {
         try {
-            console.log('[DASHBOARD] Loading conversations...');
+            console.log('[DASHBOARD] Loading conversations...', { tenantId: state.session?.tenantId });
             const data = await api.fetchData('conversations');
-            console.log('[DASHBOARD] Conversations data received:', data);
+            console.log('[DASHBOARD] Conversations data received:', {
+                success: data?.success,
+                count: Array.isArray(data?.conversations) ? data.conversations.length : 0,
+                keys: Object.keys(data || {})
+            });
             
             const conversations = (data.conversations || []).map(c => {
                 c.lastMessage = c.last_message || c.lastMessage || '';
                 return c;
             });
-            console.log('[DASHBOARD] Processed conversations:', conversations.length);
+            console.log('[DASHBOARD] Processed conversations:', conversations.length, conversations.slice(0, 2));
             
             state.data.conversations = conversations;
             const filtered = conversations.filter(conv =>
@@ -3143,7 +3160,7 @@
                 (conv.end_user_phone || '').includes(state.searchQuery) ||
                 (conv.lastMessage || '').toLowerCase().includes(state.searchQuery.toLowerCase())
             );
-            console.log('[DASHBOARD] Filtered conversations:', filtered.length);
+            console.log('[DASHBOARD] Filtered conversations:', filtered.length, { searchQuery: state.searchQuery });
             
             document.getElementById('tabContent').innerHTML = `
                 <div class="flex justify-between items-center mb-6">
