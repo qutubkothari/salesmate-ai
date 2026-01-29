@@ -408,15 +408,23 @@ async function createLeadFromWhatsApp({
             if (profileMissingDetails && lead?.id) {
                 const { data: askedBefore } = await dbClient
                     .from('crm_lead_events')
-                    .select('id')
+                    .select('id, event_payload, created_at')
                     .eq('tenant_id', tenantId)
                     .eq('lead_id', lead.id)
                     .eq('event_type', 'DETAILS_REQUESTED')
+                    .order('created_at', { ascending: false })
+                    .limit(1)
                     .maybeSingle();
 
                 if (askedBefore) {
-                    profileMissingDetails = false; // Don't ask again
-                    console.log('[LEAD_AUTO_CREATE] Already requested details for this lead');
+                    const timing = askedBefore.event_payload?.timing || null;
+                    const createdAt = askedBefore.created_at ? new Date(askedBefore.created_at) : null;
+                    const within24h = createdAt ? (Date.now() - createdAt.getTime()) < 24 * 60 * 60 * 1000 : false;
+
+                    if (timing === 'post_reply' && within24h) {
+                        profileMissingDetails = false; // Don't ask again too soon
+                        console.log('[LEAD_AUTO_CREATE] Details already requested post-reply (recent)');
+                    }
                 }
             }
         } catch (profileCheckErr) {
