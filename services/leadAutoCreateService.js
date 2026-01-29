@@ -389,6 +389,21 @@ async function createLeadFromWhatsApp({
                 const { customer } = await customerProfileService.getCustomerByPhone(tenantId, cleanPhone);
                 profileMissingDetails = !customer || (!customer.name && !customer.email);
                 
+                // Check if we've already asked for details (don't ask repeatedly)
+                if (profileMissingDetails && lead?.id) {
+                    const { data: askedBefore } = await dbClient
+                        .from('crm_lead_events')
+                        .select('id')
+                        .eq('lead_id', lead.id)
+                        .eq('event_type', 'DETAILS_REQUESTED')
+                        .maybeSingle();
+                    
+                    if (askedBefore) {
+                        profileMissingDetails = false; // Don't ask again
+                        console.log('[LEAD_AUTO_CREATE] Already requested details for this lead');
+                    }
+                }
+                
             } catch (profileErr) {
                 console.warn('[LEAD_AUTO_CREATE] Customer profile update failed:', profileErr?.message || profileErr);
             }
@@ -425,7 +440,7 @@ async function createLeadFromWhatsApp({
             lead,
             isNew,
             needsAssignment: !lead.assigned_user_id,
-            needsCustomerDetails: profileMissingDetails && isNew
+            needsCustomerDetails: profileMissingDetails  // Ask for details even if not new
         };
 
     } catch (error) {

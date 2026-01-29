@@ -512,12 +512,23 @@ Would you like to create one? Just send *"register"* to get started with your FR
             
             // If new lead needs customer details, ask for them before continuing
             if (leadResult.needsCustomerDetails) {
-              console.log('[WEBHOOK] New lead needs customer details, sending collection message');
+              console.log('[WEBHOOK] Lead needs customer details, sending collection message');
               const detailsMsg = `Thank you for reaching out! 🙏\n\nTo serve you better, could you please share:\n\n1️⃣ Your name\n2️⃣ Company/Business name\n3️⃣ Email (optional)\n\nYou can share it in this format:\n*Name:* Your Name\n*Company:* Your Company\n*Email:* your@email.com`;
               
               try {
                 await sendMessage(message.from, detailsMsg);
                 console.log('[WEBHOOK] Customer details request sent');
+                
+                // Log that we requested details
+                const { dbClient: db } = require('../services/config');
+                await db.from('crm_lead_events').insert({
+                  id: require('crypto').randomUUID(),
+                  lead_id: leadResult.lead.id,
+                  event_type: 'DETAILS_REQUESTED',
+                  description: 'Requested customer name, company, and email',
+                  created_at: new Date().toISOString()
+                });
+                
                 // Don't process the message further, wait for customer details
                 return res.status(200).json({ ok: true, type: 'customer_details_request' });
               } catch (sendErr) {
