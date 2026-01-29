@@ -669,7 +669,7 @@ router.get('/plants', authenticateSalesman, (req, res) => {
 });
 
 // Create a new visit
-router.post('/salesman/:id/visits', authenticateSalesman, (req, res) => {
+router.post('/salesman/:id/visits', authenticateSalesman, async (req, res) => {
     try {
         const { id } = req.params;
         const { 
@@ -717,6 +717,107 @@ router.post('/salesman/:id/visits', authenticateSalesman, (req, res) => {
                 time_in || new Date().toISOString()
             ]
         );
+
+        // Create/update customer profile and lead in Supabase
+        try {
+            const { dbClient } = require('../../services/config');
+            const customerProfileService = require('../../services/customerProfileService');
+            
+            // 1. Create/update customer profile if phone is provided
+            if (customer_phone) {
+                await customerProfileService.upsertCustomerByPhone(tenantId, customer_phone, {
+                    name: customer_name,
+                    address: contact_person ? `c/o ${contact_person}` : null,
+                    lead_score: potential === 'High' ? 80 : potential === 'Medium' ? 50 : 20
+                });
+            }
+            
+            // 2. Create or update CRM lead
+            const leadId = crypto.randomUUID();
+            const now = new Date().toISOString();
+            
+            // Check if lead already exists for this phone
+            let existingLead = null;
+            if (customer_phone) {
+                const { data } = await dbClient
+                    .from('crm_leads')
+                    .select('*')
+                    .eq('tenant_id', tenantId)
+                    .eq('phone', customer_phone)
+                    .maybeSingle();
+                existingLead = data;
+            }
+            
+            if (existingLead) {
+                // Update existing lead with visit info
+                await dbClient
+                    .from('crm_leads')
+                    .update({
+                        status: next_action ? 'QUALIFIED' : 'NEW',
+                        heat: potential === 'High' ? 'HOT' : potential === 'Medium' ? 'WARM' : 'COLD',
+                        last_contact_time: now,
+                        updated_at: now
+                    })
+                    .eq('id', existingLead.id);
+                
+                // Log the visit as a lead event
+                await dbClient
+                    .from('crm_lead_events')
+                    .insert({
+                        id: crypto.randomUUID(),
+                        lead_id: existingLead.id,
+                        event_type: 'VISIT',
+                        description: `Field visit: ${remarks || 'Visit completed'}`,
+                        metadata: {
+                            visit_id: visitId,
+                            visit_type,
+                            potential,
+                            products_discussed,
+                            next_action,
+                            next_action_date
+                        },
+                        created_at: now
+                    });
+            } else if (customer_phone) {
+                // Create new lead
+                await dbClient
+                    .from('crm_leads')
+                    .insert({
+                        id: leadId,
+                        tenant_id: tenantId,
+                        name: customer_name,
+                        phone: customer_phone,
+                        source: 'FSM_VISIT',
+                        status: next_action ? 'QUALIFIED' : 'NEW',
+                        heat: potential === 'High' ? 'HOT' : potential === 'Medium' ? 'WARM' : 'COLD',
+                        assigned_user_id: id,
+                        last_contact_time: now,
+                        created_at: now,
+                        updated_at: now
+                    });
+                
+                // Log initial visit event
+                await dbClient
+                    .from('crm_lead_events')
+                    .insert({
+                        id: crypto.randomUUID(),
+                        lead_id: leadId,
+                        event_type: 'VISIT',
+                        description: `Initial field visit: ${remarks || 'First contact'}`,
+                        metadata: {
+                            visit_id: visitId,
+                            visit_type,
+                            potential,
+                            products_discussed,
+                            next_action,
+                            next_action_date
+                        },
+                        created_at: now
+                    });
+            }
+        } catch (crmError) {
+            console.warn('[FSM] Failed to create customer/lead in CRM:', crmError.message);
+        }
 
         // Emit real-time notification via WebSocket
         try {

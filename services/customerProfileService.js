@@ -101,6 +101,7 @@ async function upsertCustomerByPhone(tenantId, rawPhone, profileData) {
     }
 
     const insertPayload = {
+        id: require('crypto').randomUUID(),
         tenant_id: tenantId,
         [CUSTOMER_PHONE_COL]: normalizedPhone,
         ...allowed,
