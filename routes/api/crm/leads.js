@@ -99,7 +99,35 @@ router.get('/', requireCrmAuth, requireCrmFeature(CRM_FEATURES.CRM_LEADS), requi
     const { data, error } = await query;
     if (error) throw error;
 
-    return res.json({ success: true, leads: data || [] });
+    const leads = data || [];
+
+    // Add message counts for each lead (crm_messages)
+    try {
+      const leadIds = leads.map((l) => l.id).filter(Boolean);
+      if (leadIds.length > 0) {
+        const { data: msgRows, error: msgErr } = await supabase
+          .from('crm_messages')
+          .select('lead_id')
+          .eq('tenant_id', req.user.tenantId)
+          .in('lead_id', leadIds);
+
+        if (!msgErr && Array.isArray(msgRows)) {
+          const counts = msgRows.reduce((acc, row) => {
+            const id = row.lead_id;
+            if (!id) return acc;
+            acc[id] = (acc[id] || 0) + 1;
+            return acc;
+          }, {});
+          leads.forEach((lead) => {
+            lead.message_count = counts[lead.id] || 0;
+          });
+        }
+      }
+    } catch (countErr) {
+      console.warn('[CRM_LEADS] Failed to compute message counts:', countErr?.message || countErr);
+    }
+
+    return res.json({ success: true, leads });
   } catch (e) {
     return res.status(500).json({ success: false, error: 'list_failed', details: e?.message || String(e) });
   }

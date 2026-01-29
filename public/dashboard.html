@@ -3610,8 +3610,13 @@
     }
 
     function viewWhatsAppLeadDetail(leadId) {
-        // Future: Open modal with full conversation history and lead details
-        showNotification('Lead detail view coming soon! Lead ID: ' + leadId, 'info');
+        if (!leadId) return;
+        if (!state.session?.tenantId) {
+            showNotification('No tenant session found. Please refresh and try again.', 'error');
+            return;
+        }
+        // Reuse conversation modal with CRM lead timeline fallback
+        openConversation(state.session.tenantId, leadId);
     }
 
     async function loadProducts() {
