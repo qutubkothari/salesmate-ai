@@ -271,9 +271,11 @@ router.post('/:tenantId', async (req, res) => {
         }
 
         // Create follow-up
+        const followupId = require('crypto').randomUUID();
         const { data: followUp, error } = await dbClient
             .from('scheduled_followups')
             .insert({
+                id: followupId,
                 tenant_id: tenantId,
                 end_user_phone: customer_phone,
                 scheduled_time: new Date(scheduled_time).toISOString(),
