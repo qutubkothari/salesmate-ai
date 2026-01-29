@@ -26,9 +26,33 @@ router.get('/:tenantId', async (req, res) => {
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: true });
 
-    if (error) throw error;
+    if (error && !isMissingTableError(error)) throw error;
 
-    const users = (Array.isArray(data) ? data : []).filter((u) => (u.is_active === undefined ? true : (u.is_active === true || u.is_active === 1)));
+    let users = Array.isArray(data) ? data : [];
+    users = users.filter((u) => (u.is_active === undefined ? true : (u.is_active === true || u.is_active === 1)));
+
+    // Fallback to salesmen table if sales_users is empty or missing
+    if (!users.length || isMissingTableError(error)) {
+      const { data: salesmen, error: salesmenError } = await dbClient
+        .from('salesmen')
+        .select('id, tenant_id, name, phone, is_active, created_at, updated_at')
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: true });
+
+      if (salesmenError && !isMissingTableError(salesmenError)) throw salesmenError;
+
+      const fallback = (Array.isArray(salesmen) ? salesmen : []).filter((s) => (s.is_active === undefined ? true : (s.is_active === true || s.is_active === 1)));
+      users = fallback.map((s) => ({
+        id: s.id,
+        tenant_id: s.tenant_id,
+        name: s.name,
+        phone: s.phone,
+        role: 'SALESMAN',
+        is_active: s.is_active,
+        created_at: s.created_at,
+        updated_at: s.updated_at
+      }));
+    }
     return res.json({ success: true, users });
   } catch (e) {
     if (isMissingTableError(e)) {
