@@ -147,15 +147,47 @@ async function sendViaMaytapi(to, cleanText, cfg) {
 }
 
 function cleanOutgoingText(text) {
-    return String(text || '')
+    const normalized = String(text || '')
         .replace(/â‚¹/g, '₹')
         .replace(/Rs\./g, '₹')
         .replace(/Rs\s+/g, '₹')
         .replace(/Ã¢â€šÂ¹/g, '₹')
         .replace(/Ã°Å¸â€œÂ¦/g, '📦')
         .replace(/Ã¢Å"â€¦/g, '✅')
-        .replace(/Ã°Å¸â€™Â³/g, '💳')
-        .trim();
+        .replace(/Ã°Å¸â€™Â³/g, '💳');
+
+    // Normalize markdown links [text](url) to just the URL
+    const markdownLinkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/gi;
+    const withoutMarkdownLinks = normalized.replace(markdownLinkRegex, (full, text, url) => {
+        const textValue = String(text || '').trim();
+        const urlValue = String(url || '').trim();
+        if (!urlValue) return textValue || '';
+        return urlValue;
+    });
+
+    const urlRegex = /https?:\/\/[^\s)]+/gi;
+    const seen = new Set();
+
+    let deduped = withoutMarkdownLinks.replace(urlRegex, (match) => {
+        const url = match.trim();
+        if (seen.has(url)) return '';
+        seen.add(url);
+        return match;
+    });
+
+    deduped = deduped
+        .split('\n')
+        .map((line) => {
+            const trimmed = line.trim();
+            if (!trimmed) return '';
+            if (/^website\s*[:\-]*\s*$/i.test(trimmed)) return '';
+            if (/^website\s*[:\-]/i.test(trimmed) && !/https?:\/\//i.test(trimmed)) return '';
+            return line.replace(/\s{2,}/g, ' ').trimEnd();
+        })
+        .filter((line) => line.trim() !== '')
+        .join('\n');
+
+    return deduped.trim();
 }
 
 /**
