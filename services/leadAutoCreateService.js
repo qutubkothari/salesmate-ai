@@ -364,10 +364,11 @@ async function createLeadFromWhatsApp({
                 
                 const extracted = {
                     name: nameMatch ? nameMatch[1].trim() : undefined,
-                    email: emailMatch ? emailMatch[0].trim() : undefined
+                    email: emailMatch ? emailMatch[0].trim() : undefined,
+                    business_name: companyMatch ? companyMatch[1].trim() : undefined
                 };
 
-                if (extracted.name || extracted.email) {
+                if (extracted.name || extracted.email || extracted.business_name) {
                     await customerProfileService.upsertCustomerByPhone(tenantId, cleanPhone, extracted);
                     console.log('[LEAD_AUTO_CREATE] Customer profile updated:', extracted);
                 }

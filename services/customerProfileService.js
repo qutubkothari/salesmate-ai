@@ -4,12 +4,12 @@ const { normalizePhone, toWhatsAppFormat } = require('../utils/phoneUtils');
 
 // ALWAYS use local SQLite now (Supabase deprecated)
 const USE_LOCAL_DB = true;
-const CUSTOMER_PHONE_COL = 'phone_number';
+const CUSTOMER_PHONE_COL = 'phone';
 
 function normalizeCustomerRow(row) {
     if (!row || typeof row !== 'object') return row;
     const phone = row.phone ?? row.phone_number ?? row.phoneNumber ?? null;
-    const name = row.name ?? row.business_name ?? row.first_name ?? row.customer_name ?? null;
+    const name = row.contact_person ?? row.name ?? row.business_name ?? row.first_name ?? row.customer_name ?? null;
     return { ...row, phone, name };
 }
 
@@ -68,14 +68,21 @@ async function upsertCustomerByPhone(tenantId, rawPhone, profileData) {
     }
 
     const allowed = {
-        name: profileData?.name ?? null,
+        contact_person: profileData?.contact_person ?? profileData?.name ?? null,
+        business_name: profileData?.business_name ?? profileData?.company ?? null,
         email: profileData?.email ?? null,
-        customer_type: profileData?.customer_type ?? null,
+        business_type: profileData?.business_type ?? null,
         city: profileData?.city ?? null,
         state: profileData?.state ?? null,
-        pincode: profileData?.pincode ?? null,
         gst_number: profileData?.gst_number ?? null,
-        lead_score: profileData?.lead_score ?? null
+        status: profileData?.status ?? null,
+        assigned_salesman_id: profileData?.assigned_salesman_id ?? null,
+        last_visit_date: profileData?.last_visit_date ?? null,
+        next_follow_up_date: profileData?.next_follow_up_date ?? null,
+        visit_frequency: profileData?.visit_frequency ?? null,
+        plant_id: profileData?.plant_id ?? null,
+        source: profileData?.source ?? null,
+        notes: profileData?.notes ?? null
     };
 
     // Remove null/undefined keys we don't want to overwrite unless explicitly provided
