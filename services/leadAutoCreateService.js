@@ -366,15 +366,23 @@ async function createLeadFromWhatsApp({
                     name: nameMatch ? nameMatch[1].trim() : undefined,
                     email: emailMatch ? emailMatch[0].trim() : undefined
                 };
-                
-                // Add company to address field for now (can be separated later)
-                if (companyMatch) {
-                    extracted.address = companyMatch[1].trim();
-                }
 
-                if (extracted.name || extracted.email || extracted.address) {
+                if (extracted.name || extracted.email) {
                     await customerProfileService.upsertCustomerByPhone(tenantId, cleanPhone, extracted);
                     console.log('[LEAD_AUTO_CREATE] Customer profile updated:', extracted);
+                }
+                
+                // Update lead with company name if extracted
+                if (companyMatch && lead?.id) {
+                    const companyName = companyMatch[1].trim();
+                    await dbClient
+                        .from('crm_leads')
+                        .update({ 
+                            company: companyName,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', lead.id);
+                    console.log('[LEAD_AUTO_CREATE] Lead updated with company:', companyName);
                 }
                 
                 // Check if we still need customer details
