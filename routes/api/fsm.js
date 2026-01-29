@@ -517,6 +517,42 @@ router.post('/targets', async (req, res) => {
     const id = require('crypto').randomUUID();
     const finalTenantId = tenant_id || DEFAULT_TENANT_ID;
     
+    // Use Supabase if local DB not available
+    if (!isLocalDbReady()) {
+      const targetRecord = {
+        id,
+        tenant_id: finalTenantId,
+        salesman_id,
+        plant_id: plant_id || null,
+        period,
+        target_visits: target_visits || 0,
+        target_orders: target_orders || 0,
+        target_revenue: target_revenue || 0.0,
+        target_new_customers: target_new_customers || 0,
+        achieved_visits: 0,
+        achieved_orders: 0,
+        achieved_revenue: 0.0,
+        achieved_new_customers: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const { data, error } = await dbClient
+        .from('salesman_targets')
+        .insert(targetRecord)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return res.json({
+        success: true,
+        data: data,
+        message: 'Target created successfully'
+      });
+    }
+    
+    // Use local SQLite database
     const insertQuery = `
       INSERT INTO salesman_targets (
         id, tenant_id, salesman_id, plant_id, period,
@@ -560,6 +596,50 @@ router.put('/targets/:id', async (req, res) => {
     const { id } = req.params;
     const { salesman_id, period, target_visits, target_orders, target_revenue, target_new_customers, plant_id } = req.body;
     
+    // Use Supabase if local DB not available
+    if (!isLocalDbReady()) {
+      // Get existing target
+      const { data: existing, error: fetchError } = await dbClient
+        .from('salesman_targets')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (fetchError || !existing) {
+        return res.status(404).json({
+          success: false,
+          error: 'Target not found'
+        });
+      }
+
+      const updateData = {
+        salesman_id: salesman_id || existing.salesman_id,
+        period: period || existing.period,
+        plant_id: plant_id !== undefined ? plant_id : existing.plant_id,
+        target_visits: target_visits !== undefined ? target_visits : existing.target_visits,
+        target_orders: target_orders !== undefined ? target_orders : existing.target_orders,
+        target_revenue: target_revenue !== undefined ? target_revenue : existing.target_revenue,
+        target_new_customers: target_new_customers !== undefined ? target_new_customers : existing.target_new_customers,
+        updated_at: new Date().toISOString()
+      };
+
+      const { data, error } = await dbClient
+        .from('salesman_targets')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return res.json({
+        success: true,
+        data: data,
+        message: 'Target updated successfully'
+      });
+    }
+    
+    // Use local SQLite database
     const existing = db.prepare('SELECT * FROM salesman_targets WHERE id = ?').get(id);
     if (!existing) {
       return res.status(404).json({
@@ -608,6 +688,36 @@ router.delete('/targets/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
+    // Use Supabase if local DB not available
+    if (!isLocalDbReady()) {
+      // Check if target exists
+      const { data: existing, error: fetchError } = await dbClient
+        .from('salesman_targets')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (fetchError || !existing) {
+        return res.status(404).json({
+          success: false,
+          error: 'Target not found'
+        });
+      }
+
+      const { error } = await dbClient
+        .from('salesman_targets')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      return res.json({
+        success: true,
+        message: 'Target deleted successfully'
+      });
+    }
+    
+    // Use local SQLite database
     const existing = db.prepare('SELECT * FROM salesman_targets WHERE id = ?').get(id);
     if (!existing) {
       return res.status(404).json({
