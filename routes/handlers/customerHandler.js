@@ -62,6 +62,7 @@ const handleCustomer = async (req, res) => {
     const { sendMessage } = require('../../services/whatsappService');
     const { createLeadFromWhatsApp } = require('../../services/leadAutoCreateService');
     
+    let detailsRequest = { needed: false, leadId: null };
     try {
         // Fetch latest conversation context
         const { data: conversationData, error } = await dbClient
@@ -112,7 +113,7 @@ const handleCustomer = async (req, res) => {
             // Continue even if customer creation fails
         }
 
-        // Ensure lead exists and ask for missing customer details if needed
+        // Ensure lead exists and track missing customer details for follow-up
         try {
             const leadResult = await createLeadFromWhatsApp({
                 tenantId: tenant.id,
@@ -124,21 +125,8 @@ const handleCustomer = async (req, res) => {
             });
 
             if (leadResult.success && leadResult.needsCustomerDetails) {
-                console.log('[CUSTOMER_HANDLER] Missing customer details; requesting info');
-                const detailsMsg = `Thank you for reaching out! 🙏\n\nTo serve you better, could you please share:\n\n1️⃣ Your name\n2️⃣ Company/Business name\n3️⃣ Email (optional)\n\nYou can share it in this format:\n*Name:* Your Name\n*Company:* Your Company\n*Email:* your@email.com`;
-
-                await sendMessage(from, detailsMsg, tenant.id);
-
-                await dbClient.from('crm_lead_events').insert({
-                    id: require('crypto').randomUUID(),
-                    tenant_id: tenant.id,
-                    lead_id: leadResult.lead.id,
-                    event_type: 'DETAILS_REQUESTED',
-                    event_payload: { source: 'customer_handler' },
-                    created_at: new Date().toISOString()
-                });
-
-                return res.status(200).json({ ok: true, type: 'customer_details_request' });
+                detailsRequest = { needed: true, leadId: leadResult.lead.id };
+                console.log('[CUSTOMER_HANDLER] Missing customer details; will ask after reply');
             }
         } catch (detailsErr) {
             console.warn('[CUSTOMER_HANDLER] Details request check failed:', detailsErr?.message || detailsErr);
@@ -147,8 +135,28 @@ const handleCustomer = async (req, res) => {
         console.error('[CUSTOMER_HANDLER] Error fetching/creating conversation:', e);
         conversation = null;
     }
+
+    const response = await handleCustomerMessage(req, res, tenant, from, userQuery, conversation);
+
+    if (detailsRequest.needed && detailsRequest.leadId) {
+        try {
+            const detailsMsg = `By the way, to serve you better, could you please share your name, company name, and email (optional)?\n\nYou can reply like:\n*Name:* Your Name\n*Company:* Your Company\n*Email:* your@email.com`;
+            await sendMessage(from, detailsMsg, tenant.id);
+
+            await dbClient.from('crm_lead_events').insert({
+                id: require('crypto').randomUUID(),
+                tenant_id: tenant.id,
+                lead_id: detailsRequest.leadId,
+                event_type: 'DETAILS_REQUESTED',
+                event_payload: { source: 'customer_handler', timing: 'post_reply' },
+                created_at: new Date().toISOString()
+            });
+        } catch (sendErr) {
+            console.warn('[CUSTOMER_HANDLER] Failed to send follow-up details request:', sendErr?.message || sendErr);
+        }
+    }
     
-    return await handleCustomerMessage(req, res, tenant, from, userQuery, conversation);
+    return response;
 };
 
 module.exports = {
