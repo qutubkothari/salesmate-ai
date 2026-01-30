@@ -68,8 +68,9 @@ const handleCustomer = async (req, res) => {
         // If customer shares structured details, capture immediately
         try {
             const text = String(userQuery || '');
-            const nameMatch = text.match(/\bname\s*[:=]\s*([^\n\r]+)/i);
-            const companyMatch = text.match(/\b(company|business)\s*[:=]\s*([^\n\r]+)/i);
+            const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+            const nameMatch = text.match(/\bname\s*[:=\-]\s*([^\n\r]+)/i);
+            const companyMatch = text.match(/\b(company|business)\s*[:=\-]\s*([^\n\r]+)/i);
             const emailMatch = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
 
             const parsed = {
@@ -77,6 +78,26 @@ const handleCustomer = async (req, res) => {
                 company: companyMatch ? companyMatch[2].trim() : null,
                 email: emailMatch ? emailMatch[0].trim() : null
             };
+
+            // Heuristic fallback: if no explicit labels, try to infer from lines
+            if (!parsed.name || !parsed.company) {
+                const remaining = lines.filter((l) => {
+                    if (/name\s*[:=\-]/i.test(l)) return false;
+                    if (/(company|business)\s*[:=\-]/i.test(l)) return false;
+                    if (/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(l)) return false;
+                    return true;
+                });
+
+                const companyHint = /\b(pvt|ltd|limited|inc|corp|company|co\.?|industries|solutions|enterprises|trading)\b/i;
+                if (!parsed.company) {
+                    const companyLine = remaining.find((l) => companyHint.test(l));
+                    if (companyLine) parsed.company = companyLine;
+                }
+                if (!parsed.name) {
+                    const nameLine = remaining.find((l) => l && l !== parsed.company);
+                    if (nameLine) parsed.name = nameLine;
+                }
+            }
 
             if (parsed.name || parsed.company || parsed.email) {
                 console.log('[CUSTOMER_HANDLER] Parsed customer details:', parsed);
@@ -92,7 +113,6 @@ const handleCustomer = async (req, res) => {
                         .from('crm_leads')
                         .update({
                             name: parsed.name || undefined,
-                            company: parsed.company || undefined,
                             email: parsed.email || undefined,
                             updated_at: new Date().toISOString()
                         })
