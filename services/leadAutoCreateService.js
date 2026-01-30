@@ -362,11 +362,21 @@ async function createLeadFromWhatsApp({
                     companyMatch = text.match(/(?:from|representing|work at|at)\s+([A-Z][A-Za-z0-9\s&.]{2,50}(?:\s+(?:Ltd|Pvt|Inc|Corp|Co|Limited|Private))?)/);
                 }
                 
+                const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
                 const extracted = {
                     name: nameMatch ? nameMatch[1].trim() : undefined,
                     email: emailMatch ? emailMatch[0].trim() : undefined,
                     business_name: companyMatch ? companyMatch[1].trim() : undefined
                 };
+
+                // If no labels, infer from 3-line format: name, company, email
+                if ((!extracted.name || !extracted.business_name) && lines.length >= 2) {
+                    const emailLine = lines.find((l) => /@/.test(l));
+                    const nonEmailLines = lines.filter((l) => l !== emailLine);
+                    if (!extracted.name && nonEmailLines[0]) extracted.name = nonEmailLines[0];
+                    if (!extracted.business_name && nonEmailLines[1]) extracted.business_name = nonEmailLines[1];
+                    if (!extracted.email && emailLine) extracted.email = emailLine.trim();
+                }
 
                 if (extracted.name || extracted.email || extracted.business_name) {
                     await customerProfileService.upsertCustomerByPhone(tenantId, cleanPhone, extracted);
