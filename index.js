@@ -1359,6 +1359,10 @@ app.use('/api/mobile-app', mobileAppRouter);
 const mobileFollowupsRouter = require('./routes/api/mobile/followups');
 app.use('/api/mobile', mobileFollowupsRouter);
 
+// Push Notifications API (FCM device registration and notifications)
+const pushRouter = require('./routes/api/push');
+app.use('/api/push', pushRouter);
+
 // Performance & Scale API (Caching, Query Optimization, Rate Limiting, Health Checks)
 const performanceRouter = require('./routes/api/performance');
 app.use('/api/performance', performanceRouter);

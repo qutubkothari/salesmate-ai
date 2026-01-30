@@ -24,6 +24,9 @@ const { initializeFollowUpScheduler } = require('./schedulers/followUpCron');
 const { enhancedFollowUpScheduler, debugFollowUpProcessing } = require('./services/conversationResetService');
 const { scheduleProactiveMessages, sendPendingMessages } = require('./services/automation/proactiveMessagingService');
 
+// Import push notification service
+const pushService = require('./services/pushNotificationService');
+
 // Import VRL shipment tracking service
 const { checkShipmentsForUpdates } = require('./services/vrlTrackingService');
 const { sendMessage } = require('./services/whatsappService');
@@ -203,6 +206,12 @@ const runScheduledTasks = async () => {
             description: 'Enhanced follow-up processing with comprehensive error handling'
         },
         { 
+            name: 'Push: Follow-up Reminders', 
+            func: () => pushService.sendDueFollowupReminders(),
+            priority: 'high',
+            description: 'Send push notifications for follow-ups due in next 30 minutes'
+        },
+        { 
             name: 'Abandoned Cart Recovery', 
             func: processAbandonedCarts,
             priority: 'high',
@@ -299,6 +308,12 @@ const runScheduledTasks = async () => {
             func: sendDailySummaries,
             priority: 'daily',
             description: 'Send daily performance summaries to admins'
+        },
+        {
+            name: 'Push: Overdue Follow-up Alerts',
+            func: () => pushService.sendOverdueFollowupAlerts(),
+            priority: 'daily',
+            description: 'Send push notifications for overdue follow-ups (runs once daily)'
         },
         {
             name: 'VRL Shipment Tracking',
