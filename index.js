@@ -1367,6 +1367,10 @@ app.use('/api/push', pushRouter);
 const locationRouter = require('./routes/api/location');
 app.use('/api/location', locationRouter);
 
+// Commission Tracking API (Earnings, targets, payouts for salesmen)
+const commissionRouter = require('./routes/api/commission');
+app.use('/api/commission', commissionRouter);
+
 // Performance & Scale API (Caching, Query Optimization, Rate Limiting, Health Checks)
 const performanceRouter = require('./routes/api/performance');
 app.use('/api/performance', performanceRouter);
