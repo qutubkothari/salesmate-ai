@@ -45,13 +45,19 @@ router.get('/list', requireTenantAuth({ requireMatchParamTenantId: false }), asy
 
     const { data, error } = await dbClient
       .from('email_enquiries')
-      .select('id, from_email as sender, subject, body, received_at, assigned_to, is_read as read, created_at')
+      .select('id, from_email, subject, body, received_at, assigned_to, is_read, created_at')
       .eq('tenant_id', tenantId)
       .order('received_at', { ascending: false });
 
     if (error) throw error;
 
-    res.json({ success: true, emails: data || [] });
+    const emails = (data || []).map((row) => ({
+      ...row,
+      sender: row.from_email,
+      read: row.is_read
+    }));
+
+    res.json({ success: true, emails });
   } catch (e) {
     console.error('[EMAIL_LIST] error:', e?.message || e);
     res.status(500).json({ success: false, error: 'Failed to list emails' });

@@ -234,24 +234,28 @@ router.post('/send', requireTenantAuth({ requireMatchParamTenantId: false }), as
       return res.status(400).json({ success: false, error: 'Invalid request' });
     }
 
-    // Store the message campaign
+    // Store the message campaign (legacy table expects integer tenant_id)
     const { dbClient } = require('../../services/config');
-    const { data: messageRecord, error: insertError } = await dbClient
-      .from('interactive_messages')
-      .insert({
-        tenant_id: tenantId,
-        type: type || 'buttons',
-        body,
-        options: JSON.stringify(options || {}),
-        recipient_count: recipients.length,
-        response_count: 0,
-        status: 'pending',
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single();
+    let messageRecord = null;
+    if (/^\d+$/.test(tenantId)) {
+      const { data, error: insertError } = await dbClient
+        .from('interactive_messages')
+        .insert({
+          tenant_id: tenantId,
+          type: type || 'buttons',
+          body,
+          options: JSON.stringify(options || {}),
+          recipient_count: recipients.length,
+          response_count: 0,
+          status: 'pending',
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
 
-    if (insertError) throw insertError;
+      if (insertError) throw insertError;
+      messageRecord = data;
+    }
 
     // Send to each recipient (in background)
     const sendPromises = recipients.map(async (recipient) => {
@@ -266,7 +270,7 @@ router.post('/send', requireTenantAuth({ requireMatchParamTenantId: false }), as
     // Don't await all sends
     Promise.all(sendPromises).catch(console.error);
 
-    res.json({ success: true, messageId: messageRecord.id, recipients: recipients.length });
+    res.json({ success: true, messageId: messageRecord?.id || null, recipients: recipients.length });
   } catch (e) {
     console.error('[INTERACTIVE_SEND] error:', e?.message || e);
     res.status(500).json({ success: false, error: 'Failed to send message' });
