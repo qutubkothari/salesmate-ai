@@ -11,7 +11,7 @@ function getRedirectUri() {
   return (
     env('GOOGLE_REDIRECT_URI') ||
     env('GMAIL_REDIRECT_URI') ||
-    'https://salesmate.saksolution.com/api/email/gmail/callback'
+    `${env('APP_URL') || env('PUBLIC_APP_URL') || 'https://sak-ai.saksolution.com'}/api/email/gmail/callback`
   );
 }
 
