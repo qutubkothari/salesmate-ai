@@ -1937,20 +1937,42 @@ router.get('/salesman/:id/ai/best-times', authenticateSalesman, async (req, res)
 });
 
 // Customer Locations for Heat Map
-router.get('/salesman/:id/customers/locations', authenticateSalesman, (req, res) => {
+router.get('/salesman/:id/customers/locations', authenticateSalesman, async (req, res) => {
     try {
         const { id } = req.params;
         const tenantId = getTenantId(req);
 
-        const locations = dbAll(
-            `SELECT cl.latitude, cl.longitude, c.business_name,
-                    (SELECT COUNT(*) FROM visits WHERE customer_name = c.business_name) as visit_count,
-                    (SELECT COUNT(*) * 15000 FROM visits WHERE customer_name = c.business_name AND potential = 'High') as revenue
-             FROM customer_locations cl
-             JOIN customer_profiles_new c ON cl.customer_id = c.id
-             WHERE c.tenant_id = ? AND cl.latitude IS NOT NULL AND cl.longitude IS NOT NULL`,
-            [tenantId]
-        );
+        let locations;
+        if (USE_SUPABASE) {
+            const { data } = await dbClient
+                .from('customer_locations')
+                .select(`
+                    latitude,
+                    longitude,
+                    customer_profiles_new!inner(id, business_name, tenant_id)
+                `)
+                .not('latitude', 'is', null)
+                .not('longitude', 'is', null)
+                .eq('customer_profiles_new.tenant_id', tenantId);
+
+            locations = (data || []).map(loc => ({
+                latitude: loc.latitude,
+                longitude: loc.longitude,
+                business_name: loc.customer_profiles_new?.business_name,
+                visit_count: 0,
+                revenue: 0
+            }));
+        } else {
+            locations = dbAll(
+                `SELECT cl.latitude, cl.longitude, c.business_name,
+                        (SELECT COUNT(*) FROM visits WHERE customer_name = c.business_name) as visit_count,
+                        (SELECT COUNT(*) * 15000 FROM visits WHERE customer_name = c.business_name AND potential = 'High') as revenue
+                 FROM customer_locations cl
+                 JOIN customer_profiles_new c ON cl.customer_id = c.id
+                 WHERE c.tenant_id = ? AND cl.latitude IS NOT NULL AND cl.longitude IS NOT NULL`,
+                [tenantId]
+            );
+        }
 
         const data = locations.map(loc => ({
             lat: loc.latitude,
