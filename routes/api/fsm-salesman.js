@@ -1059,21 +1059,20 @@ router.get('/salesman/:id/visits', authenticateSalesman, async (req, res) => {
         
         let visits;
         if (USE_SUPABASE) {
-            const { data } = await dbClient
+            const { data, error } = await dbClient
                 .from('visits')
-                .select(`
-                    *,
-                    customer_profiles_new!visits_customer_id_fkey(business_name)
-                `)
+                .select('*')
                 .eq('tenant_id', tenantId)
                 .eq('salesman_id', id)
                 .order('visit_date', { ascending: false })
                 .order('created_at', { ascending: false })
                 .limit(limit);
-            visits = (data || []).map(v => ({
-                ...v,
-                customer_name: v.customer_profiles_new?.business_name || v.customer_name
-            }));
+
+            if (error) {
+                throw error;
+            }
+
+            visits = data || [];
         } else {
             visits = dbAll(
                 `SELECT v.*, 
