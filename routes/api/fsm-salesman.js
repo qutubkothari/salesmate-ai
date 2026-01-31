@@ -1536,10 +1536,17 @@ router.get('/salesman/:id/notifications', authenticateSalesman, async (req, res)
                 query = query.eq('status', status);
             }
             
-            const { data } = await query
+            const { data, error: supaError } = await query
                 .order('created_at', { ascending: false })
                 .limit(limit);
-            rows = data || [];
+            
+            if (supaError) {
+                console.error('Supabase error fetching notifications:', supaError);
+                // Return empty array if table doesn't exist or other error
+                rows = [];
+            } else {
+                rows = data || [];
+            }
         } else {
             rows = status
                 ? dbAll(
