@@ -27,7 +27,7 @@ async function requireSalesmanAuth(req, res, next) {
         .select('id, user_id, tenant_id, name, phone, email, is_active')
         .eq('tenant_id', tenantId)
         .eq('user_id', userId)
-        .eq('is_active', true)
+        .eq('is_active', 1)
         .maybeSingle();
 
       if (error) throw error;
@@ -43,7 +43,7 @@ async function requireSalesmanAuth(req, res, next) {
         .eq('tenant_id', tenantId)
         .eq('phone', salesmanPhone)
         .eq('role', 'salesman')
-        .eq('is_active', true)
+        .eq('is_active', 1)
         .maybeSingle();
 
       if (userError) throw userError;
@@ -59,7 +59,7 @@ async function requireSalesmanAuth(req, res, next) {
             .select('id, user_id, tenant_id, name, phone, email, is_active')
             .eq('tenant_id', tenantId)
             .eq('user_id', user.id)
-            .eq('is_active', true)
+            .eq('is_active', 1)
             .maybeSingle();
 
           if (salesmanError) throw salesmanError;

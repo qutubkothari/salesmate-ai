@@ -36,9 +36,9 @@ WHERE follow_up_at IS NOT NULL
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS salesman_devices (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  salesman_id UUID NOT NULL REFERENCES salesmen(id) ON DELETE CASCADE,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  salesman_id TEXT NOT NULL REFERENCES salesmen(id) ON DELETE CASCADE,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   device_token TEXT NOT NULL UNIQUE,
   platform TEXT NOT NULL CHECK (platform IN ('ios', 'android')),
   is_active BOOLEAN DEFAULT true,
@@ -54,9 +54,9 @@ CREATE INDEX IF NOT EXISTS idx_salesman_devices_tenant
 ON salesman_devices(tenant_id);
 
 CREATE TABLE IF NOT EXISTS notification_logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  salesman_id UUID NOT NULL REFERENCES salesmen(id) ON DELETE CASCADE,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  salesman_id TEXT NOT NULL REFERENCES salesmen(id) ON DELETE CASCADE,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   notification_type TEXT NOT NULL,
   title TEXT NOT NULL,
   body TEXT NOT NULL,
@@ -74,9 +74,9 @@ ON notification_logs(salesman_id, sent_at DESC);
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS salesman_locations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  salesman_id UUID NOT NULL REFERENCES salesmen(id) ON DELETE CASCADE,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  salesman_id TEXT NOT NULL REFERENCES salesmen(id) ON DELETE CASCADE,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   latitude DECIMAL(10, 8) NOT NULL,
   longitude DECIMAL(11, 8) NOT NULL,
   accuracy DECIMAL(10, 2),
@@ -88,10 +88,10 @@ CREATE INDEX IF NOT EXISTS idx_salesman_locations_salesman
 ON salesman_locations(salesman_id, recorded_at DESC);
 
 CREATE TABLE IF NOT EXISTS customer_visits (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  salesman_id UUID NOT NULL REFERENCES salesmen(id) ON DELETE CASCADE,
-  customer_id UUID NOT NULL REFERENCES customer_profiles_new(id) ON DELETE CASCADE,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  salesman_id TEXT NOT NULL REFERENCES salesmen(id) ON DELETE CASCADE,
+  customer_id TEXT NOT NULL REFERENCES customer_profiles_new(id) ON DELETE CASCADE,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   visit_type TEXT NOT NULL,
   check_in_time TIMESTAMP NOT NULL,
   check_in_latitude DECIMAL(10, 8) NOT NULL,
@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS customer_visits (
   distance_from_customer DECIMAL(10, 2),
   notes TEXT,
   outcome TEXT,
-  conversation_id UUID REFERENCES conversations_new(id) ON DELETE SET NULL,
+  conversation_id TEXT REFERENCES conversations_new(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -118,9 +118,9 @@ CREATE INDEX IF NOT EXISTS idx_customer_visits_customer
 ON customer_visits(customer_id, check_in_time DESC);
 
 CREATE TABLE IF NOT EXISTS daily_routes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  salesman_id UUID NOT NULL REFERENCES salesmen(id) ON DELETE CASCADE,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  salesman_id TEXT NOT NULL REFERENCES salesmen(id) ON DELETE CASCADE,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   route_date DATE NOT NULL,
   total_customers INTEGER DEFAULT 0,
   total_distance_km DECIMAL(10, 2),
@@ -142,8 +142,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_routes_unique
 ON daily_routes(salesman_id, route_date);
 
 CREATE TABLE IF NOT EXISTS geo_fence_rules (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   rule_name TEXT NOT NULL,
   rule_type TEXT NOT NULL,
   center_latitude DECIMAL(10, 8),
@@ -166,8 +166,8 @@ ADD COLUMN IF NOT EXISTS address_geocoded_at TIMESTAMP;
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS commission_rules (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   rule_name TEXT NOT NULL,
   commission_type TEXT NOT NULL,
   base_percentage DECIMAL(5, 2),
@@ -187,21 +187,42 @@ CREATE INDEX IF NOT EXISTS idx_commission_rules_tenant
 ON commission_rules(tenant_id) WHERE is_active = true;
 
 CREATE TABLE IF NOT EXISTS salesman_targets (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  salesman_id UUID NOT NULL REFERENCES salesmen(id) ON DELETE CASCADE,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  target_period TEXT NOT NULL,
-  period_start DATE NOT NULL,
-  period_end DATE NOT NULL,
-  sales_target_amount DECIMAL(12, 2) NOT NULL,
-  orders_target_count INTEGER,
-  customers_target_count INTEGER,
-  bonus_percentage DECIMAL(5, 2),
-  bonus_amount DECIMAL(10, 2),
-  status TEXT DEFAULT 'active',
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  salesman_id TEXT NOT NULL,
+  tenant_id TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
+
+-- Add columns to salesman_targets if they don't exist
+ALTER TABLE salesman_targets
+ADD COLUMN IF NOT EXISTS target_period TEXT,
+ADD COLUMN IF NOT EXISTS period_start DATE,
+ADD COLUMN IF NOT EXISTS period_end DATE,
+ADD COLUMN IF NOT EXISTS sales_target_amount DECIMAL(12, 2),
+ADD COLUMN IF NOT EXISTS orders_target_count INTEGER,
+ADD COLUMN IF NOT EXISTS customers_target_count INTEGER,
+ADD COLUMN IF NOT EXISTS bonus_percentage DECIMAL(5, 2),
+ADD COLUMN IF NOT EXISTS bonus_amount DECIMAL(10, 2),
+ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+
+-- Add foreign keys if table is new (will fail silently if already exists)
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'salesman_targets_salesman_id_fkey'
+  ) THEN
+    ALTER TABLE salesman_targets ADD CONSTRAINT salesman_targets_salesman_id_fkey 
+    FOREIGN KEY (salesman_id) REFERENCES salesmen(id) ON DELETE CASCADE;
+  END IF;
+  
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'salesman_targets_tenant_id_fkey'
+  ) THEN
+    ALTER TABLE salesman_targets ADD CONSTRAINT salesman_targets_tenant_id_fkey 
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_salesman_targets_salesman 
 ON salesman_targets(salesman_id, period_start DESC);
@@ -210,22 +231,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_salesman_targets_unique
 ON salesman_targets(salesman_id, target_period, period_start);
 
 CREATE TABLE IF NOT EXISTS commission_transactions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  salesman_id UUID NOT NULL REFERENCES salesmen(id) ON DELETE CASCADE,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  salesman_id TEXT NOT NULL REFERENCES salesmen(id) ON DELETE CASCADE,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   order_id TEXT,
-  conversation_id UUID REFERENCES conversations_new(id) ON DELETE SET NULL,
-  customer_id UUID REFERENCES customer_profiles_new(id) ON DELETE SET NULL,
+  conversation_id TEXT REFERENCES conversations_new(id) ON DELETE SET NULL,
+  customer_id TEXT REFERENCES customer_profiles_new(id) ON DELETE SET NULL,
   sale_amount DECIMAL(12, 2) NOT NULL,
   commission_rate DECIMAL(5, 2) NOT NULL,
   commission_amount DECIMAL(10, 2) NOT NULL,
-  rule_id UUID REFERENCES commission_rules(id) ON DELETE SET NULL,
+  rule_id TEXT REFERENCES commission_rules(id) ON DELETE SET NULL,
   rule_name TEXT,
   transaction_date DATE NOT NULL,
   transaction_type TEXT DEFAULT 'sale',
   description TEXT,
   payout_status TEXT DEFAULT 'pending',
-  payout_id UUID,
+  payout_id TEXT,
   paid_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
@@ -239,9 +260,9 @@ ON commission_transactions(payout_status, salesman_id)
 WHERE payout_status = 'pending';
 
 CREATE TABLE IF NOT EXISTS commission_payouts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  salesman_id UUID NOT NULL REFERENCES salesmen(id) ON DELETE CASCADE,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  salesman_id TEXT NOT NULL REFERENCES salesmen(id) ON DELETE CASCADE,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   period_start DATE NOT NULL,
   period_end DATE NOT NULL,
   total_commission DECIMAL(12, 2) NOT NULL,
@@ -253,7 +274,7 @@ CREATE TABLE IF NOT EXISTS commission_payouts (
   payment_reference TEXT,
   payment_notes TEXT,
   status TEXT DEFAULT 'pending',
-  approved_by UUID REFERENCES users(id),
+  approved_by TEXT REFERENCES users(id),
   approved_at TIMESTAMP,
   paid_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
