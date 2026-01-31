@@ -1444,10 +1444,10 @@
                 <button onclick="closeNewFollowupModal()" style="background:rgba(255,255,255,0.2); border:none; width:36px; height:36px; border-radius:50%; font-size:24px; cursor:pointer; color:white;">&times;</button>
             </div>
             <form id="newFollowupForm" onsubmit="event.preventDefault(); submitNewFollowup();" style="padding:24px;">
-                <div style="margin-bottom:18px;">
+                <div style="margin-bottom:18px;position:relative;">
                     <label style="font-weight:600;">Customer <span style="color:#e74c3c;">*</span></label>
-                    <input type="text" id="followupCustomer" list="followupCustomerList" placeholder="Search or select customer" style="width:100%;padding:10px;border-radius:8px;border:2px solid #e0e0e0;">
-                    <datalist id="followupCustomerList"></datalist>
+                    <input type="text" id="followupCustomer" placeholder="Search or select customer" autocomplete="off" onfocus="showFollowupCustomerDropdown()" oninput="filterFollowupCustomers()" style="width:100%;padding:10px;border-radius:8px;border:2px solid #e0e0e0;">
+                    <div id="followupCustomerDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:2px solid #667eea;border-top:none;border-radius:0 0 8px 8px;max-height:200px;overflow-y:auto;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
                 </div>
                 <div style="margin-bottom:18px;">
                     <label style="font-weight:600;">Follow-up Date <span style="color:#e74c3c;">*</span></label>
@@ -1525,6 +1525,9 @@
             gap: 8px;
         }
         .product-dropdown-item:hover {
+            background: #f8f9ff;
+        }
+        .followup-customer-item:hover {
             background: #f8f9ff;
         }
         .product-dropdown-item input[type="checkbox"] {
@@ -3318,7 +3321,12 @@
             document.getElementById('newFollowupModal').style.display = 'none';
             document.getElementById('newFollowupForm').reset();
             document.getElementById('followupTypeFields').innerHTML = '';
+            document.getElementById('followupCustomerDropdown').style.display = 'none';
+            document.getElementById('followupCustomer').removeAttribute('data-customer-id');
+            document.getElementById('followupCustomer').removeAttribute('data-customer-phone');
         }
+
+        let followupCustomersList = [];
 
         async function loadFollowupCustomerList() {
             // Reuse customersData if available, else fetch
@@ -3330,9 +3338,54 @@
                     window.customersData = customers;
                 } catch (e) { customers = []; }
             }
-            const list = document.getElementById('followupCustomerList');
-            list.innerHTML = customers.map(c => `<option value="${c.name} (${c.phone})" data-phone="${c.phone}" data-id="${c.id}"></option>`).join('');
+            followupCustomersList = customers;
+            renderFollowupCustomerDropdown(customers);
         }
+
+        function showFollowupCustomerDropdown() {
+            const dropdown = document.getElementById('followupCustomerDropdown');
+            renderFollowupCustomerDropdown(followupCustomersList);
+            dropdown.style.display = 'block';
+        }
+
+        function filterFollowupCustomers() {
+            const searchText = document.getElementById('followupCustomer').value.toLowerCase();
+            const filtered = followupCustomersList.filter(c => 
+                (c.name || '').toLowerCase().includes(searchText) || 
+                (c.phone || '').includes(searchText)
+            );
+            renderFollowupCustomerDropdown(filtered);
+        }
+
+        function renderFollowupCustomerDropdown(customers) {
+            const dropdown = document.getElementById('followupCustomerDropdown');
+            if (!customers.length) {
+                dropdown.innerHTML = '<div style="padding:12px;text-align:center;color:#999;">No customers found</div>';
+                return;
+            }
+            dropdown.innerHTML = customers.map(c => `
+                <div class="followup-customer-item" onclick="selectFollowupCustomer('${c.id}', '${(c.name || '').replace(/'/g, "\\'")}'(${c.phone})', '${c.phone}')" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;">
+                    <div style="font-weight:600;">${c.name || 'Unknown'}</div>
+                    <div style="font-size:12px;color:#666;">${c.phone || ''}</div>
+                </div>
+            `).join('');
+        }
+
+        function selectFollowupCustomer(id, displayName, phone) {
+            document.getElementById('followupCustomer').value = displayName;
+            document.getElementById('followupCustomer').setAttribute('data-customer-id', id);
+            document.getElementById('followupCustomer').setAttribute('data-customer-phone', phone);
+            document.getElementById('followupCustomerDropdown').style.display = 'none';
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const input = document.getElementById('followupCustomer');
+            const dropdown = document.getElementById('followupCustomerDropdown');
+            if (input && dropdown && !input.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
 
         function onFollowupTypeChange(type) {
             const container = document.getElementById('followupTypeFields');
@@ -3351,9 +3404,8 @@
         }
 
         async function submitNewFollowup() {
-            const customerInput = document.getElementById('followupCustomer').value.trim();
-            const customerOpt = Array.from(document.getElementById('followupCustomerList').options).find(o => o.value === customerInput);
-            const phone = customerOpt ? customerOpt.getAttribute('data-phone') : '';
+            const customerInput = document.getElementById('followupCustomer');
+            const phone = customerInput.getAttribute('data-customer-phone') || '';
             if (!phone) { alert('Please select a valid customer.'); return; }
             const followUpAt = document.getElementById('followupDate').value + ' ' + document.getElementById('followupTime').value;
             if (!document.getElementById('followupDate').value) { alert('Please select date.'); return; }
