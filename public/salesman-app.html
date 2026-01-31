@@ -1881,8 +1881,39 @@
 
         async function renderCustomersPage() {
             try {
-                const response = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/customers?tenant_id=${encodeURIComponent(tenantId)}&limit=200`);
-                const customers = response.data || [];
+                let customers = [];
+                try {
+                    const response = await apiFetch(`/api/customers/list/${encodeURIComponent(tenantId)}?limit=500`);
+                    customers = (response.customers || []).map(c => ({
+                        ...c,
+                        name: c.name || c.business_name || c.customer_name || c.first_name || c.company_name || 'Unknown',
+                        phone: c.phone || c.phone_number || c.phoneNumber || c.mobile || '',
+                        last_visit_date: c.last_visit_date || c.last_visit_at || c.last_visit
+                    }));
+                } catch (e) {
+                    console.warn('Customer service list failed, will fallback to visits.', e);
+                }
+
+                if (!customers.length) {
+                    const visitsResp = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/visits?tenant_id=${encodeURIComponent(tenantId)}&limit=500`);
+                    const visits = visitsResp.data || [];
+                    const customerMap = new Map();
+                    visits.forEach(v => {
+                        const key = v.customer_id || v.phone || v.customer_name;
+                        if (!key || customerMap.has(key)) return;
+                        customerMap.set(key, {
+                            id: v.customer_id || key,
+                            name: v.customer_name || 'Unknown',
+                            phone: v.phone || '-',
+                            city: v.city || v.location || '-',
+                            last_visit_date: v.visit_date || v.created_at || null,
+                            total_orders: v.total_orders || 0
+                        });
+                    });
+                    customers = Array.from(customerMap.values());
+                }
+
+                window.customersData = customers;
 
                 // Update stats
                 document.getElementById('customersTotal').textContent = customers.length;
