@@ -385,6 +385,20 @@
                 const result = await response.json();
 
                 if (response.ok && result.success) {
+                    // Check if user is a salesman - redirect to salesman login
+                    if (result.session && result.session.role === 'salesman') {
+                        showError('Please use the salesman login page');
+                        loginBtn.disabled = false;
+                        loginBtnText.classList.remove('hidden');
+                        loginBtnLoader.classList.add('hidden');
+                        
+                        // Redirect to salesman login after 2 seconds
+                        setTimeout(() => {
+                            window.location.href = '/salesman-login.html';
+                        }, 2000);
+                        return;
+                    }
+                    
                     // Store session
                     localStorage.setItem('dashboardSession', JSON.stringify(result.session));
                     
