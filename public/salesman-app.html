@@ -3333,11 +3333,17 @@
             let customers = window.customersData || [];
             if (!customers.length) {
                 try {
+                    console.log('Fetching customers for followup...');
                     const res = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/customers?tenant_id=${encodeURIComponent(tenantId)}&limit=200`);
+                    console.log('Customers response:', res);
                     customers = res.data || [];
                     window.customersData = customers;
-                } catch (e) { customers = []; }
+                } catch (e) { 
+                    console.error('Error loading customers:', e);
+                    customers = []; 
+                }
             }
+            console.log('Total customers loaded:', customers.length);
             followupCustomersList = customers;
             renderFollowupCustomerDropdown(customers);
         }

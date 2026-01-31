@@ -1107,13 +1107,13 @@ router.get('/salesman/:id/customers', authenticateSalesman, async (req, res) => 
                 .from('customer_profiles_new')
                 .select('*')
                 .eq('tenant_id', tenantId)
-                .eq('assigned_salesman_id', id)
+                // Removed assigned_salesman_id filter so all tenant customers are available for follow-ups
                 .order('business_name', { ascending: true })
                 .limit(limit);
             
             if (supaError) {
                 console.error('Supabase error fetching customers:', supaError);
-                customers = [];
+                return res.json({ success: true, data: [], count: 0 });
             } else {
                 // Map business_name to name for frontend compatibility
                 customers = (data || []).map(c => ({
@@ -1125,16 +1125,17 @@ router.get('/salesman/:id/customers', authenticateSalesman, async (req, res) => 
             customers = dbAll(
                 `SELECT *
                  FROM customer_profiles_new
-                 WHERE tenant_id = ? AND assigned_salesman_id = ?
+                 WHERE tenant_id = ?
                  ORDER BY business_name
                  LIMIT ?`,
-                [tenantId, id, limit]
+                [tenantId, limit]
             ).map(c => ({
                 ...c,
                 name: c.business_name || c.name
             }));
         }
 
+        console.log(`Loaded ${customers.length} customers for tenant ${tenantId}`);
         res.json({ success: true, data: customers, count: customers.length });
     } catch (error) {
         console.error('Error getting salesman customers:', error);
