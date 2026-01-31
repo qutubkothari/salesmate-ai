@@ -332,7 +332,6 @@ router.post('/salesman/login', async (req, res) => {
                 .insert({
                     tenant_id: tenantId,
                     salesman_id: salesman_id,
-                    user_id: matchedUser.id,
                     device_id: device_id,
                     device_type: device_type || 'web',
                     device_name: device_name || 'Unknown',
