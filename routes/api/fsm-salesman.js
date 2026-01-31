@@ -340,7 +340,7 @@ router.post('/salesman/login', async (req, res) => {
                     fcm_token: fcm_token,
                     session_token_hash: tokenHash,
                     session_expires_at: expiresAt,
-                    is_online: true,
+                    is_online: 1,
                     last_seen_at: new Date().toISOString(),
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
