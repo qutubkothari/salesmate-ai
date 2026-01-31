@@ -3022,13 +3022,6 @@
                 return;
             }
 
-            // Verify map container has dimensions
-            const container = document.getElementById('territoryMap');
-            if (!container || container.offsetWidth === 0 || container.offsetHeight === 0) {
-                console.log('Map container not ready for heat layer');
-                return;
-            }
-
             // Sample customer locations in India
             const sampleLocations = [
                 [19.0760, 72.8777, 0.8], // Mumbai
