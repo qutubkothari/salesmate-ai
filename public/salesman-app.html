@@ -3334,9 +3334,20 @@
             if (!customers.length) {
                 try {
                     console.log('Fetching customers for followup...');
-                    const res = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/customers?tenant_id=${encodeURIComponent(tenantId)}&limit=200`);
-                    console.log('Customers response:', res);
-                    customers = res.data || [];
+                    const res = await apiFetch(`/api/customers/list/${encodeURIComponent(tenantId)}?limit=500`);
+                    console.log('Customers response (customer service):', res);
+                    customers = res.customers || [];
+                    if (!customers.length) {
+                        console.log('Customer service returned empty, falling back to fsm customers endpoint...');
+                        const fallbackRes = await apiFetch(`/api/fsm/salesman/${encodeURIComponent(salesmanId)}/customers?tenant_id=${encodeURIComponent(tenantId)}&limit=500`);
+                        console.log('Customers response (fsm endpoint):', fallbackRes);
+                        customers = fallbackRes.data || [];
+                    }
+                    customers = (customers || []).map(c => ({
+                        ...c,
+                        name: c.name || c.business_name || c.customer_name || c.first_name || c.company_name || 'Unknown',
+                        phone: c.phone || c.phone_number || c.phoneNumber || c.mobile || ''
+                    }));
                     window.customersData = customers;
                 } catch (e) { 
                     console.error('Error loading customers:', e);
