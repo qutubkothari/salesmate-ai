@@ -1413,6 +1413,10 @@ app.use('/api/integrations/justdial', justdialIntegrationRouter);
 const whatsappWebRouter = require('./routes/api/whatsappWeb');
 app.use('/api/whatsapp-web', whatsappWebRouter);
 
+// WhatsApp Web (whatsapp-web.js) Admin API
+const whatsappWebJsRouter = require('./routes/api/whatsappWebJs');
+app.use('/api/whatsapp-webjs', whatsappWebJsRouter);
+
 // Salesman WhatsApp Connection API
 const salesmanWhatsappRouter = require('./routes/api/salesmanWhatsapp');
 app.use('/api/salesman-whatsapp', salesmanWhatsappRouter);
