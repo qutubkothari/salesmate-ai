@@ -44,8 +44,8 @@ class ErrorRecoveryService {
         const retryCount = await this.getRetryCount(conversationId, errorType);
         
         // Get conversation history for context
-        const memory = await ConversationMemory.getMemory(tenantId, conversationId);
-        const recentContext = memory ? memory.recent_messages.slice(-3) : [];
+        const memory = await ConversationMemory.getMemory(tenantId, phoneNumber);
+        const recentContext = memory ? (memory.recentMessages || []).slice(-3) : [];
         
         // Generate contextual recovery based on error type
         let recovery;

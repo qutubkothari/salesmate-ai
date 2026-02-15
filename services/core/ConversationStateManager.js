@@ -11,7 +11,19 @@
  */
 
 const { dbClient } = require('../config');
-const { toWhatsAppFormat } = require('../../utils/phoneUtils');
+
+function normalizePhoneDigits(phone) {
+    return String(phone || '').replace(/\D/g, '');
+}
+
+function buildPhoneVariants(phone) {
+    const digits = normalizePhoneDigits(phone);
+    const variants = new Set();
+    if (digits) variants.add(digits);
+    if (digits.startsWith('91') && digits.length === 12) variants.add(digits.slice(2));
+    if (digits.length === 10) variants.add(`91${digits}`);
+    return Array.from(variants);
+}
 
 /**
  * Valid conversation states
@@ -92,17 +104,42 @@ async function getState(tenantId, phoneNumber) {
     try {
         validateTenantId(tenantId);
         validatePhone(phoneNumber);
-        
-        const whatsappPhone = toWhatsAppFormat(phoneNumber);
-        
-        const { data, error } = await dbClient
-            .from('conversations')
-            .select('id, state')
-            .eq('tenant_id', tenantId)
-            .eq('end_user_phone', whatsappPhone)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+
+        const variants = buildPhoneVariants(phoneNumber);
+        if (variants.length === 0) {
+            return { state: STATES.INITIAL, conversationId: null };
+        }
+
+        let data = null;
+        let error = null;
+
+        // Prefer exact match
+        for (const v of variants) {
+            ({ data, error } = await dbClient
+                .from('conversations_new')
+                .select('id, state')
+                .eq('tenant_id', tenantId)
+                .eq('end_user_phone', v)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle());
+            if (!error && data) break;
+        }
+
+        // Fallback to ilike if storage isn't normalized
+        if (!data) {
+            for (const v of variants) {
+                ({ data, error } = await dbClient
+                    .from('conversations_new')
+                    .select('id, state')
+                    .eq('tenant_id', tenantId)
+                    .ilike('end_user_phone', `%${v}%`)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle());
+                if (!error && data) break;
+            }
+        }
         
         if (error && error.code !== 'PGRST116') {
             console.error('[StateManager] Error fetching state:', error);
@@ -110,11 +147,11 @@ async function getState(tenantId, phoneNumber) {
         }
         
         if (!data) {
-            console.log(`[StateManager] No conversation found for: ${whatsappPhone}`);
+            console.log(`[StateManager] No conversation found for: ${phoneNumber}`);
             return { state: STATES.INITIAL, conversationId: null };
         }
         
-        console.log(`[StateManager] Current state for ${whatsappPhone}: ${data.state || 'INITIAL'}`);
+        console.log(`[StateManager] Current state for ${phoneNumber}: ${data.state || 'INITIAL'}`);
         return { state: data.state || STATES.INITIAL, conversationId: data.id };
         
     } catch (error) {
@@ -137,8 +174,8 @@ async function setState(tenantId, phoneNumber, newState, options = {}) {
     try {
         validateTenantId(tenantId);
         validatePhone(phoneNumber);
-        
-        const whatsappPhone = toWhatsAppFormat(phoneNumber);
+
+        const cleanPhone = normalizePhoneDigits(phoneNumber);
         const { state: currentState, conversationId } = await getState(tenantId, phoneNumber);
         
         // Validate transition unless forced
@@ -148,20 +185,40 @@ async function setState(tenantId, phoneNumber, newState, options = {}) {
             throw new Error(error);
         }
         
-        if (!conversationId) {
-            console.error('[StateManager] Cannot set state: no conversation exists');
+        let targetConversationId = conversationId;
+        if (!targetConversationId) {
+            const { data: created, error: createError } = await dbClient
+                .from('conversations_new')
+                .insert({
+                    tenant_id: tenantId,
+                    end_user_phone: cleanPhone,
+                    state: newState,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                })
+                .select('id')
+                .maybeSingle();
+
+            if (!createError && created?.id) {
+                targetConversationId = created.id;
+            }
+        }
+
+        if (!targetConversationId) {
+            console.error('[StateManager] Cannot set state: no conversation exists and create failed');
             throw new Error('No conversation found to update state');
         }
-        
-        console.log(`[StateManager] State transition: ${currentState} â†’ ${newState} for ${whatsappPhone}`);
-        
+
+        console.log(`[StateManager] State transition: ${currentState} â†’ ${newState} for ${cleanPhone}`);
+
         const { error } = await dbClient
-            .from('conversations')
+            .from('conversations_new')
             .update({
                 state: newState,
+                last_activity_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
             })
-            .eq('id', conversationId);
+            .eq('id', targetConversationId);
         
         if (error) {
             console.error('[StateManager] Error updating state:', error);
@@ -199,6 +256,11 @@ async function resetState(tenantId, phoneNumber) {
         // Don't throw - reset should be forgiving
         return false;
     }
+}
+
+// Alias used by some webhook paths
+async function clearState(tenantId, phoneNumber) {
+    return await resetState(tenantId, phoneNumber);
 }
 
 /**
@@ -303,6 +365,7 @@ module.exports = {
     getState,
     setState,
     resetState,
+    clearState,
     
     // State checks
     isInState,

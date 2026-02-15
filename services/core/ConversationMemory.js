@@ -11,7 +11,27 @@
  */
 
 const { dbClient } = require('../config');
-const { toWhatsAppFormat } = require('../../utils/phoneUtils');
+
+function normalizePhoneDigits(phone) {
+    return String(phone || '').replace(/\D/g, '');
+}
+
+function buildPhoneVariants(phone) {
+    const digits = normalizePhoneDigits(phone);
+    const variants = new Set();
+    if (digits) variants.add(digits);
+    // Common India prefixes
+    if (digits.startsWith('91') && digits.length === 12) variants.add(digits.slice(2));
+    if (digits.length === 10) variants.add(`91${digits}`);
+    return Array.from(variants);
+}
+
+function normalizeSender(sender) {
+    const s = String(sender || '').toLowerCase();
+    if (s === 'customer' || s === 'user') return 'user';
+    if (s === 'bot' || s === 'assistant') return 'bot';
+    return s || 'user';
+}
 
 /**
  * Maximum messages to keep in memory
@@ -55,40 +75,48 @@ function isMissingColumnError(error, columnName) {
  * Tries multiple phone column names: end_user_phone, phone_number, phone
  * @private
  */
-async function findLatestConversationByPhone(tenantId, cleanPhone) {
-    const candidates = ['end_user_phone', 'phone_number', 'phone'];
-    
-    for (const col of candidates) {
+async function findLatestConversationByPhone(tenantId, phoneNumberRaw) {
+    const variants = buildPhoneVariants(phoneNumberRaw);
+    if (variants.length === 0) return null;
+
+    // Prefer exact matches first
+    for (const v of variants) {
         try {
             const { data, error } = await dbClient
-                .from('conversations')
-                .select('id, last_intent, metadata, created_at')
+                .from('conversations_new')
+                .select('id, last_intent, created_at')
                 .eq('tenant_id', tenantId)
-                .eq(col, cleanPhone)
+                .eq('end_user_phone', v)
                 .order('created_at', { ascending: false })
                 .limit(1)
                 .maybeSingle();
-            
-            // If column doesn't exist, try next candidate
-            if (error && isMissingColumnError(error, col)) {
-                continue;
-            }
-            
-            // If other error, skip this candidate
-            if (error) {
-                continue;
-            }
-            
-            // Success - return the data
-            if (data) {
-                return data;
-            }
-        } catch (e) {
-            // Try next candidate
+
+            if (error) continue;
+            if (data) return data;
+        } catch (_) {
             continue;
         }
     }
-    
+
+    // Fallback: tolerate non-normalized storage (e.g., includes country code prefixes)
+    for (const v of variants) {
+        try {
+            const { data, error } = await dbClient
+                .from('conversations_new')
+                .select('id, last_intent, created_at')
+                .eq('tenant_id', tenantId)
+                .ilike('end_user_phone', `%${v}%`)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (error) continue;
+            if (data) return data;
+        } catch (_) {
+            continue;
+        }
+    }
+
     return null;
 }
 
@@ -111,11 +139,9 @@ async function getMemory(tenantId, phoneNumber) {
     try {
         validateTenantId(tenantId);
         validatePhone(phoneNumber);
-        
-        const whatsappPhone = toWhatsAppFormat(phoneNumber);
-        
-        // Get conversation ID using schema-flexible lookup
-        const conversation = await findLatestConversationByPhone(tenantId, whatsappPhone);
+
+        const cleanPhone = normalizePhoneDigits(phoneNumber);
+        const conversation = await findLatestConversationByPhone(tenantId, cleanPhone);
         
         if (!conversation) {
             console.log('[Memory] No conversation found, returning empty memory');
@@ -132,8 +158,8 @@ async function getMemory(tenantId, phoneNumber) {
         
         // Get recent messages (last N messages)
         const { data: messages } = await dbClient
-            .from('conversation_messages')
-            .select('content, sender, created_at, metadata')
+            .from('messages')
+            .select('message_body, sender, created_at, message_type')
             .eq('conversation_id', conversation.id)
             .order('created_at', { ascending: false })
             .limit(MAX_HISTORY_LENGTH);
@@ -152,7 +178,7 @@ async function getMemory(tenantId, phoneNumber) {
         
         const memory = {
             recentMessages: (messages || []).reverse().map(m => ({
-                content: m.content,
+                content: m.message_body ?? m.content,
                 sender: m.sender,
                 timestamp: m.created_at
             })),
@@ -202,27 +228,41 @@ async function saveMessage(tenantId, phoneNumber, content, sender, metadata = {}
     try {
         validateTenantId(tenantId);
         validatePhone(phoneNumber);
-        
-        const whatsappPhone = toWhatsAppFormat(phoneNumber);
-        
-        // Get or create conversation using schema-flexible lookup
-        const conversation = await findLatestConversationByPhone(tenantId, whatsappPhone);
+
+        const cleanPhone = normalizePhoneDigits(phoneNumber);
+        const conversation = await findLatestConversationByPhone(tenantId, cleanPhone);
         
         if (!conversation) {
             console.log('[Memory] No conversation found, cannot save message');
             return false;
         }
         
-        // Save message
-        const { error } = await dbClient
-            .from('conversation_messages')
+        const normalizedSender = normalizeSender(sender);
+        const messageType = metadata?.message_type || (normalizedSender === 'user' ? 'user_input' : 'bot_response');
+
+        // Save message to the live table. Some older schemas may not have message_type.
+        let { error } = await dbClient
+            .from('messages')
             .insert({
                 conversation_id: conversation.id,
-                content: content,
-                sender: sender,
-                metadata: metadata || {}
+                message_body: content,
+                sender: normalizedSender,
+                message_type: messageType,
+                created_at: new Date().toISOString()
             });
-        
+
+        if (error) {
+            const { message_type: _omit, ...withoutType } = {
+                conversation_id: conversation.id,
+                message_body: content,
+                sender: normalizedSender,
+                message_type: messageType,
+                created_at: new Date().toISOString()
+            };
+            const retry = await dbClient.from('messages').insert(withoutType);
+            error = retry?.error;
+        }
+
         if (error) {
             console.error('[Memory] Error saving message:', error);
             return false;
@@ -249,11 +289,9 @@ async function updateIntent(tenantId, phoneNumber, intent) {
     try {
         validateTenantId(tenantId);
         validatePhone(phoneNumber);
-        
-        const whatsappPhone = toWhatsAppFormat(phoneNumber);
-        
-        // Find conversation using schema-flexible lookup
-        const conversation = await findLatestConversationByPhone(tenantId, whatsappPhone);
+
+        const cleanPhone = normalizePhoneDigits(phoneNumber);
+        const conversation = await findLatestConversationByPhone(tenantId, cleanPhone);
         
         if (!conversation) {
             console.log('[Memory] No conversation found, cannot update intent');
@@ -262,7 +300,7 @@ async function updateIntent(tenantId, phoneNumber, intent) {
         
         // Update by ID to avoid column name issues
         const { error } = await dbClient
-            .from('conversations')
+            .from('conversations_new')
             .update({
                 last_intent: intent,
                 updated_at: new Date().toISOString()
@@ -293,9 +331,8 @@ function extractEntities(messages) {
     const prices = new Set();
     
     messages.forEach(msg => {
-        if (!msg.content) return;
-        
-        const content = msg.content;
+        const content = msg?.content ?? msg?.message_body;
+        if (!content) return;
         
         // Extract product codes (e.g., 10x140, 8x80, NFF 8x100)
         const productPattern = /\b([A-Z]{2,}\s+)?\d+[x*Ã—]\d+\b/gi;
@@ -353,7 +390,7 @@ function buildContextString(memory) {
     
     if (memory.recentMessages.length > 0) {
         const lastCustomerMsg = memory.recentMessages
-            .filter(m => m.sender === 'customer')
+            .filter(m => (m.sender === 'customer' || m.sender === 'user'))
             .pop();
         
         if (lastCustomerMsg) {
@@ -393,21 +430,14 @@ async function pruneOldMessages(tenantId, phoneNumber) {
         validateTenantId(tenantId);
         validatePhone(phoneNumber);
         
-        const whatsappPhone = toWhatsAppFormat(phoneNumber);
-        
-        // Get conversation ID
-        const { data: conversation } = await dbClient
-            .from('conversations')
-            .select('id')
-            .eq('tenant_id', tenantId)
-            .eq('end_user_phone', whatsappPhone)
-            .maybeSingle();
+        const cleanPhone = normalizePhoneDigits(phoneNumber);
+        const conversation = await findLatestConversationByPhone(tenantId, cleanPhone);
         
         if (!conversation) return 0;
         
         // Get IDs of messages to keep
         const { data: keepMessages } = await dbClient
-            .from('conversation_messages')
+            .from('messages')
             .select('id')
             .eq('conversation_id', conversation.id)
             .order('created_at', { ascending: false })
@@ -419,7 +449,7 @@ async function pruneOldMessages(tenantId, phoneNumber) {
         
         // Delete old messages
         const { data: deleted } = await dbClient
-            .from('conversation_messages')
+            .from('messages')
             .delete()
             .eq('conversation_id', conversation.id)
             .not('id', 'in', `(${keepIds.join(',')})`)

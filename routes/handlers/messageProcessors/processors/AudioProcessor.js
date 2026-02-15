@@ -522,7 +522,7 @@ class AIProcessor extends BaseProcessor {
         const { getProductRecommendations } = require('../../../services/recommendationService');
         const { isHandoverRequest, flagAndNotifyForHandover } = require('../../../services/handoverService');
         const { detectHandoverTriggers, notifySalesTeam, sendHandoverResponse } = require('../../../services/humanHandoverService');
-        const { getAIResponse, getAIResponseV2 } = require('../../../services/aiService');
+        const safeAIService = require('../../../services/safeAIService');
         const { trackResponse } = require('../../../services/responseAnalytics');
         const { trackCustomerMessage, trackBotMessage } = require('../../../services/realtimeTestingService');
         const { detectLanguage } = require('../../../services/multiLanguageService');
@@ -602,10 +602,19 @@ class AIProcessor extends BaseProcessor {
                     if (conversationId) {
                         try {
                             const { dbClient } = require('../../../services/config');
-                            await dbClient
-                                .from('conversations')
+                            // Prefer the live table
+                            let updateResult = await dbClient
+                                .from('conversations_new')
                                 .update({ requires_human_attention: true, updated_at: new Date().toISOString() })
                                 .eq('id', conversationId);
+
+                            // Back-compat fallback
+                            if (updateResult?.error) {
+                                await dbClient
+                                    .from('conversations')
+                                    .update({ requires_human_attention: true, updated_at: new Date().toISOString() })
+                                    .eq('id', conversationId);
+                            }
 
                             await upsertTriageForConversation(dbClient, {
                                 tenantId: tenant.id,
@@ -637,18 +646,14 @@ class AIProcessor extends BaseProcessor {
             const userLanguage = await detectLanguage(userQuery);
             const aiPrompt = await this.createDynamicAIPrompt(userQuery, userLanguage, tenant.id, conversation, from);
 
-            let aiResponse;
-            try {
-                aiResponse = await getAIResponseV2(tenant.id, aiPrompt, {
-                    mode: 'fast',
-                    temperature: 0.7,
-                    originalUserQuery: userQuery,
-                    conversationId: conversation?.id || null
-                });
-            } catch (error) {
-                console.error('[AI] V2 failed, using fallback:', error.message);
-                aiResponse = await getAIResponse(tenant.id, aiPrompt);
-            }
+            const aiResponse = await safeAIService.safeAICall(tenant.id, aiPrompt, {
+                mode: 'fast',
+                temperature: 0.7,
+                originalUserQuery: userQuery,
+                conversationId: conversation?.id || null,
+                phoneNumber: from,
+                rawQuery: userQuery
+            });
 
             await trackResponse(tenant.id, userQuery, 'ai', 0.03);
             await this.sendAndLog(from, aiResponse, tenant.id, 'ai_response');

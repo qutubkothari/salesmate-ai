@@ -161,16 +161,7 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
         }
 
         // ===== ENHANCED AI INTELLIGENCE SYSTEM =====
-        // Save message to conversation memory for context tracking
-        if (conversation?.id) {
-            console.log('[ENHANCED_AI] Saving message to conversation memory');
-            await ConversationMemory.saveMessage(
-                conversation.id,
-                userQuery,
-                'user',
-                { intent: null, entities: null } // Will be filled after classification
-            );
-        }
+        // ConversationMemory reads from `messages` (already persisted above), so we don't re-insert here.
 
         // Get conversation context and memory
         const conversationMemory = conversation?.id 
@@ -402,14 +393,9 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
             entities: Object.keys(enhancedIntent.entities || {}).length
         });
         
-        // Save the classified intent back to memory
-        if (conversation?.id) {
-            await ConversationMemory.saveMessage(
-                conversation.id,
-                userQuery,
-                'user',
-                { intent: enhancedIntent.intent, entities: enhancedIntent.entities }
-            );
+        // Persist the classified intent for downstream routing/context (best-effort)
+        if (enhancedIntent?.intent) {
+            await ConversationMemory.updateIntent(tenant.id, from, enhancedIntent.intent);
         }
         
         // Fallback to old intent processing if Enhanced AI not available
