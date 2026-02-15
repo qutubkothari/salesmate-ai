@@ -35,6 +35,29 @@ function setNoCacheJson(res) {
     res.set('ETag', String(Date.now()));
 }
 
+async function getPreferredSessionName(tenantId, providedSessionName) {
+    if (providedSessionName) return String(providedSessionName);
+
+    try {
+        const { data: row } = await dbClient
+            .from('whatsapp_connections')
+            .select('session_name, provider, status, updated_at, is_primary')
+            .eq('tenant_id', tenantId)
+            .eq('provider', 'waha')
+            .order('is_primary', { ascending: false })
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (row?.session_name) return String(row.session_name);
+    } catch (_) {
+        // ignore
+    }
+
+    // Default to a tenant-scoped WAHA session to avoid collisions across tenants.
+    return `tenant_${tenantId}`;
+}
+
 /**
  * POST /api/whatsapp-web/connect
  * Initialize WAHA session for tenant
@@ -47,7 +70,7 @@ router.post('/connect', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Tenant ID is required' });
         }
 
-        const sn = sessionName || 'default';
+        const sn = await getPreferredSessionName(tenantId, sessionName);
         console.log('[WAHA_API] Starting session for tenant:', tenantId, 'session:', sn);
 
         // Check if session exists
@@ -100,9 +123,10 @@ router.post('/connect', async (req, res) => {
 router.get('/qr/:tenantId', async (req, res) => {
     try {
         setNoCacheJson(res);
-        const sessionName = req.query.sessionName || 'default';
+        const { tenantId } = req.params;
+        const sessionName = await getPreferredSessionName(tenantId, req.query.sessionName);
 
-        const cacheKey = `${req.params.tenantId}:${String(sessionName)}`;
+        const cacheKey = `${tenantId}:${String(sessionName)}`;
 
         // Get QR as base64 image
         const qrRes = await wahaRequest('GET', `/api/${sessionName}/auth/qr`, null, 'arraybuffer');
@@ -117,8 +141,9 @@ router.get('/qr/:tenantId', async (req, res) => {
         // If no QR available, session might be connected or not started
         console.log('[WAHA_API] QR not available:', error.response?.status);
 
-        const sessionName = req.query.sessionName || 'default';
-        const cacheKey = `${req.params.tenantId}:${String(sessionName)}`;
+        const { tenantId } = req.params;
+        const sessionName = await getPreferredSessionName(tenantId, req.query.sessionName);
+        const cacheKey = `${tenantId}:${String(sessionName)}`;
         const cached = qrCache.get(cacheKey);
         if (cached?.qrCode && cached?.at && Date.now() - cached.at < QR_CACHE_TTL_MS) {
             return res.json({ success: true, qrCode: cached.qrCode, status: 'qr_ready', cached: true });
@@ -136,7 +161,7 @@ router.get('/status/:tenantId', async (req, res) => {
     try {
         setNoCacheJson(res);
         const { tenantId } = req.params;
-        const sessionName = req.query.sessionName || 'default';
+        const sessionName = await getPreferredSessionName(tenantId, req.query.sessionName);
 
         let wahaStatus = 'disconnected';
         let phoneNumber = null;
@@ -216,7 +241,7 @@ router.post('/disconnect', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Tenant ID is required' });
         }
 
-        const sn = sessionName || 'default';
+        const sn = await getPreferredSessionName(tenantId, sessionName);
         console.log('[WAHA_API] Stopping session:', sn);
 
         try {
