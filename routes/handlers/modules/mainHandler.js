@@ -703,6 +703,75 @@ May I know your name and company name? You can also share a visiting card/busine
                                 // ignore
                             }
 
+                            // Auto-followup: create a follow-up task so it shows up in the system.
+                            try {
+                                const delayMin = Number(process.env.FOLLOWUP_NOT_FOUND_DELAY_MIN || 30);
+                                const followAt = new Date(Date.now() + Math.max(5, delayMin) * 60 * 1000);
+
+                                // Dedupe: if a follow-up was created very recently for this phone, skip.
+                                let skipFollowup = false;
+                                try {
+                                    const { data: lastFup } = await dbClient
+                                        .from('scheduled_followups')
+                                        .select('id, created_at, original_request, status')
+                                        .eq('tenant_id', tenant.id)
+                                        .eq('end_user_phone', from)
+                                        .order('created_at', { ascending: false })
+                                        .limit(1)
+                                        .maybeSingle();
+
+                                    const lastCreatedMs = lastFup?.created_at ? new Date(lastFup.created_at).getTime() : null;
+                                    if (lastCreatedMs && Number.isFinite(lastCreatedMs) && (Date.now() - lastCreatedMs) < (60 * 60 * 1000)) {
+                                        skipFollowup = true;
+                                    }
+                                } catch (_) {
+                                    // ignore
+                                }
+
+                                if (!skipFollowup) {
+                                    const followupId = require('crypto').randomUUID();
+                                    const original = String(userQuery || '').substring(0, 500);
+                                    const description = `Follow up: product/service not found — ${original.substring(0, 120)}`;
+
+                                    await dbClient
+                                        .from('scheduled_followups')
+                                        .insert({
+                                            id: followupId,
+                                            tenant_id: tenant.id,
+                                            end_user_phone: from,
+                                            scheduled_time: followAt.toISOString(),
+                                            description,
+                                            original_request: original,
+                                            conversation_context: JSON.stringify({
+                                                type: 'PRODUCT_NOT_FOUND',
+                                                conversation_id: conversationId,
+                                                source: 'mainHandler',
+                                                smartSource: smartSource || null
+                                            }),
+                                            status: 'scheduled',
+                                            created_at: nowIso
+                                        });
+
+                                    // Best-effort: also set conversation follow_up_* fields if they exist in this Supabase schema.
+                                    try {
+                                        await dbClient
+                                            .from('conversations_new')
+                                            .update({
+                                                follow_up_at: followAt.toISOString(),
+                                                follow_up_note: description,
+                                                follow_up_type: 'call',
+                                                follow_up_priority: 'high',
+                                                updated_at: nowIso
+                                            })
+                                            .eq('id', conversationId);
+                                    } catch (_) {
+                                        // ignore (some schemas won't have these columns)
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn('[MAIN_HANDLER] Auto-followup creation failed:', e?.message || e);
+                            }
+
                             try {
                                 await upsertTriageForConversation(dbClient, {
                                     tenantId: tenant.id,
