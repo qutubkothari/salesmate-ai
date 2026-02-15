@@ -1409,9 +1409,6 @@ app.use('/api/integrations/email', emailIntegrationRouter);
 const justdialIntegrationRouter = require('./routes/api/integrations/justdial');
 app.use('/api/integrations/justdial', justdialIntegrationRouter);
 
-const justdialIntegrationRouter = require('./routes/api/integrations/justdial');
-app.use('/api/integrations/justdial', justdialIntegrationRouter);
-
 // WhatsApp Web Standalone API (separate from existing Maytapi system)
 const whatsappWebRouter = require('./routes/api/whatsappWeb');
 app.use('/api/whatsapp-web', whatsappWebRouter);
