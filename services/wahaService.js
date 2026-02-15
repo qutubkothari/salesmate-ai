@@ -1,8 +1,10 @@
 const axios = require('axios');
 const { toWhatsAppFormat, normalizePhone } = require('./phoneUtils');
 
-const WAHA_URL = process.env.WAHA_URL || 'http://localhost:3000';
-const WAHA_API_KEY = process.env.WAHA_API_KEY || 'your-secret-key';
+// WAHA runs on port 3001 on our VPS (3001->3000 container mapping).
+// Keep defaults aligned with the existing `/api/whatsapp-web/*` routes.
+const WAHA_URL = process.env.WAHA_URL || 'http://localhost:3001';
+const WAHA_API_KEY = process.env.WAHA_API_KEY || 'waha_salesmate_2024';
 
 async function wahaRequest(method, url, data = null, responseType = 'json') {
   const config = {
@@ -10,7 +12,8 @@ async function wahaRequest(method, url, data = null, responseType = 'json') {
     url: `${WAHA_URL}${url}`,
     headers: {
       'Content-Type': 'application/json',
-      // WAHA expects uppercase X-API-KEY
+      // WAHA accepts the API key header; send both casings for compatibility.
+      'X-Api-Key': WAHA_API_KEY,
       'X-API-KEY': WAHA_API_KEY
     },
     responseType
