@@ -88,16 +88,20 @@ const processProactiveMessages = async () => {
   try {
     const { dbClient } = require('./services/config');
     
-    // Get all active tenants
+        // Get tenants and filter active in JS to support both boolean and integer schemas
     const { data: tenants, error } = await dbClient
       .from('tenants')
-      .select('id, business_name')
-      .eq('is_active', true);
+            .select('id, business_name, is_active');
 
     if (error) throw error;
 
+        const activeTenants = (tenants || []).filter((tenant) => {
+            const value = tenant.is_active;
+            return value === true || value === 1 || value === '1';
+        });
+
     let totalScheduled = 0;
-    for (const tenant of tenants || []) {
+        for (const tenant of activeTenants) {
       try {
         console.log(`[PROACTIVE] Processing tenant: ${tenant.business_name} (${tenant.id})`);
         const result = await scheduleProactiveMessages(tenant.id);
@@ -120,16 +124,20 @@ const sendProactiveMessages = async () => {
   try {
     const { dbClient } = require('./services/config');
     
-    // Get all active tenants
+        // Get tenants and filter active in JS to support both boolean and integer schemas
     const { data: tenants, error } = await dbClient
       .from('tenants')
-      .select('id, business_name')
-      .eq('is_active', true);
+            .select('id, business_name, is_active');
 
     if (error) throw error;
 
+        const activeTenants = (tenants || []).filter((tenant) => {
+            const value = tenant.is_active;
+            return value === true || value === 1 || value === '1';
+        });
+
     let totalSent = 0;
-    for (const tenant of tenants || []) {
+        for (const tenant of activeTenants) {
       try {
         console.log(`[PROACTIVE] Sending pending messages for: ${tenant.business_name} (${tenant.id})`);
         await sendPendingMessages(tenant.id);

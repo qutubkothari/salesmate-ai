@@ -3,6 +3,10 @@ const { analyzePurchaseFrequency } = require('../analytics/purchaseFrequency');
 const { analyzeProductAffinity } = require('../analytics/productAffinity');
 const { isUnsubscribed } = require('../unsubscribeService');
 
+function isTruthyLike(value) {
+  return value === true || value === 1 || value === '1' || String(value || '').toLowerCase() === 'true';
+}
+
 /**
  * PROACTIVE MESSAGING SYSTEM
  * Automatically sends reorder reminders to customers
@@ -131,13 +135,13 @@ async function shouldSendProactiveMessage(customer) {
         .from('customer_messaging_preferences')
         .insert({
           customer_profile_id: customer.id,
-          proactive_reminders_enabled: true
+          proactive_reminders_enabled: 1
         });
       return { send: true };
     }
 
     // Check if reminders are enabled
-    if (!prefs.proactive_reminders_enabled) {
+    if (!isTruthyLike(prefs.proactive_reminders_enabled)) {
       return { send: false, reason: 'Reminders disabled' };
     }
 
@@ -159,16 +163,7 @@ async function shouldSendProactiveMessage(customer) {
     // Check for pending messages
     let pendingMessages = null;
     try {
-      if (statusColumnExists === null) {
-        // Probe once whether 'status' column exists; cache the result
-        try {
-          await dbClient.from('proactive_messages').select('status').limit(1).maybeSingle();
-          statusColumnExists = true;
-        } catch (probeErr) {
-          statusColumnExists = false;
-          console.warn('[PROACTIVE] status column probe failed, will use fallback queries');
-        }
-      }
+      const statusColumnExists = await _hasProactiveStatusColumn();
 
       if (statusColumnExists) {
         const q = await dbClient
@@ -495,9 +490,9 @@ async function markMessageAsResponded(customerProfileId, orderId = null) {
     await dbClient
       .from('proactive_messages')
       .update({
-        customer_responded: true,
+        customer_responded: 1,
         response_time: new Date().toISOString(),
-        resulted_in_order: !!orderId,
+        resulted_in_order: orderId ? 1 : 0,
         order_id: orderId
       })
       .eq('id', message.id);
