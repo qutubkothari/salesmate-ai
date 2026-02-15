@@ -15,7 +15,7 @@ const { requireAuth: authenticateToken } = require('../../middleware/authMiddlew
  */
 router.get('/', authenticateToken, async (req, res) => {
     try {
-        const sequences = AutonomousFollowupService.listSequences(req.user.tenantId);
+        const sequences = await AutonomousFollowupService.listSequences(req.user.tenantId);
         res.json({ success: true, sequences });
     } catch (error) {
         console.error('[API] Error listing sequences:', error);
@@ -35,7 +35,7 @@ router.post('/', authenticateToken, async (req, res) => {
             return res.status(400).json({ success: false, error: 'Sequence name required' });
         }
 
-        const result = AutonomousFollowupService.createSequence(
+        const result = await AutonomousFollowupService.createSequence(
             req.user.tenantId,
             { name, type, description, targetCustomerType, targetDealStage },
             req.user.userId
@@ -64,7 +64,7 @@ router.post('/:sequenceId/steps', authenticateToken, async (req, res) => {
             return res.status(400).json({ success: false, error: 'Channel and message body required' });
         }
 
-        const result = AutonomousFollowupService.addStep(
+        const result = await AutonomousFollowupService.addStep(
             req.user.tenantId,
             parseInt(sequenceId),
             {
@@ -102,7 +102,7 @@ router.post('/:sequenceId/enroll', authenticateToken, async (req, res) => {
             return res.status(400).json({ success: false, error: 'Customer ID required' });
         }
 
-        const result = AutonomousFollowupService.enrollContact(
+        const result = await AutonomousFollowupService.enrollContact(
             req.user.tenantId,
             parseInt(sequenceId),
             { customerId, contactId, dealId, source },
@@ -123,7 +123,7 @@ router.post('/:sequenceId/enroll', authenticateToken, async (req, res) => {
 router.get('/:sequenceId/performance', authenticateToken, async (req, res) => {
     try {
         const { sequenceId } = req.params;
-        const performance = AutonomousFollowupService.getSequencePerformance(parseInt(sequenceId));
+        const performance = await AutonomousFollowupService.getSequencePerformance(parseInt(sequenceId));
         res.json({ success: true, ...performance });
     } catch (error) {
         console.error('[API] Error getting performance:', error);
@@ -138,7 +138,7 @@ router.get('/:sequenceId/performance', authenticateToken, async (req, res) => {
 router.post('/:sequenceId/pause', authenticateToken, async (req, res) => {
     try {
         const { sequenceId } = req.params;
-        AutonomousFollowupService.pauseSequence(req.user.tenantId, parseInt(sequenceId));
+        await AutonomousFollowupService.pauseSequence(req.user.tenantId, parseInt(sequenceId));
         res.json({ success: true, message: 'Sequence paused' });
     } catch (error) {
         console.error('[API] Error pausing sequence:', error);
@@ -153,7 +153,7 @@ router.post('/:sequenceId/pause', authenticateToken, async (req, res) => {
 router.post('/:sequenceId/activate', authenticateToken, async (req, res) => {
     try {
         const { sequenceId } = req.params;
-        AutonomousFollowupService.activateSequence(req.user.tenantId, parseInt(sequenceId));
+        await AutonomousFollowupService.activateSequence(req.user.tenantId, parseInt(sequenceId));
         res.json({ success: true, message: 'Sequence activated' });
     } catch (error) {
         console.error('[API] Error activating sequence:', error);
@@ -168,7 +168,7 @@ router.post('/:sequenceId/activate', authenticateToken, async (req, res) => {
 router.post('/messages/:messageId/track/opened', async (req, res) => {
     try {
         const { messageId } = req.params;
-        AutonomousFollowupService.trackOpen(parseInt(messageId));
+        await AutonomousFollowupService.trackOpen(parseInt(messageId));
         res.json({ success: true });
     } catch (error) {
         console.error('[API] Error tracking open:', error);
@@ -184,7 +184,7 @@ router.post('/messages/:messageId/track/clicked', async (req, res) => {
     try {
         const { messageId } = req.params;
         const { linkUrl } = req.body;
-        AutonomousFollowupService.trackClick(parseInt(messageId), linkUrl);
+        await AutonomousFollowupService.trackClick(parseInt(messageId), linkUrl);
         res.json({ success: true });
     } catch (error) {
         console.error('[API] Error tracking click:', error);
@@ -201,7 +201,7 @@ router.post('/enrollments/:enrollmentId/convert', authenticateToken, async (req,
         const { enrollmentId } = req.params;
         const { conversionValue } = req.body;
         
-        AutonomousFollowupService.markConversion(parseInt(enrollmentId), conversionValue);
+        await AutonomousFollowupService.markConversion(parseInt(enrollmentId), conversionValue);
         res.json({ success: true, message: 'Conversion tracked' });
     } catch (error) {
         console.error('[API] Error tracking conversion:', error);

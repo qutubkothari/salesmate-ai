@@ -10,12 +10,67 @@
  */
 
 const Database = require('better-sqlite3');
+const { dbClient } = require('./config');
+
+function usingSupabase() {
+  return String(process.env.USE_SUPABASE || '') === 'true';
+}
+
+function ensureSequencesEnabled() {
+  // Keep this opt-in to avoid accidental blasts.
+  const enabled = String(process.env.ENABLE_AUTONOMOUS_SEQUENCES || '') === '1' ||
+    String(process.env.ENABLE_SUPABASE_AUTONOMOUS_SEQUENCES || '') === '1';
+
+  if (!enabled) {
+    return { enabled: false, reason: 'disabled_by_default' };
+  }
+
+  return { enabled: true };
+}
+
+function mustHaveSupabase() {
+  if (!dbClient || typeof dbClient.from !== 'function') {
+    throw new Error('Supabase dbClient not configured. Set USE_SUPABASE=true and SUPABASE_URL/SUPABASE_SERVICE_KEY.');
+  }
+}
+
+function asText(value) {
+  if (value === undefined || value === null) return null;
+  const s = String(value).trim();
+  return s ? s : null;
+}
 
 class AutonomousFollowupService {
   /**
    * Create a new follow-up sequence
    */
-  static createSequence(tenantId, sequenceData, createdBy) {
+  static async createSequence(tenantId, sequenceData, createdBy) {
+    if (usingSupabase()) {
+      mustHaveSupabase();
+
+      const payload = {
+        tenant_id: asText(tenantId),
+        sequence_name: asText(sequenceData?.name),
+        sequence_type: asText(sequenceData?.type) || 'nurture',
+        description: asText(sequenceData?.description),
+        target_customer_type: asText(sequenceData?.targetCustomerType),
+        target_deal_stage: asText(sequenceData?.targetDealStage),
+        created_by: asText(createdBy),
+      };
+
+      if (!payload.tenant_id) throw new Error('tenantId required');
+      if (!payload.sequence_name) throw new Error('Sequence name required');
+
+      const { data, error } = await dbClient
+        .from('followup_sequences')
+        .insert(payload)
+        .select('id')
+        .single();
+
+      if (error) throw new Error(error.message);
+      return { sequenceId: data.id };
+    }
+
     const db = new Database(process.env.DB_PATH || 'local-database.db');
 
     try {
@@ -44,7 +99,44 @@ class AutonomousFollowupService {
   /**
    * Add step to sequence
    */
-  static addStep(tenantId, sequenceId, stepData) {
+  static async addStep(tenantId, sequenceId, stepData) {
+    if (usingSupabase()) {
+      mustHaveSupabase();
+
+      const skipWeekends = (stepData?.skipWeekends === undefined || stepData?.skipWeekends === null)
+        ? true
+        : Boolean(stepData.skipWeekends);
+
+      const payload = {
+        sequence_id: Number(sequenceId),
+        tenant_id: asText(tenantId),
+        step_number: Number(stepData?.stepNumber || 1),
+        step_name: asText(stepData?.name) || `Step ${Number(stepData?.stepNumber || 1)}`,
+        delay_days: Number(stepData?.delayDays || 0),
+        delay_hours: Number(stepData?.delayHours || 0),
+        send_time: asText(stepData?.sendTime),
+        skip_weekends: skipWeekends,
+        channel: asText(stepData?.channel),
+        subject_line: asText(stepData?.subjectLine),
+        message_body: asText(stepData?.messageBody),
+        cta_text: asText(stepData?.ctaText),
+        cta_url: asText(stepData?.ctaUrl),
+      };
+
+      if (!payload.tenant_id) throw new Error('tenantId required');
+      if (!payload.sequence_id || Number.isNaN(payload.sequence_id)) throw new Error('sequenceId required');
+      if (!payload.channel || !payload.message_body) throw new Error('Channel and message body required');
+
+      const { data, error } = await dbClient
+        .from('sequence_steps')
+        .insert(payload)
+        .select('id')
+        .single();
+
+      if (error) throw new Error(error.message);
+      return { stepId: data.id };
+    }
+
     const db = new Database(process.env.DB_PATH || 'local-database.db');
 
     try {
@@ -63,7 +155,7 @@ class AutonomousFollowupService {
         stepData.delayDays || 0,
         stepData.delayHours || 0,
         stepData.sendTime || null,
-        stepData.skipWeekends ? 1 : 0,
+        (stepData.skipWeekends === undefined || stepData.skipWeekends === null) ? 1 : (stepData.skipWeekends ? 1 : 0),
         stepData.channel,
         stepData.subjectLine || null,
         stepData.messageBody,
@@ -81,7 +173,31 @@ class AutonomousFollowupService {
   /**
    * List all sequences for tenant
    */
-  static listSequences(tenantId) {
+  static async listSequences(tenantId) {
+    if (usingSupabase()) {
+      mustHaveSupabase();
+
+      const { data, error } = await dbClient
+        .from('followup_sequences')
+        .select('*')
+        .eq('tenant_id', asText(tenantId))
+        .order('created_at', { ascending: false });
+
+      if (error) throw new Error(error.message);
+
+      return (data || []).map(seq => ({
+        id: seq.id,
+        name: seq.sequence_name,
+        type: seq.sequence_type,
+        description: seq.description,
+        isActive: Boolean(seq.is_active),
+        enrollments: seq.current_enrollments,
+        totalSent: seq.total_sent,
+        conversionRate: seq.conversion_rate,
+        createdAt: seq.created_at,
+      }));
+    }
+
     const db = new Database(process.env.DB_PATH || 'local-database.db');
 
     try {
@@ -111,7 +227,82 @@ class AutonomousFollowupService {
   /**
    * Enroll contact in sequence
    */
-  static enrollContact(tenantId, sequenceId, enrollmentData, enrolledBy) {
+  static async enrollContact(tenantId, sequenceId, enrollmentData, enrolledBy) {
+    if (usingSupabase()) {
+      mustHaveSupabase();
+
+      const customerId = asText(enrollmentData?.customerId);
+      if (!customerId) throw new Error('Customer ID required');
+
+      // Check if already enrolled
+      const { data: existing, error: existingErr } = await dbClient
+        .from('sequence_enrollments')
+        .select('id')
+        .eq('sequence_id', Number(sequenceId))
+        .eq('customer_id', customerId)
+        .in('enrollment_status', ['active', 'paused'])
+        .limit(1);
+
+      if (existingErr) throw new Error(existingErr.message);
+      if (existing && existing.length) throw new Error('Contact already enrolled in this sequence');
+
+      // Check unsubscribe status
+      const unsubscribed = await this._checkUnsubscribeSupabase(asText(tenantId), customerId, Number(sequenceId));
+      if (unsubscribed) throw new Error('Contact has unsubscribed from this sequence');
+
+      // First step for scheduling
+      const { data: firstStep, error: stepErr } = await dbClient
+        .from('sequence_steps')
+        .select('*')
+        .eq('sequence_id', Number(sequenceId))
+        .order('step_number', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (stepErr) throw new Error(stepErr.message);
+      if (!firstStep) throw new Error('Sequence has no steps');
+
+      const nextSendAt = this._calculateNextSendTime(firstStep);
+
+      const { data: created, error: createErr } = await dbClient
+        .from('sequence_enrollments')
+        .insert({
+          sequence_id: Number(sequenceId),
+          tenant_id: asText(tenantId),
+          customer_id: customerId,
+          contact_id: asText(enrollmentData?.contactId),
+          deal_id: asText(enrollmentData?.dealId),
+          enrolled_by: asText(enrolledBy),
+          enrollment_source: asText(enrollmentData?.source) || 'manual',
+          current_step: 0,
+          next_send_at: nextSendAt,
+        })
+        .select('id')
+        .single();
+
+      if (createErr) throw new Error(createErr.message);
+
+      // Update sequence enrollment count (best-effort)
+      try {
+        const { data: seqRow } = await dbClient
+          .from('followup_sequences')
+          .select('id,current_enrollments')
+          .eq('id', Number(sequenceId))
+          .maybeSingle();
+
+        if (seqRow) {
+          await dbClient
+            .from('followup_sequences')
+            .update({ current_enrollments: Number(seqRow.current_enrollments || 0) + 1 })
+            .eq('id', Number(sequenceId));
+        }
+      } catch (_) {
+        // ignore
+      }
+
+      return { enrollmentId: created.id };
+    }
+
     const db = new Database(process.env.DB_PATH || 'local-database.db');
 
     try {
@@ -182,13 +373,178 @@ class AutonomousFollowupService {
    * Process sequences - send pending messages (cron job)
    */
   static async processSequences() {
-    // This service is SQLite-backed. Production runs primarily on Supabase and
-    // some servers may have a corrupted legacy SQLite file (SQLITE_CORRUPT),
-    // which can destabilize the whole app via cron.
-    //
+    const enabledCheck = ensureSequencesEnabled();
+    if (!enabledCheck.enabled) {
+      return {
+        disabled: true,
+        reason: enabledCheck.reason,
+        processed: 0,
+        sent: 0,
+        failed: 0,
+        completed: 0,
+      };
+    }
+
+    if (usingSupabase()) {
+      mustHaveSupabase();
+
+      const now = new Date().toISOString();
+      const results = { processed: 0, sent: 0, failed: 0, completed: 0 };
+
+      const { data: readyEnrollments, error: enrollErr } = await dbClient
+        .from('sequence_enrollments')
+        .select('*')
+        .eq('enrollment_status', 'active')
+        .not('next_send_at', 'is', null)
+        .lte('next_send_at', now)
+        .limit(100);
+
+      if (enrollErr) throw new Error(enrollErr.message);
+
+      for (const enrollment of readyEnrollments || []) {
+        results.processed++;
+
+        try {
+          const nextStepNumber = Number(enrollment.current_step || 0) + 1;
+          const { data: step, error: stepErr } = await dbClient
+            .from('sequence_steps')
+            .select('*')
+            .eq('sequence_id', Number(enrollment.sequence_id))
+            .eq('step_number', nextStepNumber)
+            .maybeSingle();
+
+          if (stepErr) throw new Error(stepErr.message);
+
+          if (!step) {
+            await dbClient
+              .from('sequence_enrollments')
+              .update({
+                enrollment_status: 'completed',
+                completed_at: new Date().toISOString(),
+                next_send_at: null,
+              })
+              .eq('id', enrollment.id);
+            results.completed++;
+            continue;
+          }
+
+          const customer = await this._getCustomerForEnrollment(enrollment);
+          if (!customer) {
+            results.failed++;
+            continue;
+          }
+
+          const personalizedMessage = this._personalizeMessage(step.message_body, customer, enrollment);
+          const personalizedSubject = step.subject_line
+            ? this._personalizeMessage(step.subject_line, customer, enrollment)
+            : null;
+
+          const recipient = step.channel === 'email' ? customer.email : (customer.phone || customer.customer_phone);
+          const recipientText = asText(recipient);
+          if (!recipientText) {
+            results.failed++;
+            continue;
+          }
+
+          // Create message record as pending
+          const { data: createdMsg, error: msgErr } = await dbClient
+            .from('sequence_messages')
+            .insert({
+              enrollment_id: Number(enrollment.id),
+              step_id: Number(step.id),
+              tenant_id: asText(enrollment.tenant_id),
+              channel: asText(step.channel),
+              recipient_contact: recipientText,
+              subject_line: personalizedSubject,
+              message_body: personalizedMessage,
+              scheduled_send_at: now,
+              delivery_status: 'pending',
+            })
+            .select('id')
+            .single();
+
+          if (msgErr) throw new Error(msgErr.message);
+
+          try {
+            await this._sendMessage(step.channel, recipientText, personalizedSubject, personalizedMessage, enrollment.tenant_id);
+
+            await dbClient
+              .from('sequence_messages')
+              .update({ delivery_status: 'sent', actual_sent_at: new Date().toISOString() })
+              .eq('id', createdMsg.id);
+          } catch (sendErr) {
+            await dbClient
+              .from('sequence_messages')
+              .update({ delivery_status: 'failed', failure_reason: String(sendErr?.message || sendErr) })
+              .eq('id', createdMsg.id);
+            results.failed++;
+            continue;
+          }
+
+          // Next send time
+          const { data: nextStep, error: nextStepErr } = await dbClient
+            .from('sequence_steps')
+            .select('*')
+            .eq('sequence_id', Number(enrollment.sequence_id))
+            .eq('step_number', nextStepNumber + 1)
+            .maybeSingle();
+
+          if (nextStepErr) throw new Error(nextStepErr.message);
+          const nextSendAt = nextStep ? this._calculateNextSendTime(nextStep, now) : null;
+
+          await dbClient
+            .from('sequence_enrollments')
+            .update({
+              current_step: nextStepNumber,
+              next_send_at: nextSendAt,
+              total_messages_sent: Number(enrollment.total_messages_sent || 0) + 1,
+            })
+            .eq('id', enrollment.id);
+
+          // Stats (best-effort)
+          try {
+            await dbClient
+              .from('sequence_steps')
+              .update({ sent_count: Number(step.sent_count || 0) + 1 })
+              .eq('id', step.id);
+
+            const { data: seqRow } = await dbClient
+              .from('followup_sequences')
+              .select('id,total_sent,total_opened,total_clicked,total_replied,total_converted,current_enrollments')
+              .eq('id', Number(enrollment.sequence_id))
+              .maybeSingle();
+
+            if (seqRow) {
+              await dbClient
+                .from('followup_sequences')
+                .update({ total_sent: Number(seqRow.total_sent || 0) + 1 })
+                .eq('id', seqRow.id);
+            }
+          } catch (_) {
+            // ignore
+          }
+
+          results.sent++;
+        } catch (err) {
+          console.error(`Error processing enrollment ${enrollment?.id}:`, err);
+          results.failed++;
+        }
+      }
+
+      return results;
+    }
+
+    // SQLite implementation (legacy/local)
     // Keep it disabled unless explicitly enabled.
     if (String(process.env.ENABLE_SQLITE_AUTONOMOUS_SEQUENCES || '') !== '1') {
-      return { disabled: true, reason: 'disabled_by_default' };
+      return {
+        disabled: true,
+        reason: 'sqlite_disabled',
+        processed: 0,
+        sent: 0,
+        failed: 0,
+        completed: 0,
+      };
     }
 
     const db = new Database(process.env.DB_PATH || 'local-database.db');
@@ -342,7 +698,24 @@ class AutonomousFollowupService {
   /**
    * Pause sequence
    */
-  static pauseSequence(tenantId, sequenceId) {
+  static async pauseSequence(tenantId, sequenceId) {
+    if (usingSupabase()) {
+      mustHaveSupabase();
+      await dbClient
+        .from('followup_sequences')
+        .update({ is_active: false })
+        .eq('id', Number(sequenceId))
+        .eq('tenant_id', asText(tenantId));
+
+      await dbClient
+        .from('sequence_enrollments')
+        .update({ enrollment_status: 'paused' })
+        .eq('sequence_id', Number(sequenceId))
+        .eq('enrollment_status', 'active');
+
+      return;
+    }
+
     const db = new Database(process.env.DB_PATH || 'local-database.db');
 
     try {
@@ -368,7 +741,24 @@ class AutonomousFollowupService {
   /**
    * Activate sequence
    */
-  static activateSequence(tenantId, sequenceId) {
+  static async activateSequence(tenantId, sequenceId) {
+    if (usingSupabase()) {
+      mustHaveSupabase();
+      await dbClient
+        .from('followup_sequences')
+        .update({ is_active: true })
+        .eq('id', Number(sequenceId))
+        .eq('tenant_id', asText(tenantId));
+
+      await dbClient
+        .from('sequence_enrollments')
+        .update({ enrollment_status: 'active' })
+        .eq('sequence_id', Number(sequenceId))
+        .eq('enrollment_status', 'paused');
+
+      return;
+    }
+
     const db = new Database(process.env.DB_PATH || 'local-database.db');
 
     try {
@@ -394,7 +784,79 @@ class AutonomousFollowupService {
   /**
    * Track message opened
    */
-  static trackOpen(messageId) {
+  static async trackOpen(messageId) {
+    if (usingSupabase()) {
+      mustHaveSupabase();
+
+      const { data: message, error } = await dbClient
+        .from('sequence_messages')
+        .select('*')
+        .eq('id', Number(messageId))
+        .maybeSingle();
+
+      if (error) throw new Error(error.message);
+      if (!message) return;
+
+      const isFirstOpen = !message.opened_at;
+      const now = new Date().toISOString();
+
+      await dbClient
+        .from('sequence_messages')
+        .update({
+          opened_at: message.opened_at || now,
+          open_count: Number(message.open_count || 0) + 1,
+        })
+        .eq('id', Number(messageId));
+
+      if (isFirstOpen) {
+        const { data: enrollment } = await dbClient
+          .from('sequence_enrollments')
+          .select('*')
+          .eq('id', Number(message.enrollment_id))
+          .maybeSingle();
+
+        if (enrollment) {
+          await dbClient
+            .from('sequence_enrollments')
+            .update({ total_opened: Number(enrollment.total_opened || 0) + 1 })
+            .eq('id', enrollment.id);
+        }
+
+        const { data: step } = await dbClient
+          .from('sequence_steps')
+          .select('*')
+          .eq('id', Number(message.step_id))
+          .maybeSingle();
+
+        if (step) {
+          await dbClient
+            .from('sequence_steps')
+            .update({ opened_count: Number(step.opened_count || 0) + 1 })
+            .eq('id', step.id);
+        }
+
+        if (enrollment) {
+          const { data: seq } = await dbClient
+            .from('followup_sequences')
+            .select('*')
+            .eq('id', Number(enrollment.sequence_id))
+            .maybeSingle();
+
+          if (seq) {
+            const totalOpened = Number(seq.total_opened || 0) + 1;
+            const totalSent = Number(seq.total_sent || 0);
+            const openRate = totalSent > 0 ? totalOpened / totalSent : 0;
+            await dbClient
+              .from('followup_sequences')
+              .update({ total_opened: totalOpened, open_rate: openRate })
+              .eq('id', seq.id);
+          }
+        }
+      }
+
+      return;
+    }
+
     const db = new Database(process.env.DB_PATH || 'local-database.db');
 
     try {
@@ -443,7 +905,79 @@ class AutonomousFollowupService {
   /**
    * Track link clicked
    */
-  static trackClick(messageId) {
+  static async trackClick(messageId) {
+    if (usingSupabase()) {
+      mustHaveSupabase();
+
+      const { data: message, error } = await dbClient
+        .from('sequence_messages')
+        .select('*')
+        .eq('id', Number(messageId))
+        .maybeSingle();
+
+      if (error) throw new Error(error.message);
+      if (!message) return;
+
+      const isFirstClick = !message.first_clicked_at;
+      const now = new Date().toISOString();
+
+      await dbClient
+        .from('sequence_messages')
+        .update({
+          first_clicked_at: message.first_clicked_at || now,
+          click_count: Number(message.click_count || 0) + 1,
+        })
+        .eq('id', Number(messageId));
+
+      if (isFirstClick) {
+        const { data: enrollment } = await dbClient
+          .from('sequence_enrollments')
+          .select('*')
+          .eq('id', Number(message.enrollment_id))
+          .maybeSingle();
+
+        if (enrollment) {
+          await dbClient
+            .from('sequence_enrollments')
+            .update({ total_clicked: Number(enrollment.total_clicked || 0) + 1 })
+            .eq('id', enrollment.id);
+        }
+
+        const { data: step } = await dbClient
+          .from('sequence_steps')
+          .select('*')
+          .eq('id', Number(message.step_id))
+          .maybeSingle();
+
+        if (step) {
+          await dbClient
+            .from('sequence_steps')
+            .update({ clicked_count: Number(step.clicked_count || 0) + 1 })
+            .eq('id', step.id);
+        }
+
+        if (enrollment) {
+          const { data: seq } = await dbClient
+            .from('followup_sequences')
+            .select('*')
+            .eq('id', Number(enrollment.sequence_id))
+            .maybeSingle();
+
+          if (seq) {
+            const totalClicked = Number(seq.total_clicked || 0) + 1;
+            const totalSent = Number(seq.total_sent || 0);
+            const clickRate = totalSent > 0 ? totalClicked / totalSent : 0;
+            await dbClient
+              .from('followup_sequences')
+              .update({ total_clicked: totalClicked, click_rate: clickRate })
+              .eq('id', seq.id);
+          }
+        }
+      }
+
+      return;
+    }
+
     const db = new Database(process.env.DB_PATH || 'local-database.db');
 
     try {
@@ -489,7 +1023,72 @@ class AutonomousFollowupService {
   /**
    * Track reply
    */
-  static trackReply(messageId, replyText) {
+  static async trackReply(messageId, replyText) {
+    if (usingSupabase()) {
+      mustHaveSupabase();
+
+      const now = new Date().toISOString();
+      await dbClient
+        .from('sequence_messages')
+        .update({ replied_at: now, reply_text: asText(replyText) })
+        .eq('id', Number(messageId));
+
+      const { data: message, error } = await dbClient
+        .from('sequence_messages')
+        .select('*')
+        .eq('id', Number(messageId))
+        .maybeSingle();
+
+      if (error) throw new Error(error.message);
+      if (!message) return;
+
+      const { data: enrollment } = await dbClient
+        .from('sequence_enrollments')
+        .select('*')
+        .eq('id', Number(message.enrollment_id))
+        .maybeSingle();
+
+      if (enrollment) {
+        await dbClient
+          .from('sequence_enrollments')
+          .update({ total_replied: Number(enrollment.total_replied || 0) + 1 })
+          .eq('id', enrollment.id);
+      }
+
+      const { data: step } = await dbClient
+        .from('sequence_steps')
+        .select('*')
+        .eq('id', Number(message.step_id))
+        .maybeSingle();
+
+      if (step) {
+        await dbClient
+          .from('sequence_steps')
+          .update({ replied_count: Number(step.replied_count || 0) + 1 })
+          .eq('id', step.id);
+      }
+
+      if (enrollment) {
+        const { data: seq } = await dbClient
+          .from('followup_sequences')
+          .select('*')
+          .eq('id', Number(enrollment.sequence_id))
+          .maybeSingle();
+
+        if (seq) {
+          const totalReplied = Number(seq.total_replied || 0) + 1;
+          const totalSent = Number(seq.total_sent || 0);
+          const replyRate = totalSent > 0 ? totalReplied / totalSent : 0;
+          await dbClient
+            .from('followup_sequences')
+            .update({ total_replied: totalReplied, reply_rate: replyRate })
+            .eq('id', seq.id);
+        }
+      }
+
+      return;
+    }
+
     const db = new Database(process.env.DB_PATH || 'local-database.db');
 
     try {
@@ -530,7 +1129,49 @@ class AutonomousFollowupService {
   /**
    * Mark enrollment as converted
    */
-  static markConverted(enrollmentId, conversionValue = 0) {
+  static async markConverted(enrollmentId, conversionValue = 0) {
+    if (usingSupabase()) {
+      mustHaveSupabase();
+
+      const { data: enrollment, error: enrollErr } = await dbClient
+        .from('sequence_enrollments')
+        .select('*')
+        .eq('id', Number(enrollmentId))
+        .maybeSingle();
+
+      if (enrollErr) throw new Error(enrollErr.message);
+      if (!enrollment) return;
+
+      await dbClient
+        .from('sequence_enrollments')
+        .update({
+          converted: true,
+          converted_at: new Date().toISOString(),
+          conversion_value: Number(conversionValue || 0),
+          enrollment_status: 'completed',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', enrollment.id);
+
+      const { data: seq } = await dbClient
+        .from('followup_sequences')
+        .select('*')
+        .eq('id', Number(enrollment.sequence_id))
+        .maybeSingle();
+
+      if (seq) {
+        const totalConverted = Number(seq.total_converted || 0) + 1;
+        const denom = Number(seq.current_enrollments || 0) || 0;
+        const conversionRate = denom > 0 ? totalConverted / denom : 0;
+        await dbClient
+          .from('followup_sequences')
+          .update({ total_converted: totalConverted, conversion_rate: conversionRate })
+          .eq('id', seq.id);
+      }
+
+      return;
+    }
+
     const db = new Database(process.env.DB_PATH || 'local-database.db');
 
     try {
@@ -560,7 +1201,72 @@ class AutonomousFollowupService {
   /**
    * Get sequence performance
    */
-  static getSequencePerformance(sequenceId) {
+  static async getSequencePerformance(sequenceId) {
+    if (usingSupabase()) {
+      mustHaveSupabase();
+
+      const { data: sequence, error: seqErr } = await dbClient
+        .from('followup_sequences')
+        .select('*')
+        .eq('id', Number(sequenceId))
+        .maybeSingle();
+
+      if (seqErr) throw new Error(seqErr.message);
+      if (!sequence) throw new Error('Sequence not found');
+
+      const { data: steps, error: stepsErr } = await dbClient
+        .from('sequence_steps')
+        .select('*')
+        .eq('sequence_id', Number(sequenceId))
+        .order('step_number', { ascending: true });
+
+      if (stepsErr) throw new Error(stepsErr.message);
+
+      const { data: enrollments, error: enrollErr } = await dbClient
+        .from('sequence_enrollments')
+        .select('enrollment_status')
+        .eq('sequence_id', Number(sequenceId));
+
+      if (enrollErr) throw new Error(enrollErr.message);
+
+      const breakdown = {};
+      for (const row of enrollments || []) {
+        breakdown[row.enrollment_status] = (breakdown[row.enrollment_status] || 0) + 1;
+      }
+
+      return {
+        sequence: {
+          id: sequence.id,
+          name: sequence.sequence_name,
+          type: sequence.sequence_type,
+          isActive: Boolean(sequence.is_active),
+        },
+        performance: {
+          totalEnrollments: sequence.current_enrollments,
+          totalSent: sequence.total_sent,
+          totalOpened: sequence.total_opened,
+          totalClicked: sequence.total_clicked,
+          totalReplied: sequence.total_replied,
+          totalConverted: sequence.total_converted,
+          openRate: sequence.open_rate,
+          clickRate: sequence.click_rate,
+          replyRate: sequence.reply_rate,
+          conversionRate: sequence.conversion_rate,
+        },
+        steps: (steps || []).map(step => ({
+          stepNumber: step.step_number,
+          name: step.step_name,
+          channel: step.channel,
+          sent: step.sent_count,
+          opened: step.opened_count,
+          clicked: step.clicked_count,
+          replied: step.replied_count,
+          openRate: step.sent_count > 0 ? (step.opened_count / step.sent_count) * 100 : 0,
+        })),
+        enrollmentBreakdown: breakdown,
+      };
+    }
+
     const db = new Database(process.env.DB_PATH || 'local-database.db');
 
     try {
@@ -653,9 +1359,13 @@ class AutonomousFollowupService {
     let personalized = template;
 
     // Replace placeholders
-    personalized = personalized.replace(/\{\{customer_name\}\}/g, customer.customer_name || 'there');
-    personalized = personalized.replace(/\{\{company_name\}\}/g, customer.company_name || customer.customer_name || '');
-    personalized = personalized.replace(/\{\{contact_person\}\}/g, customer.contact_person || '');
+    const customerName = customer.customer_name || customer.business_name || customer.customer_name || customer.contact_person || 'there';
+    const companyName = customer.company_name || customer.business_name || customer.customer_name || '';
+    const contactPerson = customer.contact_person || customer.contact_name || '';
+
+    personalized = personalized.replace(/\{\{customer_name\}\}/g, customerName);
+    personalized = personalized.replace(/\{\{company_name\}\}/g, companyName);
+    personalized = personalized.replace(/\{\{contact_person\}\}/g, contactPerson);
 
     return personalized;
   }
@@ -669,6 +1379,57 @@ class AutonomousFollowupService {
     `).get(tenantId, customerId, sequenceId);
 
     return !!unsubscribe;
+  }
+
+  static async _checkUnsubscribeSupabase(tenantId, customerId, sequenceId) {
+    mustHaveSupabase();
+    if (!tenantId || !customerId) return false;
+
+    const orClause = `unsubscribe_type.eq.all_sequences,sequence_id.eq.${Number(sequenceId)}`;
+    const { data, error } = await dbClient
+      .from('sequence_unsubscribes')
+      .select('id')
+      .eq('tenant_id', asText(tenantId))
+      .eq('customer_id', asText(customerId))
+      .or(orClause)
+      .limit(1);
+
+    if (error) throw new Error(error.message);
+    return !!(data && data.length);
+  }
+
+  static async _getCustomerForEnrollment(enrollment) {
+    mustHaveSupabase();
+
+    const customerId = asText(enrollment?.customer_id);
+    const tenantId = asText(enrollment?.tenant_id);
+    if (!customerId) return null;
+
+    // Prefer the new schema
+    const { data: profile, error } = await dbClient
+      .from('customer_profiles_new')
+      .select('*')
+      .eq('id', customerId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (!error && profile) return profile;
+
+    // Fallback to legacy table name
+    const { data: legacy, error: legacyErr } = await dbClient
+      .from('customer_profiles')
+      .select('*')
+      .eq('id', customerId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (legacyErr) return null;
+    return legacy || null;
+  }
+
+  // Backward-compat alias for route typo
+  static async markConversion(enrollmentId, conversionValue = 0) {
+    return this.markConverted(enrollmentId, conversionValue);
   }
 
   /**

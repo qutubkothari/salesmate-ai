@@ -639,12 +639,16 @@ cron.schedule('*/15 * * * *', async () => {
     try {
         const AutonomousFollowupService = require('./services/autonomous-followup-service');
         const results = await AutonomousFollowupService.processSequences();
-        console.log(`[Scheduler] Follow-up processing complete:`, {
-            processed: results.processed,
-            sent: results.sent,
-            failed: results.failed,
-            completed: results.completed
-        });
+        if (results?.disabled) {
+            console.log('[Scheduler] Follow-up sequences disabled:', results.reason || 'disabled');
+        } else {
+            console.log(`[Scheduler] Follow-up processing complete:`, {
+                processed: results.processed,
+                sent: results.sent,
+                failed: results.failed,
+                completed: results.completed
+            });
+        }
     } catch (error) {
         console.error('[Scheduler] Follow-up processing failed:', error);
     }
