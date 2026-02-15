@@ -1,85 +1,85 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbClient: supabase } = require('../../../services/config');
+const { upsertInboundLead, normalizeChannel, normalizePhone } = require('../../../services/crmInboundLeadService');
 const { requireCrmAuth } = require('../../../middleware/crmAuth');
 const { requireCrmFeature } = require('../../../middleware/requireCrmFeature');
 const { CRM_FEATURES } = require('../../../services/crmFeatureFlags');
 
-function nowIso() {
-  return new Date().toISOString();
-}
+function mapInboundBySource(source, payload = {}) {
+  const normalizedSource = String(source || payload.source || 'whatsapp').toLowerCase();
 
-function normalizeChannel(channel) {
-  return String(channel || 'WHATSAPP').toUpperCase();
-}
-
-async function upsertLeadFromInbound({ tenantId, channel, name, phone, email }) {
-  // Very simple dedupe strategy for now: phone first, else email.
-  const phoneKey = phone ? String(phone).trim() : null;
-  const emailKey = email ? String(email).trim().toLowerCase() : null;
-
-  let lead = null;
-  if (phoneKey) {
-    const { data } = await supabase
-      .from('crm_leads')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('phone', phoneKey)
-      .maybeSingle();
-    lead = data || null;
-  }
-
-  if (!lead && emailKey) {
-    const { data } = await supabase
-      .from('crm_leads')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('email', emailKey)
-      .maybeSingle();
-    lead = data || null;
-  }
-
-  if (lead) {
-    // Patch identity fields if missing
-    const updates = {
-      updated_at: nowIso(),
-      last_activity_at: nowIso()
+  if (normalizedSource === 'indiamart') {
+    return {
+      source: 'indiamart',
+      channel: 'INDIAMART',
+      lead: {
+        name: payload.lead?.name || payload.sender_name || payload.name || payload.full_name || payload.buyer_name || null,
+        phone: normalizePhone(payload.lead?.phone || payload.sender_mobile || payload.phone || payload.mobile || payload.sender_phone || null),
+        email: payload.lead?.email || payload.sender_email || payload.email || null
+      },
+      message: {
+        body: [payload.product_name || payload.product, payload.subject || payload.enquiry_subject, payload.message || payload.requirement || payload.enquiry_message]
+          .filter(Boolean)
+          .join(' - ') || null,
+        externalId: payload.query_id || payload.enquiry_id || payload.external_id || null,
+        rawPayload: payload
+      },
+      triageReason: 'IndiaMart enquiry'
     };
-    if (name && !lead.name) updates.name = String(name).trim();
-    if (phoneKey && !lead.phone) updates.phone = phoneKey;
-    if (emailKey && !lead.email) updates.email = emailKey;
-    if (channel && !lead.channel) updates.channel = normalizeChannel(channel);
-
-    const { data: updated } = await supabase
-      .from('crm_leads')
-      .update(updates)
-      .eq('tenant_id', tenantId)
-      .eq('id', lead.id)
-      .select('*')
-      .single();
-
-    return updated;
   }
 
-  const { data: created, error } = await supabase
-    .from('crm_leads')
-    .insert({
-      tenant_id: tenantId,
-      name: name ? String(name).trim() : null,
-      phone: phoneKey,
-      email: emailKey,
-      channel: normalizeChannel(channel),
-      status: 'NEW',
-      heat: 'COLD',
-      score: 0,
-      last_activity_at: nowIso()
-    })
-    .select('*')
-    .single();
+  if (normalizedSource === 'justdial') {
+    return {
+      source: 'justdial',
+      channel: 'JUSTDIAL',
+      lead: {
+        name: payload.lead?.name || payload.name || payload.sender_name || payload.customer_name || null,
+        phone: normalizePhone(payload.lead?.phone || payload.phone || payload.mobile || payload.contact || null),
+        email: payload.lead?.email || payload.email || null
+      },
+      message: {
+        body: [payload.requirement || payload.message || payload.enquiry, payload.city ? `City: ${payload.city}` : null].filter(Boolean).join(' | ') || null,
+        externalId: payload.lead_id || payload.enquiry_id || payload.external_id || null,
+        rawPayload: payload
+      },
+      triageReason: 'JustDial enquiry'
+    };
+  }
 
-  if (error) throw error;
-  return created;
+  if (normalizedSource === 'website' || normalizedSource === 'website_form') {
+    return {
+      source: 'website_form',
+      channel: 'WEBSITE',
+      lead: {
+        name: payload.lead?.name || payload.name || null,
+        phone: normalizePhone(payload.lead?.phone || payload.phone || null),
+        email: payload.lead?.email || payload.email || null
+      },
+      message: {
+        body: payload.message?.body || payload.message || payload.requirement || null,
+        externalId: payload.message?.externalId || payload.externalId || null,
+        rawPayload: payload
+      },
+      triageReason: 'Website enquiry'
+    };
+  }
+
+  return {
+    source: normalizedSource,
+    channel: normalizeChannel(payload.channel || 'WHATSAPP'),
+    lead: {
+      name: payload.lead?.name || null,
+      phone: normalizePhone(payload.lead?.phone || null),
+      email: payload.lead?.email || null
+    },
+    message: {
+      body: payload.message?.body != null ? String(payload.message.body) : null,
+      externalId: payload.message?.externalId != null ? String(payload.message.externalId) : null,
+      rawPayload: payload.message?.rawPayload != null ? payload.message.rawPayload : payload
+    },
+    triageReason: `${normalizeChannel(payload.channel || normalizedSource)} inbound`
+  };
 }
 
 /**
@@ -90,37 +90,19 @@ async function upsertLeadFromInbound({ tenantId, channel, name, phone, email }) 
 router.post('/', requireCrmAuth, requireCrmFeature(CRM_FEATURES.CRM_INGEST), async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
-    const channel = normalizeChannel(req.body?.channel);
+    const mapped = mapInboundBySource(req.body?.source, req.body || {});
 
-    const leadInput = req.body?.lead || {};
-    const msgInput = req.body?.message || {};
-
-    const lead = await upsertLeadFromInbound({
+    const result = await upsertInboundLead({
       tenantId,
-      channel,
-      name: leadInput.name,
-      phone: leadInput.phone,
-      email: leadInput.email
+      source: mapped.source,
+      channel: mapped.channel,
+      leadInput: mapped.lead,
+      messageInput: mapped.message,
+      triageReason: mapped.triageReason,
+      autoAssign: true
     });
 
-    const { data: msg, error } = await supabase
-      .from('crm_messages')
-      .insert({
-        tenant_id: tenantId,
-        lead_id: lead.id,
-        direction: 'INBOUND',
-        channel,
-        body: msgInput.body != null ? String(msgInput.body) : null,
-        external_id: msgInput.externalId != null ? String(msgInput.externalId) : null,
-        raw_payload: msgInput.rawPayload != null ? msgInput.rawPayload : null,
-        created_at: nowIso()
-      })
-      .select('*')
-      .single();
-
-    if (error) throw error;
-
-    return res.json({ success: true, lead, message: msg });
+    return res.json({ success: true, ...result });
   } catch (e) {
     return res.status(500).json({ success: false, error: 'ingest_failed', details: e?.message || String(e) });
   }
@@ -142,36 +124,19 @@ router.post('/webhook', requireCrmFeature(CRM_FEATURES.CRM_INGEST), async (req, 
     const { tenantId } = req.body || {};
     if (!tenantId) return res.status(400).json({ success: false, error: 'tenantId required' });
 
-    const channel = normalizeChannel(req.body?.channel);
-    const leadInput = req.body?.lead || {};
-    const msgInput = req.body?.message || {};
+    const mapped = mapInboundBySource(req.body?.source, req.body || {});
 
-    const lead = await upsertLeadFromInbound({
+    const result = await upsertInboundLead({
       tenantId,
-      channel,
-      name: leadInput.name,
-      phone: leadInput.phone,
-      email: leadInput.email
+      source: mapped.source,
+      channel: mapped.channel,
+      leadInput: mapped.lead,
+      messageInput: mapped.message,
+      triageReason: mapped.triageReason || `${mapped.channel} webhook inbound`,
+      autoAssign: true
     });
 
-    const { data: msg, error } = await supabase
-      .from('crm_messages')
-      .insert({
-        tenant_id: tenantId,
-        lead_id: lead.id,
-        direction: 'INBOUND',
-        channel,
-        body: msgInput.body != null ? String(msgInput.body) : null,
-        external_id: msgInput.externalId != null ? String(msgInput.externalId) : null,
-        raw_payload: msgInput.rawPayload != null ? msgInput.rawPayload : null,
-        created_at: nowIso()
-      })
-      .select('*')
-      .single();
-
-    if (error) throw error;
-
-    return res.json({ success: true, lead, message: msg });
+    return res.json({ success: true, ...result });
   } catch (e) {
     return res.status(500).json({ success: false, error: 'webhook_ingest_failed', details: e?.message || String(e) });
   }

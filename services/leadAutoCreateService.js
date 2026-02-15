@@ -526,7 +526,7 @@ async function getLeadAssignmentSettings(tenantId) {
             considerScore: config?.consider_score === 1 || config?.consider_score === true,
             assignmentMode,
             caps: customRules.caps || {},
-            weights: customRules.weights || { conversion: 0.5, repeat: 0.3, revenue: 0.2 },
+            weights: customRules.weights || { conversion: 0.45, repeat: 0.25, revenue: 0.2, workload: 0.1 },
             windowDays: customRules.window_days || 30,
             rrIndex: customRules.rr_index || 0,
             customRules
@@ -578,6 +578,13 @@ async function autoAssignLead(tenantId, leadId) {
             selectedSalesman = await selectSalesmanBalancedPerformance({ tenantId, salesmen });
             if (selectedSalesman) {
                 console.log('[AUTO_ASSIGN] BALANCED_PERFORMANCE selected:', selectedSalesman.name);
+            }
+        }
+
+        if (!selectedSalesman && settings.assignmentMode === 'WEIGHTED_ROUND_ROBIN') {
+            selectedSalesman = await selectSalesmanWeightedRoundRobin({ tenantId, salesmen, settings });
+            if (selectedSalesman) {
+                console.log('[AUTO_ASSIGN] WEIGHTED_ROUND_ROBIN selected:', selectedSalesman.name);
             }
         }
 
@@ -885,7 +892,63 @@ async function selectSalesmanBalancedPerformance({ tenantId, salesmen }) {
     return scored[0] || null;
 }
 
+async function selectSalesmanWeightedRoundRobin({ tenantId, salesmen, settings }) {
+    const salesmenWithWorkload = await getSalesmenWithActiveLeads(tenantId, salesmen);
+    const thirtyDaysAgo = new Date(Date.now() - (30 * 24 * 60 * 60 * 1000)).toISOString();
+
+    const { data: wins } = await dbClient
+        .from('crm_leads')
+        .select('assigned_user_id')
+        .eq('tenant_id', tenantId)
+        .eq('status', 'WON')
+        .gte('updated_at', thirtyDaysAgo);
+
+    const winCountByUser = new Map();
+    (wins || []).forEach(row => {
+        if (!row.assigned_user_id) return;
+        winCountByUser.set(row.assigned_user_id, (winCountByUser.get(row.assigned_user_id) || 0) + 1);
+    });
+
+    const maxWorkload = Math.max(1, ...salesmenWithWorkload.map(s => s.activeLeads || 0));
+    const maxWins = Math.max(1, ...salesmenWithWorkload.map(s => winCountByUser.get(s.id) || 0));
+
+    const weights = settings.weights || {};
+    const conversionW = Number(weights.conversion ?? 0.45);
+    const repeatW = Number(weights.repeat ?? 0.25);
+    const revenueW = Number(weights.revenue ?? 0.2);
+    const workloadW = Number(weights.workload ?? 0.1);
+
+    const candidates = salesmenWithWorkload.map((salesman) => {
+        const winsNorm = (winCountByUser.get(salesman.id) || 0) / maxWins;
+        const workloadNorm = (salesman.activeLeads || 0) / maxWorkload;
+
+        const weightedScore =
+            (conversionW * winsNorm) +
+            (repeatW * winsNorm) +
+            (revenueW * winsNorm) +
+            (workloadW * (1 - workloadNorm));
+
+        return {
+            salesman,
+            weight: Math.max(0.05, Number(weightedScore.toFixed(4)))
+        };
+    });
+
+    const total = candidates.reduce((sum, c) => sum + c.weight, 0);
+    let pick = Math.random() * total;
+
+    for (const candidate of candidates) {
+        pick -= candidate.weight;
+        if (pick <= 0) {
+            return candidate.salesman;
+        }
+    }
+
+    return candidates[0]?.salesman || null;
+}
+
 module.exports = {
+    analyzeLeadQuality,
     createLeadFromWhatsApp,
     getLeadAssignmentSettings,
     autoAssignLead

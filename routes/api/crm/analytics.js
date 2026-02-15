@@ -356,29 +356,44 @@ router.get('/team-performance', requireCrmAuth, requireCrmFeature(CRM_FEATURES.C
  * GET /api/crm/analytics/executive-insights
  * Management-grade summary with actionable red flags.
  */
-router.get('/executive-insights', requireCrmAuth, requireCrmFeature(CRM_FEATURES.CRM_LEADS), requireRole(['OWNER', 'ADMIN', 'MANAGER']), async (req, res) => {
+router.get('/executive-insights', requireCrmAuth, requireRole(['OWNER', 'ADMIN', 'MANAGER']), async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000)).toISOString();
+    const previousSevenDaysAgo = new Date(now.getTime() - (14 * 24 * 60 * 60 * 1000)).toISOString();
     const fourteenDaysAgo = new Date(now.getTime() - (14 * 24 * 60 * 60 * 1000)).toISOString();
     const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000)).toISOString();
 
-    const { data: leads, error: leadsErr } = await supabase
-      .from('crm_leads')
-      .select('id, status, heat, score, assigned_user_id, created_at, updated_at, last_activity_at, channel')
-      .eq('tenant_id', tenantId)
-      .limit(5000);
+    const [{ data: leads, error: leadsErr }, { data: triageItems }, { data: users }] = await Promise.all([
+      supabase
+        .from('crm_leads')
+        .select('id, status, heat, score, assigned_user_id, created_at, updated_at, last_activity_at, channel')
+        .eq('tenant_id', tenantId)
+        .limit(7000),
+      supabase
+        .from('crm_triage_items')
+        .select('id, status, assigned_user_id, updated_at, created_at')
+        .eq('tenant_id', tenantId)
+        .limit(7000),
+      supabase
+        .from('crm_users')
+        .select('id, name, role')
+        .eq('tenant_id', tenantId)
+    ]);
 
     if (leadsErr) throw leadsErr;
 
     const allLeads = leads || [];
+    const triage = triageItems || [];
     const staleLeads = allLeads.filter(l => (l.last_activity_at || l.updated_at || l.created_at || '') < fourteenDaysAgo);
     const onFireUnassigned = allLeads.filter(l => String(l.heat || '').toUpperCase() === 'ON_FIRE' && !l.assigned_user_id);
     const hotUnassigned = allLeads.filter(l => ['HOT', 'ON_FIRE'].includes(String(l.heat || '').toUpperCase()) && !l.assigned_user_id);
     const wonLeads = allLeads.filter(l => String(l.status || '').toUpperCase() === 'WON');
     const lostLeads = allLeads.filter(l => String(l.status || '').toUpperCase() === 'LOST');
     const newLast7 = allLeads.filter(l => (l.created_at || '') >= sevenDaysAgo);
+    const newPrev7 = allLeads.filter(l => (l.created_at || '') >= previousSevenDaysAgo && (l.created_at || '') < sevenDaysAgo);
+    const openPipeline = allLeads.filter(l => !['WON', 'LOST'].includes(String(l.status || '').toUpperCase()));
 
     const highRiskChurn = allLeads.filter(l => {
       const heat = String(l.heat || '').toUpperCase();
@@ -386,6 +401,29 @@ router.get('/executive-insights', requireCrmAuth, requireCrmFeature(CRM_FEATURES
       const idle = (l.last_activity_at || l.updated_at || l.created_at || '') < thirtyDaysAgo;
       return ['HOT', 'ON_FIRE', 'WARM'].includes(heat) && !['WON', 'LOST'].includes(status) && idle;
     });
+
+    const staleOpenTriage = triage.filter(t => {
+      const status = String(t.status || '').toUpperCase();
+      return ['OPEN', 'ASSIGNED'].includes(status) && (t.updated_at || t.created_at || '') < sevenDaysAgo;
+    });
+
+    const unownedTriage = triage.filter(t => {
+      const status = String(t.status || '').toUpperCase();
+      return status === 'OPEN' && !t.assigned_user_id;
+    });
+
+    const avgResponseHours = (() => {
+      const durations = [];
+      for (const lead of allLeads) {
+        const created = lead.created_at ? new Date(lead.created_at).getTime() : null;
+        const touched = lead.last_activity_at ? new Date(lead.last_activity_at).getTime() : null;
+        if (created && touched && touched > created) {
+          durations.push((touched - created) / (1000 * 60 * 60));
+        }
+      }
+      if (!durations.length) return 0;
+      return Number((durations.reduce((sum, h) => sum + h, 0) / durations.length).toFixed(1));
+    })();
 
     let overdueFollowupsCount = 0;
     try {
@@ -404,12 +442,58 @@ router.get('/executive-insights', requireCrmAuth, requireCrmFeature(CRM_FEATURES
     const winRate = allLeads.length > 0 ? Number(((wonLeads.length / allLeads.length) * 100).toFixed(2)) : 0;
     const lossRate = allLeads.length > 0 ? Number(((lostLeads.length / allLeads.length) * 100).toFixed(2)) : 0;
     const avgScore = allLeads.length > 0 ? Number((allLeads.reduce((s, l) => s + (Number(l.score) || 0), 0) / allLeads.length).toFixed(1)) : 0;
+    const leadVelocityDelta = newPrev7.length > 0
+      ? Number((((newLast7.length - newPrev7.length) / newPrev7.length) * 100).toFixed(2))
+      : (newLast7.length > 0 ? 100 : 0);
 
     const channelMix = {};
     allLeads.forEach(l => {
       const key = String(l.channel || 'UNKNOWN').toUpperCase();
       channelMix[key] = (channelMix[key] || 0) + 1;
     });
+
+    const channelMixLast7 = {};
+    const channelMixPrev7 = {};
+    newLast7.forEach(l => {
+      const key = String(l.channel || 'UNKNOWN').toUpperCase();
+      channelMixLast7[key] = (channelMixLast7[key] || 0) + 1;
+    });
+    newPrev7.forEach(l => {
+      const key = String(l.channel || 'UNKNOWN').toUpperCase();
+      channelMixPrev7[key] = (channelMixPrev7[key] || 0) + 1;
+    });
+
+    const channelTrends = Object.keys({ ...channelMixLast7, ...channelMixPrev7 }).map(channel => {
+      const current = channelMixLast7[channel] || 0;
+      const previous = channelMixPrev7[channel] || 0;
+      const deltaPct = previous > 0 ? Number((((current - previous) / previous) * 100).toFixed(2)) : (current > 0 ? 100 : 0);
+      return { channel, current, previous, deltaPct };
+    }).sort((a, b) => b.current - a.current);
+
+    const teamMap = new Map((users || []).map(u => [u.id, { id: u.id, name: u.name || 'Unknown', role: u.role || null, openLeads: 0, wonLast30: 0 }]));
+    openPipeline.forEach(lead => {
+      if (!lead.assigned_user_id) return;
+      if (!teamMap.has(lead.assigned_user_id)) {
+        teamMap.set(lead.assigned_user_id, { id: lead.assigned_user_id, name: 'Unknown', role: null, openLeads: 0, wonLast30: 0 });
+      }
+      teamMap.get(lead.assigned_user_id).openLeads += 1;
+    });
+    const wonLast30 = allLeads.filter(l => String(l.status || '').toUpperCase() === 'WON' && (l.updated_at || l.created_at || '') >= thirtyDaysAgo);
+    wonLast30.forEach(lead => {
+      if (!lead.assigned_user_id) return;
+      if (!teamMap.has(lead.assigned_user_id)) {
+        teamMap.set(lead.assigned_user_id, { id: lead.assigned_user_id, name: 'Unknown', role: null, openLeads: 0, wonLast30: 0 });
+      }
+      teamMap.get(lead.assigned_user_id).wonLast30 += 1;
+    });
+
+    const teamPressure = Array.from(teamMap.values())
+      .map(user => ({
+        ...user,
+        pressureScore: Number((user.openLeads * 0.7 - user.wonLast30 * 0.3).toFixed(2))
+      }))
+      .sort((a, b) => b.pressureScore - a.pressureScore)
+      .slice(0, 10);
 
     const redFlags = [];
     if (onFireUnassigned.length > 0) {
@@ -424,11 +508,18 @@ router.get('/executive-insights', requireCrmAuth, requireCrmFeature(CRM_FEATURES
     if (staleLeads.length > 0) {
       redFlags.push({ type: 'medium', code: 'STALE_PIPELINE', count: staleLeads.length, message: `${staleLeads.length} leads inactive for >14 days` });
     }
+    if (unownedTriage.length > 0) {
+      redFlags.push({ type: 'high', code: 'TRIAGE_UNOWNED', count: unownedTriage.length, message: `${unownedTriage.length} triage items are open without owner` });
+    }
+    if (staleOpenTriage.length > 0) {
+      redFlags.push({ type: 'medium', code: 'TRIAGE_STALE', count: staleOpenTriage.length, message: `${staleOpenTriage.length} triage items have no progress in 7+ days` });
+    }
 
     const recommendations = [
       hotUnassigned.length > 0 ? `Assign ${hotUnassigned.length} hot leads immediately using round-robin + capacity rules` : null,
       overdueFollowupsCount > 0 ? `Clear ${overdueFollowupsCount} overdue follow-ups in the next 24 hours` : null,
       highRiskChurn.length > 0 ? `Run reactivation sequence for ${highRiskChurn.length} at-risk leads (WhatsApp + call)` : null,
+      avgResponseHours > 24 ? 'Reduce first response SLA below 24h for new leads' : null,
       winRate < 10 && allLeads.length >= 20 ? 'Review qualification criteria and first-response SLA to improve conversion' : null
     ].filter(Boolean);
 
@@ -437,14 +528,20 @@ router.get('/executive-insights', requireCrmAuth, requireCrmFeature(CRM_FEATURES
       summary: {
         totalLeads: allLeads.length,
         newLast7Days: newLast7.length,
+        newPrev7Days: newPrev7.length,
+        leadVelocityDeltaPct: leadVelocityDelta,
         winRate,
         lossRate,
         avgScore,
+        avgResponseHours,
         overdueFollowups: overdueFollowupsCount,
         highRiskChurn: highRiskChurn.length,
-        staleLeads: staleLeads.length
+        staleLeads: staleLeads.length,
+        unownedTriage: unownedTriage.length
       },
       channelMix,
+      channelTrends,
+      teamPressure,
       redFlags,
       recommendations
     });
