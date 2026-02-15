@@ -182,10 +182,13 @@ class AutonomousFollowupService {
    * Process sequences - send pending messages (cron job)
    */
   static async processSequences() {
-    // This service is currently SQLite-backed. In Supabase mode, the local SQLite
-    // database may be absent/corrupted and can destabilize the whole app.
-    if (String(process.env.USE_SUPABASE || '').toLowerCase() === 'true') {
-      return { disabled: true, reason: 'supabase_mode' };
+    // This service is SQLite-backed. Production runs primarily on Supabase and
+    // some servers may have a corrupted legacy SQLite file (SQLITE_CORRUPT),
+    // which can destabilize the whole app via cron.
+    //
+    // Keep it disabled unless explicitly enabled.
+    if (String(process.env.ENABLE_SQLITE_AUTONOMOUS_SEQUENCES || '') !== '1') {
+      return { disabled: true, reason: 'disabled_by_default' };
     }
 
     const db = new Database(process.env.DB_PATH || 'local-database.db');
