@@ -243,18 +243,51 @@ const sendMessage = async (to, text, tenantId = null) => {
             return await sendViaMaytapi(to, cleanText, cfg);
         }
 
-        console.log('[WHATSAPP_SEND] Provider: WhatsApp Web (tenant)', tenantId);
-        const { getClientStatus, sendWebMessage } = require('./whatsappWebService');
-        const status = getClientStatus(String(tenantId));
-        if (!status || status.status !== 'ready') {
+        // WhatsApp Web (WAHA)
+        // IMPORTANT: This must match the existing in-app QR scan/connect flow.
+        console.log('[WHATSAPP_SEND] Provider: WhatsApp Web (WAHA tenant)', tenantId);
+        const { wahaRequest } = require('./wahaService');
+        const { toWhatsAppFormat, normalizePhone } = require('./phoneUtils');
+
+        const resolvedTenantId = String(tenantId);
+        let sessionName = 'default';
+        try {
+            const { data: conn } = await dbClient
+                .from('whatsapp_connections')
+                .select('session_name,status,provider,updated_at')
+                .eq('tenant_id', resolvedTenantId)
+                .order('updated_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (conn?.session_name) sessionName = String(conn.session_name);
+        } catch (_) {
+            // ignore; keep default
+        }
+
+        // Preflight session status
+        const statusRes = await wahaRequest('GET', `/api/sessions/${sessionName}`);
+        const sessionStatus = statusRes?.data?.status;
+        if (sessionStatus !== 'WORKING') {
             throw new Error('WhatsApp Web is not connected for this tenant. Please connect via QR code first.');
         }
 
-        const result = await sendWebMessage(String(tenantId), to, cleanText);
-        if (!result?.success) {
-            throw new Error('Failed to send WhatsApp Web message');
+        const normalized = normalizePhone(to);
+        const chatId = toWhatsAppFormat(normalized);
+        if (!chatId) {
+            throw new Error('Invalid recipient phone number');
         }
-        return result.messageId || result.message_id || ('waweb_' + Date.now());
+
+        const resp = await wahaRequest('POST', '/api/sendText', {
+            session: sessionName,
+            chatId,
+            text: cleanText
+        });
+        if (resp?.data?.error) {
+            throw new Error(resp.data.error);
+        }
+
+        return resp?.data?.id || resp?.data?.messageId || ('waha_' + Date.now());
     } catch (error) {
         console.error('Error sending WhatsApp message:', error.message);
         return null;
