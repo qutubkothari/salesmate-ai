@@ -22,14 +22,16 @@ async function _resolveCustomerProfilesTable() {
   if (_customerProfilesTableName) return _customerProfilesTableName;
 
   try {
-    await dbClient.from('customer_profiles').select('id').limit(1).maybeSingle();
+    const probe = await dbClient.from('customer_profiles').select('id').limit(1);
+    if (probe?.error) throw probe.error;
     _customerProfilesTableName = 'customer_profiles';
     return _customerProfilesTableName;
   } catch (_) {
   }
 
   try {
-    await dbClient.from('customer_profiles_new').select('id').limit(1).maybeSingle();
+    const probe2 = await dbClient.from('customer_profiles_new').select('id').limit(1);
+    if (probe2?.error) throw probe2.error;
     _customerProfilesTableName = 'customer_profiles_new';
     return _customerProfilesTableName;
   } catch (_) {

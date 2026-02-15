@@ -3,7 +3,7 @@ const { isFeatureEnabled } = require('../services/crmFeatureFlags');
 function requireCrmFeature(featureKey) {
   return async (req, res, next) => {
     try {
-      const tenantId = req.user?.tenantId || req.params?.tenantId;
+      const tenantId = req.user?.tenantId || req.params?.tenantId || req.body?.tenantId || req.query?.tenantId;
       if (!tenantId) return res.status(400).json({ success: false, error: 'missing_tenant' });
 
       const enabled = await isFeatureEnabled(tenantId, featureKey);
