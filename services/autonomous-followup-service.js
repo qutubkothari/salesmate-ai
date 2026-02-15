@@ -1441,20 +1441,28 @@ class AutonomousFollowupService {
       if (channel === 'whatsapp') {
         // Send via WhatsApp
         const { sendMessage } = require('./whatsappService');
-        await sendMessage(tenantId, recipient, messageBody);
-        
+        const messageId = await sendMessage(recipient, messageBody, tenantId);
+
+        if (!messageId) {
+          throw new Error('WhatsApp send failed (provider returned null)');
+        }
+
         console.log(`[FOLLOWUP] WhatsApp sent to ${recipient}`);
-        return { success: true, channel: 'whatsapp' };
+        return { success: true, channel: 'whatsapp', messageId };
         
       } else if (channel === 'email') {
         // Send via Email (if email service is configured)
         const emailService = require('./emailService');
-        await emailService.sendEmail({
+        const emailResult = await emailService.sendEmail({
           to: recipient,
           subject: subject,
           body: messageBody,
           tenantId: tenantId
         });
+
+        if (emailResult === false) {
+          throw new Error('Email send failed');
+        }
         
         console.log(`[FOLLOWUP] Email sent to ${recipient}`);
         return { success: true, channel: 'email' };
