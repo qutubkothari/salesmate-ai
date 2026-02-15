@@ -68,10 +68,21 @@ const handleCustomer = async (req, res) => {
         // If customer shares structured details, capture immediately
         try {
             const text = String(userQuery || '');
+            const textTrim = text.trim();
+            const looksLikeGreetingOnly = /^\s*(hi+|hello+|hey+|hlo+|hii+|namaste|salaam|salam|assalam|as-salam|good\s*(morning|afternoon|evening))\b/i.test(textTrim);
+            const hasExplicitLabels = /\bname\s*[:=\-]|\b(company|business)\s*[:=\-]/i.test(text);
             const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
             const nameMatch = text.match(/\bname\s*[:=\-]\s*([^\n\r]+)/i);
             const companyMatch = text.match(/\b(company|business)\s*[:=\-]\s*([^\n\r]+)/i);
             const emailMatch = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+
+            // Guardrail: do NOT treat greetings/single-line chat as customer details.
+            // Only attempt parsing if the message actually looks like a details payload.
+            const looksLikeDetailsPayload = !!(hasExplicitLabels || emailMatch || lines.length >= 2);
+            if (!looksLikeDetailsPayload || looksLikeGreetingOnly) {
+                // Skip parsing
+                throw new Error('skip_details_parse');
+            }
 
             const parsed = {
                 name: nameMatch ? nameMatch[1].trim() : null,
@@ -130,7 +141,10 @@ const handleCustomer = async (req, res) => {
                 }
             }
         } catch (detailsParseErr) {
-            console.warn('[CUSTOMER_HANDLER] Failed to parse/save customer details:', detailsParseErr?.message || detailsParseErr);
+            const msg = detailsParseErr?.message || '';
+            if (msg !== 'skip_details_parse') {
+                console.warn('[CUSTOMER_HANDLER] Failed to parse/save customer details:', detailsParseErr?.message || detailsParseErr);
+            }
         }
 
         // Fetch latest conversation context

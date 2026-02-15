@@ -424,6 +424,21 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
         console.log('[MAIN_HANDLER] Final intent decision:', finalIntent, 
             enhancedIntent ? `(Enhanced AI: ${enhancedIntent.confidence})` : '(Legacy)');
 
+        // STEP 1.9: Deterministic greeting fast-path
+        // Avoid expensive AI for greetings and prevent generic/off-tone replies.
+        if (String(finalIntent || '').toLowerCase() === 'greeting') {
+            const businessName = (tenant.business_name || 'Salesmate').toString().trim();
+            const reply = `Hi! 👋 Welcome to ${businessName}.
+
+How can I help you today?
+• Type "catalog" to see products
+• Ask "price of <product>" for rates
+• Or tell me what you need + quantity (e.g., "8x80 5 cartons")`;
+
+            await sendAndSaveMessage(from, reply, conversation?.id || null, tenant.id);
+            return res.status(200).json({ ok: true, type: 'greeting_fastpath' });
+        }
+
         // STEP 2: Smart routing based on Enhanced AI classification
         console.log('[MAIN_HANDLER] STEP 2: Smart Intent Routing');
         
