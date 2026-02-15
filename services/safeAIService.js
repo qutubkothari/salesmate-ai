@@ -55,7 +55,14 @@ class SafeAIService {
             const enhancedOptions = {
                 mode: prompt.length < 200 ? 'fast' : (options.mode || 'fast'),
                 temperature: options.temperature || 0.7,
-                max_tokens: Math.min(options.max_tokens || 150, 300) // Limit tokens to reduce cost
+                max_tokens: Math.min(options.max_tokens || 150, 300) // Note: V2 doesn't always use this, but keep for forward-compat.
+            };
+
+            // Preserve caller-provided context fields consumed by getAIResponseV2
+            // (conversationId, rawQuery, phoneNumber, etc.) while enforcing cheap-mode defaults.
+            const v2Options = {
+                ...(options || {}),
+                ...(enhancedOptions || {})
             };
 
             let aiResponse;
@@ -64,8 +71,8 @@ class SafeAIService {
             // Try V2 first (faster, cheaper)
             try {
                 console.log('[SAFE_AI] Attempting AI V2 call...');
-                aiResponse = await getAIResponseV2(tenantId, prompt, enhancedOptions);
-                actualCost = this.estimateCost(prompt, enhancedOptions);
+                aiResponse = await getAIResponseV2(tenantId, prompt, v2Options);
+                actualCost = this.estimateCost(prompt, v2Options);
             } catch (v2Error) {
                 console.warn('[SAFE_AI] V2 failed, trying fallback:', v2Error.message);
                 aiResponse = await getAIResponse(tenantId, prompt);

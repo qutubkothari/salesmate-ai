@@ -1,13 +1,16 @@
 // services/multiLanguageService.js
 const { openai } = require('./config');
 
+const FAST_MODEL = process.env.AI_MODEL_FAST || 'gpt-4o-mini';
+
 /**
  * Detect language from user message
  */
 const detectLanguage = async (text) => {
   try {
+    if (!openai) return 'en';
     const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: FAST_MODEL,
       messages: [{
         role: "system", 
         content: `Detect the language of the message. Respond with ONLY one of these codes:
@@ -43,6 +46,7 @@ const translateMessage = async (text, targetLanguage) => {
   if (targetLanguage === 'en') return text;
   
   try {
+    if (!openai) return text;
     const languageMap = {
       'hi': 'Hindi (हिंदी)',
       'hinglish': 'Hinglish - a natural mix of Hindi and English commonly used in India',
@@ -61,7 +65,7 @@ const translateMessage = async (text, targetLanguage) => {
     const targetLangName = languageMap[targetLanguage] || targetLanguage.toUpperCase();
     
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: FAST_MODEL,
       messages: [{
         role: "system",
         content: `You are a professional translator. Translate the following business/sales message to ${targetLangName}. 

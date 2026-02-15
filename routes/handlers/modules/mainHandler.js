@@ -613,9 +613,24 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
             }
         }
 
-        // STEP 3: SKIPPED - Smart Response Router deprecated in favor of AI
-        // Use AI for all general queries instead of hardcoded smart responses
-        console.log('[MAIN_HANDLER] STEP 3: Skipping Smart Response Router (deprecated), moving directly to AI');
+        // STEP 3: Smart Response Router (DB-first fast paths, reduces AI cost)
+        // Try deterministic/catalog/price handlers before falling back to full AI.
+        console.log('[MAIN_HANDLER] STEP 3: Trying Smart Response Router before AI fallback');
+        try {
+            const { getSmartResponse } = require('../../../services/smartResponseRouter');
+            const smart = await getSmartResponse(userQuery, tenant.id, from);
+            const smartText = typeof smart === 'string'
+                ? smart
+                : (smart && typeof smart.response === 'string' ? smart.response : null);
+
+            if (smartText && smartText.trim()) {
+                console.log('[MAIN_HANDLER] Smart Router handled the query');
+                await sendAndSaveMessage(from, smartText, conversation?.id, tenant.id);
+                return res.status(200).json({ ok: true, type: 'smart_response' });
+            }
+        } catch (e) {
+            console.warn('[MAIN_HANDLER] Smart Router failed, continuing to AI:', e?.message || e);
+        }
         
         // STEP 3.5: Check if we need clarification (low confidence or ambiguous input)
         console.log('[MAIN_HANDLER] STEP 3.5: Proactive Clarification Check');
@@ -662,27 +677,36 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
             return res.status(200).json({ ok: true, type: 'website_reply' });
         }
 
-        // STEP 4: Fallback to AI response WITH WEBSITE CONTEXT
-        console.log('[MAIN_HANDLER] STEP 4: AI Fallback with website context');
-        const { getAIResponseV2 } = require('../../../services/aiService');
+        // STEP 4: Fallback to AI response WITH WEBSITE CONTEXT (cost-controlled)
+        console.log('[MAIN_HANDLER] STEP 4: AI Fallback with website context (safeAIService)');
+        const safeAIService = require('../../../services/safeAIService');
 
         // Build AI prompt with conversation history (use existing conversationContext from intent processing)
         const aiPrompt = conversationContext ? 
             `Previous messages:\n${conversationContext}\n\nCustomer just said: ${userQuery}` :
             userQuery;
 
-        console.log('[MAIN_HANDLER] Calling getAIResponseV2 for tenant:', tenant.id);
-        const aiResponse = await getAIResponseV2(tenant.id, aiPrompt, {
-            phoneNumber: from,
-            tenantId: tenant.id,
-            conversationId: conversation?.id,
-            rawQuery: userQuery,          // exact last user message for website search
-            userQuery: userQuery,         // pass through for embedding prompt
-            originalUserQuery: userQuery  // backward compatibility
-        });
+        console.log('[MAIN_HANDLER] Calling safeAIService for tenant:', tenant.id);
+        const aiResult = await safeAIService.getResponse(
+            userQuery,
+            tenant.id,
+            from,
+            aiPrompt,
+            {
+                // Pass-through fields consumed by getAIResponseV2
+                phoneNumber: from,
+                tenantId: tenant.id,
+                conversationId: conversation?.id,
+                rawQuery: userQuery,          // exact last user message for website search
+                userQuery: userQuery,         // pass through for embedding prompt
+                originalUserQuery: userQuery, // backward compatibility
+                mode: 'fast'
+            }
+        );
 
-        console.log('[MAIN_HANDLER] AI Response generated:', aiResponse ? 'SUCCESS' : 'FAILED');
-        await sendAndSaveMessage(from, aiResponse, conversation?.id, tenant.id);
+        const aiText = (aiResult && typeof aiResult.response === 'string') ? aiResult.response : String(aiResult || '');
+        console.log('[MAIN_HANDLER] AI Response generated:', aiText ? 'SUCCESS' : 'FAILED', 'source:', aiResult?.source);
+        await sendAndSaveMessage(from, aiText, conversation?.id, tenant.id);
         return res.status(200).json({ ok: true, type: 'ai_response_v2' });
 
     } catch (error) {
