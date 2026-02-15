@@ -803,38 +803,70 @@ app.post('/api/waha/webhook', async (req, res) => {
     // Log full body for debugging
     console.log(`[WAHA] Webhook received: ${event}`, JSON.stringify(body).substring(0, 500));
 
-    // CRITICAL: Skip ALL outgoing messages to prevent infinite loops
+    const eventName = String(event || '').toLowerCase();
+    const payload = body.payload || {};
+
+    const looksLikeMessagePayload = !!(
+      payload.body ||
+      payload.text ||
+      payload._data?.body ||
+      payload.chatId ||
+      payload.from
+    );
+
+    const isMessageEvent =
+      eventName === 'message' ||
+      eventName.startsWith('message.') ||
+      eventName.startsWith('message_') ||
+      eventName.startsWith('message-') ||
+      eventName.includes('message');
+
+    if (!(isMessageEvent || looksLikeMessagePayload)) {
+      return res.json({ ok: true, ignored: true, event: eventName || event || null });
+    }
+
+    // CRITICAL: Skip ALL outgoing messages to prevent infinite loops (only for message-like events)
     // Check multiple fields that indicate outgoing message
-    const isFromMe = body.payload?.fromMe || body.payload?._data?.id?.fromMe || body.me?.id === body.payload?.from;
-    
+    const isFromMe =
+      payload?.fromMe ||
+      payload?._data?.id?.fromMe ||
+      (body.me?.id && payload?.from && body.me.id === payload.from);
+
     if (isFromMe) {
       console.log('[WAHA] Skipping outgoing message (fromMe=true)');
       return res.json({ ok: true, skipped: true, reason: 'fromMe' });
     }
 
-    // Handle incoming message
-    if (event === 'message') {
-      // WAHA payload structure: payload.from, payload.body OR payload._data.body
-      const payload = body.payload || {};
-      
-      // CRITICAL: Message deduplication to prevent infinite loops
-      const messageId = payload.id || payload._data?.id?.id || `${payload.from}_${payload.timestamp}`;
-      if (processedMessageIds.has(messageId)) {
-        console.log('[WAHA] Skipping duplicate message:', messageId);
-        return res.json({ ok: true, skipped: true, reason: 'duplicate' });
-      }
-      processedMessageIds.add(messageId);
-      
-      const from = String(payload.from || payload.chatId || '').replace('@c.us', '');
-      const message = String(payload.body || payload._data?.body || payload.text || '');
-      
-      // Skip if no message body or from self
-      if (!from || !message) {
-        console.log('[WAHA] Skipping: no from or message');
-        return res.json({ ok: true, skipped: true, reason: 'no_content' });
-      }
-      
-      console.log(`[WAHA] Processing incoming message from ${from}: ${message.substring(0, 50)}...`);
+    const rawChatId = String(
+      payload.chatId ||
+      payload.from ||
+      payload._data?.id?.remote ||
+      payload._data?.from ||
+      ''
+    );
+
+    const from = rawChatId.replace('@c.us', '').replace(/\D/g, '');
+    const message = String(payload.body || payload._data?.body || payload.text || '').trim();
+
+    // Skip if no message body
+    if (!from || !message) {
+      console.log('[WAHA] Skipping: no from or message');
+      return res.json({ ok: true, skipped: true, reason: 'no_content' });
+    }
+
+    // CRITICAL: Message deduplication to prevent infinite loops
+    const messageId =
+      payload.id ||
+      payload._data?.id?.id ||
+      payload._data?.id?._serialized ||
+      `${rawChatId}_${payload.timestamp || body.timestamp || Date.now()}`;
+    if (processedMessageIds.has(messageId)) {
+      console.log('[WAHA] Skipping duplicate message:', messageId);
+      return res.json({ ok: true, skipped: true, reason: 'duplicate' });
+    }
+    processedMessageIds.add(messageId);
+
+    console.log(`[WAHA] Processing incoming message from ${from}: ${message.substring(0, 50)}...`);
 
       // Global opt-out enforcement for replies
       try {
@@ -953,11 +985,17 @@ app.post('/api/waha/webhook', async (req, res) => {
         global.capturedMessage = prevCaptured;
         global.capturedMessages = prevCapturedMessages;
 
+        let replyChatId = String(payload.from || payload.chatId || '').trim();
+        if (replyChatId && !/@c\.us$/i.test(replyChatId)) {
+          const digits = replyChatId.replace(/\D/g, '');
+          if (digits) replyChatId = `${digits}@c.us`;
+        }
+
         for (const text of outgoing) {
           if (typeof text !== 'string' || !text.trim()) continue;
           await wahaRequest('POST', '/api/sendText', {
             session: session,
-            chatId: payload.from,
+            chatId: replyChatId,
             text
           });
         }
@@ -965,8 +1003,6 @@ app.post('/api/waha/webhook', async (req, res) => {
           console.log(`[WAHA] Sent ${outgoing.length} captured reply message(s) to ${from}`);
         }
       }
-    }
-
     res.json({ ok: true });
 
   } catch (error) {
