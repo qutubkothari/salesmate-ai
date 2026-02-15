@@ -1103,47 +1103,109 @@ router.get('/salesman/:id/customers', authenticateSalesman, async (req, res) => 
 
         let customers;
         if (USE_SUPABASE) {
-            // Query from visits to get customers that actually have visit history
-            const { data: visitsData, error: supaError } = await dbClient
-                .from('visits')
-                .select(`
-                    customer_id,
-                    customer_profiles_new!visits_customer_id_fkey(id, business_name, phone, email, address, tenant_id)
-                `)
-                .eq('tenant_id', tenantId)
-                .not('customer_profiles_new', 'is', null)
-                .limit(500);
-            
-            if (supaError) {
-                console.error('Supabase error fetching customers from visits:', supaError);
-                return res.json({ success: true, data: [], count: 0 });
-            }
-            
-            // Get unique customers and map fields
             const customerMap = new Map();
-            (visitsData || []).forEach(v => {
-                const cust = v.customer_profiles_new;
-                if (cust && cust.id && !customerMap.has(cust.id)) {
-                    customerMap.set(cust.id, {
-                        ...cust,
-                        name: cust.business_name || cust.name
+
+            const { data: profileData, error: profileError } = await dbClient
+                .from('customer_profiles_new')
+                .select('id, business_name, phone, email, address, city, state, assigned_salesman_id, status, created_at, updated_at')
+                .eq('tenant_id', tenantId)
+                .limit(Math.max(limit * 5, 500));
+
+            if (profileError) {
+                console.error('Supabase error fetching customer profiles:', profileError);
+            } else {
+                (profileData || []).forEach(c => {
+                    const key = c.id || c.phone || c.business_name;
+                    if (!key) return;
+                    customerMap.set(key, {
+                        ...c,
+                        name: c.business_name || c.name || 'Unknown',
+                        phone: c.phone || '',
+                        source: 'profile'
                     });
-                }
-            });
-            customers = Array.from(customerMap.values()).slice(0, limit);
+                });
+            }
+
+            const { data: visitsData, error: visitsError } = await dbClient
+                .from('visits')
+                .select('customer_id, customer_name, phone, city, location, visit_date, created_at')
+                .eq('tenant_id', tenantId)
+                .order('visit_date', { ascending: false })
+                .limit(3000);
+
+            if (visitsError) {
+                console.error('Supabase error fetching visits for customers:', visitsError);
+            } else {
+                (visitsData || []).forEach(v => {
+                    const key = v.customer_id || v.phone || v.customer_name;
+                    if (!key) return;
+                    const existing = customerMap.get(key) || {};
+                    customerMap.set(key, {
+                        id: v.customer_id || existing.id || key,
+                        business_name: existing.business_name || v.customer_name || existing.name || 'Unknown',
+                        name: existing.name || existing.business_name || v.customer_name || 'Unknown',
+                        phone: existing.phone || v.phone || '',
+                        city: existing.city || v.city || v.location || '',
+                        status: existing.status || 'active',
+                        last_visit_date: existing.last_visit_date || v.visit_date || v.created_at || null,
+                        source: existing.source || 'visits'
+                    });
+                });
+            }
+
+            customers = Array.from(customerMap.values())
+                .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                .slice(0, limit);
         } else {
-            customers = dbAll(
-                `SELECT DISTINCT c.*
-                 FROM customer_profiles_new c
-                 INNER JOIN visits v ON v.customer_id = c.id
-                 WHERE c.tenant_id = ?
-                 ORDER BY c.business_name
+            const profileRows = dbAll(
+                `SELECT id, business_name, phone, email, address, city, state, assigned_salesman_id, status, created_at, updated_at
+                 FROM customer_profiles_new
+                 WHERE tenant_id = ?
+                 ORDER BY business_name
                  LIMIT ?`,
-                [tenantId, limit]
-            ).map(c => ({
-                ...c,
-                name: c.business_name || c.name
-            }));
+                [tenantId, Math.max(limit * 5, 500)]
+            );
+
+            const visitRows = dbAll(
+                `SELECT customer_id, customer_name, phone, city, location, visit_date, created_at
+                 FROM visits
+                 WHERE tenant_id = ?
+                 ORDER BY datetime(visit_date) DESC, datetime(created_at) DESC
+                 LIMIT 3000`,
+                [tenantId]
+            );
+
+            const customerMap = new Map();
+            profileRows.forEach(c => {
+                const key = c.id || c.phone || c.business_name;
+                if (!key) return;
+                customerMap.set(key, {
+                    ...c,
+                    name: c.business_name || c.name || 'Unknown',
+                    phone: c.phone || '',
+                    source: 'profile'
+                });
+            });
+
+            visitRows.forEach(v => {
+                const key = v.customer_id || v.phone || v.customer_name;
+                if (!key) return;
+                const existing = customerMap.get(key) || {};
+                customerMap.set(key, {
+                    id: v.customer_id || existing.id || key,
+                    business_name: existing.business_name || v.customer_name || existing.name || 'Unknown',
+                    name: existing.name || existing.business_name || v.customer_name || 'Unknown',
+                    phone: existing.phone || v.phone || '',
+                    city: existing.city || v.city || v.location || '',
+                    status: existing.status || 'active',
+                    last_visit_date: existing.last_visit_date || v.visit_date || v.created_at || null,
+                    source: existing.source || 'visits'
+                });
+            });
+
+            customers = Array.from(customerMap.values())
+                .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                .slice(0, limit);
         }
 
         console.log(`Loaded ${customers.length} customers for tenant ${tenantId}`);
