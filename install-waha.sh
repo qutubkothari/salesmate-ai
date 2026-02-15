@@ -61,8 +61,9 @@ sudo docker run -d \
   -p 3001:3000 \
   --add-host=host.docker.internal:host-gateway \
   -v ~/waha-data:/app/.sessions \
+    -e WHATSAPP_DEFAULT_ENGINE=GOWS \
   -e WHATSAPP_HOOK_URL=http://host.docker.internal:8057/api/waha/webhook \
-  -e WHATSAPP_HOOK_EVENTS=message,session.status \
+    -e WHATSAPP_HOOK_EVENTS=message.any,message,session.status \
   -e WHATSAPP_API_KEY=waha_salesmate_2024 \
   devlikeapro/waha:latest
 
