@@ -5,6 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { dbClient } = require('../../services/config');
+const { processScheduledFollowUps } = require('../../services/followUpSchedulerService');
 
 const USE_SUPABASE = process.env.USE_SUPABASE === 'true';
 
@@ -1457,7 +1458,7 @@ router.post('/salesman/:id/followups', authenticateSalesman, async (req, res) =>
                 end_user_phone: phone,
                 scheduled_time: followUpAt,
                 message: followUpNote || `Follow-up: ${followUpType}`,
-                status: 'pending',
+                status: 'scheduled',
                 created_by: salesmanId,
                 created_at: new Date().toISOString()
             });
@@ -1511,6 +1512,24 @@ router.put('/salesman/:id/followups/:conversationId/complete', authenticateSales
     } catch (error) {
         console.error('Error completing followup:', error);
         res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.post('/followups/process-due', async (req, res) => {
+    try {
+        const adminKey = process.env.FSM_ADMIN_KEY;
+        if (!adminKey) {
+            return res.status(403).json({ success: false, error: 'FSM_ADMIN_KEY not configured' });
+        }
+        if (req.headers['x-admin-key'] !== adminKey) {
+            return res.status(403).json({ success: false, error: 'Forbidden' });
+        }
+
+        await processScheduledFollowUps();
+        return res.json({ success: true, message: 'Follow-up due processor executed' });
+    } catch (error) {
+        console.error('Error processing due followups:', error);
+        return res.status(500).json({ success: false, error: error.message });
     }
 });
 
@@ -2060,7 +2079,75 @@ router.get('/salesman/:id/ai/recommendations', authenticateSalesman, async (req,
         const tenantId = getTenantId(req);
         
         if (USE_SUPABASE) {
-            return res.json({ success: true, data: [] });
+            const { data: visitsData, error: visitsError } = await dbClient
+                .from('visits')
+                .select('customer_id, customer_name, phone, visit_date, created_at, potential')
+                .eq('tenant_id', tenantId)
+                .eq('salesman_id', id)
+                .order('visit_date', { ascending: false })
+                .limit(2000);
+
+            if (visitsError) throw visitsError;
+
+            const customerMap = new Map();
+            (visitsData || []).forEach(v => {
+                const key = v.customer_id || v.phone || v.customer_name;
+                if (!key) return;
+
+                const existing = customerMap.get(key) || {
+                    customer: v.customer_name || 'Unknown',
+                    last_visit: null,
+                    highPotentialVisits: 0,
+                    totalVisits: 0
+                };
+
+                const visitDate = v.visit_date || v.created_at;
+                if (!existing.last_visit || (visitDate && new Date(visitDate) > new Date(existing.last_visit))) {
+                    existing.last_visit = visitDate;
+                }
+
+                existing.totalVisits += 1;
+                if (String(v.potential || '').toLowerCase() === 'high') {
+                    existing.highPotentialVisits += 1;
+                }
+
+                customerMap.set(key, existing);
+            });
+
+            const recommendations = Array.from(customerMap.values()).map(c => {
+                const daysSinceVisit = c.last_visit
+                    ? Math.floor((Date.now() - new Date(c.last_visit).getTime()) / (1000 * 60 * 60 * 24))
+                    : 999;
+
+                let score = 50;
+                if (daysSinceVisit > 30) score += 30;
+                else if (daysSinceVisit > 14) score += 20;
+                else if (daysSinceVisit > 7) score += 10;
+
+                if (c.highPotentialVisits >= 5) score += 15;
+                else if (c.highPotentialVisits >= 3) score += 10;
+                else if (c.highPotentialVisits >= 1) score += 5;
+
+                score = Math.min(99, score);
+
+                let reason = 'Regular follow-up';
+                if (daysSinceVisit > 30) reason = `High potential - not visited in ${daysSinceVisit} days`;
+                else if (c.highPotentialVisits > 2) reason = 'Frequent high-potential engagement';
+
+                const times = ['9:00 AM', '10:00 AM', '11:00 AM', '2:00 PM', '3:00 PM', '4:00 PM'];
+                const bestTime = times[Math.floor(Math.random() * times.length)];
+
+                return {
+                    customer: c.customer,
+                    reason,
+                    score,
+                    potential: score >= 80 ? 'High' : score >= 60 ? 'Medium' : 'Low',
+                    bestTime,
+                    daysSinceVisit
+                };
+            }).sort((a, b) => b.score - a.score).slice(0, 5);
+
+            return res.json({ success: true, data: recommendations });
         }
 
         // Get customers sorted by priority score (using visits data since orders table doesn't exist)
@@ -2131,7 +2218,58 @@ router.get('/salesman/:id/ai/alerts', authenticateSalesman, async (req, res) => 
         const tenantId = getTenantId(req);
         
         if (USE_SUPABASE) {
-            return res.json({ success: true, data: [] });
+            const alerts = [];
+
+            const { data: visitsData, error: visitsError } = await dbClient
+                .from('visits')
+                .select('customer_name, visit_date, created_at, next_action, next_action_date')
+                .eq('tenant_id', tenantId)
+                .eq('salesman_id', id)
+                .order('visit_date', { ascending: false })
+                .limit(3000);
+
+            if (visitsError) throw visitsError;
+
+            const latestByCustomer = new Map();
+            (visitsData || []).forEach(v => {
+                const key = v.customer_name;
+                if (!key) return;
+                const dateVal = v.visit_date || v.created_at;
+                const prev = latestByCustomer.get(key);
+                if (!prev || (dateVal && new Date(dateVal) > new Date(prev))) {
+                    latestByCustomer.set(key, dateVal);
+                }
+            });
+
+            latestByCustomer.forEach((lastVisit, customerName) => {
+                if (!lastVisit) return;
+                const daysSince = Math.floor((Date.now() - new Date(lastVisit).getTime()) / (1000 * 60 * 60 * 24));
+                if (daysSince >= 20) {
+                    alerts.push({
+                        type: 'warning',
+                        icon: 'exclamation-triangle',
+                        message: `${customerName} has not been visited in ${daysSince} days`,
+                        action: 'Visit Now',
+                        customer: customerName
+                    });
+                }
+            });
+
+            (visitsData || []).forEach(v => {
+                if (!v.next_action_date || !v.next_action) return;
+                const dueDate = new Date(v.next_action_date);
+                if (dueDate < new Date()) {
+                    alerts.push({
+                        type: 'info',
+                        icon: 'calendar',
+                        message: `Follow-up due: ${v.customer_name || 'Customer'} (${String(v.next_action_date).split('T')[0]})`,
+                        action: 'Call',
+                        customer: v.customer_name || 'Customer'
+                    });
+                }
+            });
+
+            return res.json({ success: true, data: alerts.slice(0, 5) });
         }
         const alerts = [];
 

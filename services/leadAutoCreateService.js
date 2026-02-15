@@ -574,6 +574,13 @@ async function autoAssignLead(tenantId, leadId) {
             }
         }
 
+        if (!selectedSalesman && settings.assignmentMode === 'BALANCED_PERFORMANCE') {
+            selectedSalesman = await selectSalesmanBalancedPerformance({ tenantId, salesmen });
+            if (selectedSalesman) {
+                console.log('[AUTO_ASSIGN] BALANCED_PERFORMANCE selected:', selectedSalesman.name);
+            }
+        }
+
         if (!selectedSalesman) {
             if (settings.strategy === 'LEAST_ACTIVE') {
                 const salesmenWithCounts = await getSalesmenWithActiveLeads(tenantId, salesmen);
@@ -625,7 +632,8 @@ async function autoAssignLead(tenantId, leadId) {
                 event_payload: {
                     assigned_to: selectedSalesman.id,
                     assigned_by: 'AUTO_ASSIGN',
-                    strategy: settings.strategy
+                    strategy: settings.strategy,
+                    assignment_mode: settings.assignmentMode || settings.strategy
                 }
             });
 
@@ -843,6 +851,38 @@ async function selectSalesmanAutoTrain({ tenantId, salesmen, settings }) {
     }
 
     return candidates[0].salesman;
+}
+
+async function selectSalesmanBalancedPerformance({ tenantId, salesmen }) {
+    const salesmenWithWorkload = await getSalesmenWithActiveLeads(tenantId, salesmen);
+    const thirtyDaysAgo = new Date(Date.now() - (30 * 24 * 60 * 60 * 1000)).toISOString();
+
+    const { data: recentWins } = await dbClient
+        .from('crm_leads')
+        .select('assigned_user_id')
+        .eq('tenant_id', tenantId)
+        .eq('status', 'WON')
+        .gte('updated_at', thirtyDaysAgo);
+
+    const winCountByUser = new Map();
+    (recentWins || []).forEach(row => {
+        if (!row.assigned_user_id) return;
+        winCountByUser.set(row.assigned_user_id, (winCountByUser.get(row.assigned_user_id) || 0) + 1);
+    });
+
+    const maxWorkload = Math.max(1, ...salesmenWithWorkload.map(s => s.activeLeads || 0));
+    const maxWins = Math.max(1, ...salesmenWithWorkload.map(s => winCountByUser.get(s.id) || 0));
+
+    const scored = salesmenWithWorkload.map(s => {
+        const workloadNorm = (s.activeLeads || 0) / maxWorkload;
+        const winsNorm = (winCountByUser.get(s.id) || 0) / maxWins;
+
+        // Lower workload better, higher wins better
+        const score = (0.65 * (1 - workloadNorm)) + (0.35 * winsNorm);
+        return { ...s, balancedScore: score };
+    }).sort((a, b) => b.balancedScore - a.balancedScore);
+
+    return scored[0] || null;
 }
 
 module.exports = {
