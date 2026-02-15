@@ -886,45 +886,69 @@ app.post('/api/waha/webhook', async (req, res) => {
 
       // Resolve tenantId
       let tenantId = null;
+      const meId = String(body?.me?.id || '').trim();
+      const meDigits = meId ? meId.replace('@c.us', '').replace(/\D/g, '') : '';
+
       if (typeof session === 'string' && session.startsWith('tenant_')) {
         tenantId = session.replace('tenant_', '');
-      } else {
-        // Fallback: map session_name -> tenant_id (common in local/dev)
+      }
+
+      // Primary fallback: map bot (me.id) phone number -> tenant_id
+      // WAHA GOWS inbound messages often have payload.to=null, so session_name alone is ambiguous (many tenants can use "default").
+      if (!tenantId && meDigits) {
+        try {
+          const { dbClient } = require('./services/config');
+
+          // First try: whatsapp_connections (most reliable once connected)
+          const { data: conn } = await dbClient
+            .from('whatsapp_connections')
+            .select('tenant_id, phone_number, status, provider')
+            .eq('provider', 'waha')
+            .or(`phone_number.eq.${meDigits},phone_number.eq.${meDigits}@c.us`)
+            .order('is_primary', { ascending: false })
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (conn?.tenant_id) tenantId = conn.tenant_id;
+
+          // Second try: tenants.bot_phone_number
+          if (!tenantId) {
+            const { data: botTenant } = await dbClient
+              .from('tenants')
+              .select('id')
+              .or(`bot_phone_number.eq.${meDigits},bot_phone_number.eq.${meDigits}@c.us,bot_phone_number.eq.+${meDigits}`)
+              .limit(1)
+              .maybeSingle();
+            if (botTenant?.id) tenantId = botTenant.id;
+          }
+        } catch (e) {
+          console.warn('[WAHA] Could not resolve tenant from me.id:', e?.message || e);
+        }
+      }
+
+      // Secondary fallback: map session_name -> tenant_id (only safe if unique)
+      if (!tenantId) {
         try {
           const { dbClient } = require('./services/config');
           const { data: conn } = await dbClient
             .from('whatsapp_connections')
             .select('tenant_id')
+            .eq('provider', 'waha')
             .eq('session_name', String(session))
-            .single();
+            .order('is_primary', { ascending: false })
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
           if (conn?.tenant_id) tenantId = conn.tenant_id;
         } catch (e) {
           console.warn('[WAHA] Could not resolve tenant from session_name:', e?.message || e);
         }
       }
 
-      // Additional fallback: map bot phone number -> tenant_id
-      if (!tenantId) {
-        try {
-          const to = String(payload.to || payload._data?.to || payload.chatId || '').replace('@c.us', '');
-          const toDigits = String(to).replace(/\D/g, '');
-          if (toDigits) {
-            const { dbClient } = require('./services/config');
-            const { data: botTenant } = await dbClient
-              .from('tenants')
-              .select('id')
-              .or(`bot_phone_number.eq.${toDigits},bot_phone_number.eq.${toDigits}@c.us,bot_phone_number.eq.${to}`)
-              .maybeSingle();
-            if (botTenant?.id) tenantId = botTenant.id;
-          }
-        } catch (e) {
-          console.warn('[WAHA] Could not resolve tenant from bot_phone_number:', e?.message || e);
-        }
-      }
-
       console.log('[WAHA] Tenant resolution details:', {
         session,
         resolvedTenantId: tenantId,
+        meId: meId || null,
         payloadFrom: payload.from,
         payloadTo: payload.to || payload._data?.to || null,
         payloadChatId: payload.chatId || payload._data?.chatId || null
