@@ -16,6 +16,29 @@ function isTruthyLike(value) {
 /**
  * Main function: Find customers due for reorder and schedule messages
  */
+let _customerProfilesTableName = null;
+
+async function _resolveCustomerProfilesTable() {
+  if (_customerProfilesTableName) return _customerProfilesTableName;
+
+  try {
+    await dbClient.from('customer_profiles').select('id').limit(1).maybeSingle();
+    _customerProfilesTableName = 'customer_profiles';
+    return _customerProfilesTableName;
+  } catch (_) {
+  }
+
+  try {
+    await dbClient.from('customer_profiles_new').select('id').limit(1).maybeSingle();
+    _customerProfilesTableName = 'customer_profiles_new';
+    return _customerProfilesTableName;
+  } catch (_) {
+  }
+
+  _customerProfilesTableName = 'customer_profiles';
+  return _customerProfilesTableName;
+}
+
 async function scheduleProactiveMessages(tenantId) {
   console.log('[PROACTIVE] Starting daily proactive messaging run...');
   
@@ -27,8 +50,9 @@ async function scheduleProactiveMessages(tenantId) {
     };
 
     // Get all active customers for this tenant
+    const customerProfilesTable = await _resolveCustomerProfilesTable();
     const { data: customers, error } = await dbClient
-      .from('customer_profiles')
+      .from(customerProfilesTable)
       .select('id, first_name, last_name, phone, zoho_customer_id, last_order_date')
       .eq('tenant_id', tenantId)
       .not('zoho_customer_id', 'is', null)
@@ -319,10 +343,7 @@ async function sendPendingMessages(tenantId) {
       if (hasStatus) {
         messagesResult = await dbClient
           .from('proactive_messages')
-          .select(`
-            *,
-            customer_profiles(phone, first_name)
-          `)
+          .select('*')
           .eq('tenant_id', tenantId)
           .eq('status', 'pending')
           .lte('scheduled_for', new Date().toISOString())
@@ -330,10 +351,7 @@ async function sendPendingMessages(tenantId) {
       } else {
         messagesResult = await dbClient
           .from('proactive_messages')
-          .select(`
-            *,
-            customer_profiles(phone, first_name)
-          `)
+          .select('*')
           .eq('tenant_id', tenantId)
           .lte('scheduled_for', new Date().toISOString())
           .limit(50);
@@ -352,8 +370,32 @@ async function sendPendingMessages(tenantId) {
 
     console.log(`[PROACTIVE] Found ${messages.length} messages to send`);
 
+    const customerProfilesTable = await _resolveCustomerProfilesTable();
+    const profileIds = [...new Set(messages.map((m) => m.customer_profile_id).filter(Boolean))];
+    const profileMap = new Map();
+
+    if (profileIds.length > 0) {
+      const { data: profiles, error: profilesErr } = await dbClient
+        .from(customerProfilesTable)
+        .select('id, phone, first_name')
+        .in('id', profileIds);
+
+      if (profilesErr) {
+        console.warn('[PROACTIVE] Customer profile lookup failed:', profilesErr?.message || profilesErr);
+      } else {
+        (profiles || []).forEach((p) => profileMap.set(p.id, p));
+      }
+    }
+
     for (const message of messages) {
-      await sendProactiveMessage(message);
+      const profile = profileMap.get(message.customer_profile_id) || {};
+      await sendProactiveMessage({
+        ...message,
+        customer_profiles: {
+          phone: profile.phone || null,
+          first_name: profile.first_name || null
+        }
+      });
     }
 
   } catch (error) {

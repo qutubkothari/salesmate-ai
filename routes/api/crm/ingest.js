@@ -4,6 +4,7 @@ const router = express.Router();
 const { upsertInboundLead, normalizeChannel, normalizePhone } = require('../../../services/crmInboundLeadService');
 const { requireCrmAuth } = require('../../../middleware/crmAuth');
 const { requireCrmFeature } = require('../../../middleware/requireCrmFeature');
+const { isFeatureEnabled } = require('../../../services/crmFeatureFlags');
 const { CRM_FEATURES } = require('../../../services/crmFeatureFlags');
 
 function mapInboundBySource(source, payload = {}) {
@@ -113,7 +114,7 @@ router.post('/', requireCrmAuth, requireCrmFeature(CRM_FEATURES.CRM_INGEST), asy
  * External ingestion (no cookies). Secured via shared secret header.
  * Header: x-webhook-secret: <CRM_WEBHOOK_SECRET>
  */
-router.post('/webhook', requireCrmFeature(CRM_FEATURES.CRM_INGEST), async (req, res) => {
+router.post('/webhook', async (req, res) => {
   try {
     const expected = process.env.CRM_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET;
     if (!expected) return res.status(500).json({ success: false, error: 'server_not_configured' });
@@ -123,6 +124,11 @@ router.post('/webhook', requireCrmFeature(CRM_FEATURES.CRM_INGEST), async (req, 
 
     const { tenantId } = req.body || {};
     if (!tenantId) return res.status(400).json({ success: false, error: 'tenantId required' });
+
+    const ingestEnabled = await isFeatureEnabled(tenantId, CRM_FEATURES.CRM_INGEST);
+    if (!ingestEnabled) {
+      return res.status(403).json({ success: false, error: 'feature_disabled', feature: CRM_FEATURES.CRM_INGEST });
+    }
 
     const mapped = mapInboundBySource(req.body?.source, req.body || {});
 
