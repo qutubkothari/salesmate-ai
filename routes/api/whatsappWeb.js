@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const { dbClient } = require('../../services/config');
+const crypto = require('crypto');
 
 // WAHA Configuration
 const WAHA_URL = process.env.WAHA_URL || 'http://localhost:3001';
@@ -97,10 +98,27 @@ router.post('/connect', async (req, res) => {
         console.log('[WAHA_API] Session start result:', startRes.data);
 
         // Update database
+        // Supabase schema expects whatsapp_connections.id to be a UUID (and NOT NULL).
+        // Reuse existing row id when present to avoid attempting to update PK.
+        let existingId = null;
+        try {
+            const { data: existing } = await dbClient
+                .from('whatsapp_connections')
+                .select('id')
+                .eq('tenant_id', tenantId)
+                .eq('provider', 'waha')
+                .eq('session_name', sn)
+                .limit(1)
+                .maybeSingle();
+            if (existing?.id) existingId = existing.id;
+        } catch (_) {
+            // ignore
+        }
+
         await dbClient
             .from('whatsapp_connections')
             .upsert({
-                id: tenantId.substring(0, 32),
+                id: existingId || crypto.randomUUID(),
                 tenant_id: tenantId,
                 session_name: sn,
                 status: 'qr_ready',
