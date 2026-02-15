@@ -5861,28 +5861,44 @@
             const qrDisplay = document.getElementById('qrCodeDisplay');
             if (!qrDisplay) return;
 
-            qrDisplay.innerHTML = '<div class="loading-spinner mx-auto mb-4"></div><p class="text-gray-500">Loading QR code...</p>';
+            // Don't blank the QR while polling (it makes scanning nearly impossible).
+            // Only show the loading state if we don't already have an <img> displayed.
+            const existingImg = qrDisplay.querySelector('img');
+            if (!existingImg) {
+                qrDisplay.innerHTML = '<div class="loading-spinner mx-auto mb-4"></div><p class="text-gray-500">Loading QR code...</p>';
+            }
 
             const response = await fetch(`/api/whatsapp-web/qr/${tenantId}`, { cache: 'no-store' });
             const result = await response.json();
 
             if (result.success && result.qrCode) {
-                qrDisplay.innerHTML = `
-                    <img src="${result.qrCode}" alt="QR Code" class="mx-auto border-4 border-gray-200 rounded-lg" style="max-width: 300px;" />
-                    <p class="text-gray-600 mt-4 font-semibold">📱 Scan with WhatsApp</p>
-                    <p class="text-sm text-gray-500 mt-2">WhatsApp → Settings → Linked Devices → Link a Device</p>
-                    <p class="text-xs text-gray-400 mt-3">QR code refreshes automatically</p>
-                `;
+                if (existingImg) {
+                    existingImg.src = result.qrCode;
+                } else {
+                    qrDisplay.innerHTML = `
+                        <img src="${result.qrCode}" alt="QR Code" class="mx-auto border-4 border-gray-200 rounded-lg" style="max-width: 300px;" />
+                        <p class="text-gray-600 mt-4 font-semibold">📱 Scan with WhatsApp</p>
+                        <p class="text-sm text-gray-500 mt-2">WhatsApp → Settings → Linked Devices → Link a Device</p>
+                        <p class="text-xs text-gray-400 mt-3">QR code refreshes automatically</p>
+                    `;
+                }
                 setTimeout(() => pollForQRCode(tenantId), 30000);
             } else {
-                qrDisplay.innerHTML = `<p class="text-gray-500">${result.message || 'Waiting for QR code…'}</p>`;
+                // If a QR is already shown, keep it visible even if WAHA temporarily returns no QR.
+                if (!existingImg) {
+                    qrDisplay.innerHTML = `<p class="text-gray-500">${result.message || 'Waiting for QR code…'}</p>`;
+                }
                 setTimeout(() => pollForQRCode(tenantId), 3000);
             }
         } catch (error) {
             console.error('QR poll error:', error);
             const qrDisplay = document.getElementById('qrCodeDisplay');
             if (qrDisplay) {
-                qrDisplay.innerHTML = '<p class="text-red-500">Error loading QR code. Retrying...</p>';
+                // Don't wipe an already-rendered QR image on transient failures.
+                const existingImg = qrDisplay.querySelector('img');
+                if (!existingImg) {
+                    qrDisplay.innerHTML = '<p class="text-red-500">Error loading QR code. Retrying...</p>';
+                }
                 setTimeout(() => pollForQRCode(tenantId), 5000);
             }
         }
