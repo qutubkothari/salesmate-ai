@@ -287,7 +287,16 @@ const sendMessage = async (to, text, tenantId = null) => {
             throw new Error(resp.data.error);
         }
 
-        return resp?.data?.id || resp?.data?.messageId || ('waha_' + Date.now());
+        // WAHA returns a rich message object; prefer a stable serialized id if present.
+        const wahaSerialized =
+            resp?.data?._data?.id?._serialized ||
+            resp?.data?.id?._serialized ||
+            (typeof resp?.data?.id === 'string' ? resp.data.id : null) ||
+            resp?.data?.messageId ||
+            resp?.data?.message_id ||
+            null;
+
+        return String(wahaSerialized || ('waha_' + Date.now()));
     } catch (error) {
         console.error('Error sending WhatsApp message:', error.message);
         return null;
