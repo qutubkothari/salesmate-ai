@@ -36,8 +36,29 @@ function setNoCacheJson(res) {
     res.set('ETag', String(Date.now()));
 }
 
+function shouldForceDefaultWahaSession() {
+    // WAHA Core supports only a single session named 'default'.
+    // Allow overriding via env so multi-tenant deployments can still use tenant-scoped sessions when running WAHA PLUS.
+    const v = String(
+        process.env.WAHA_FORCE_DEFAULT_SESSION ||
+        process.env.WAHA_SINGLE_SESSION ||
+        ''
+    ).toLowerCase();
+    return v === '1' || v === 'true' || v === 'yes';
+}
+
+function normalizeSessionNameForWaha(sn) {
+    const name = String(sn || '').trim() || 'default';
+    if (shouldForceDefaultWahaSession() && name !== 'default') return 'default';
+    return name;
+}
+
 async function getPreferredSessionName(tenantId, providedSessionName) {
-    if (providedSessionName) return String(providedSessionName);
+    if (providedSessionName) return normalizeSessionNameForWaha(providedSessionName);
+
+    if (shouldForceDefaultWahaSession()) {
+        return 'default';
+    }
 
     try {
         const { data: row } = await dbClient
@@ -50,7 +71,7 @@ async function getPreferredSessionName(tenantId, providedSessionName) {
             .limit(1)
             .maybeSingle();
 
-        if (row?.session_name) return String(row.session_name);
+        if (row?.session_name) return normalizeSessionNameForWaha(row.session_name);
     } catch (_) {
         // ignore
     }
@@ -71,7 +92,8 @@ router.post('/connect', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Tenant ID is required' });
         }
 
-        const sn = await getPreferredSessionName(tenantId, sessionName);
+        let sn = await getPreferredSessionName(tenantId, sessionName);
+        sn = normalizeSessionNameForWaha(sn);
         console.log('[WAHA_API] Starting session for tenant:', tenantId, 'session:', sn);
 
         // Check if session exists
@@ -94,7 +116,22 @@ router.post('/connect', async (req, res) => {
         }
 
         // Start new session
-        const startRes = await wahaRequest('POST', '/api/sessions/start', { name: sn });
+        let startRes;
+        try {
+            startRes = await wahaRequest('POST', '/api/sessions/start', { name: sn });
+        } catch (e) {
+            const msg = e?.response?.data?.message || e?.response?.data?.error || e?.message || '';
+            const status = e?.response?.status;
+            const looksLikeCoreSingleSession = status === 422 && String(msg).toLowerCase().includes("core support only 'default'");
+            if (looksLikeCoreSingleSession) {
+                console.warn('[WAHA_API] WAHA Core single-session detected. Retrying with default session.');
+                sn = 'default';
+                startRes = await wahaRequest('POST', '/api/sessions/start', { name: sn });
+            } else {
+                throw e;
+            }
+        }
+
         console.log('[WAHA_API] Session start result:', startRes.data);
 
         // Update database
@@ -115,6 +152,17 @@ router.post('/connect', async (req, res) => {
             // ignore
         }
 
+        // Best-effort: ensure this is the primary session for the tenant
+        try {
+            await dbClient
+                .from('whatsapp_connections')
+                .update({ is_primary: 0 })
+                .eq('tenant_id', tenantId)
+                .eq('provider', 'waha');
+        } catch (_) {
+            // ignore
+        }
+
         await dbClient
             .from('whatsapp_connections')
             .upsert({
@@ -123,6 +171,7 @@ router.post('/connect', async (req, res) => {
                 session_name: sn,
                 status: 'qr_ready',
                 provider: 'waha',
+                is_primary: 1,
                 updated_at: new Date().toISOString()
             }, { onConflict: 'tenant_id,session_name' });
 
