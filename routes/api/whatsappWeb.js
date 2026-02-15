@@ -80,12 +80,12 @@ router.post('/connect', async (req, res) => {
                 id: tenantId.substring(0, 32),
                 tenant_id: tenantId,
                 session_name: sn,
-                status: 'awaiting_scan',
+                status: 'qr_ready',
                 provider: 'waha',
                 updated_at: new Date().toISOString()
             }, { onConflict: 'tenant_id,session_name' });
 
-        return res.json({ success: true, status: 'awaiting_scan' });
+        return res.json({ success: true, status: 'qr_ready' });
 
     } catch (error) {
         console.error('[WAHA_API] Connect error:', error.response?.data || error.message);
@@ -111,7 +111,7 @@ router.get('/qr/:tenantId', async (req, res) => {
 
         qrCache.set(cacheKey, { qrCode, at: Date.now() });
 
-        return res.json({ success: true, qrCode, status: 'awaiting_scan' });
+        return res.json({ success: true, qrCode, status: 'qr_ready' });
 
     } catch (error) {
         // If no QR available, session might be connected or not started
@@ -121,7 +121,7 @@ router.get('/qr/:tenantId', async (req, res) => {
         const cacheKey = `${req.params.tenantId}:${String(sessionName)}`;
         const cached = qrCache.get(cacheKey);
         if (cached?.qrCode && cached?.at && Date.now() - cached.at < QR_CACHE_TTL_MS) {
-            return res.json({ success: true, qrCode: cached.qrCode, status: 'awaiting_scan', cached: true });
+            return res.json({ success: true, qrCode: cached.qrCode, status: 'qr_ready', cached: true });
         }
 
         return res.json({ success: true, qrCode: null, status: 'no_qr' });
@@ -167,7 +167,8 @@ router.get('/status/:tenantId', async (req, res) => {
                         }, { onConflict: 'tenant_id,session_name' });
                         
                 } else if (session.status === 'SCAN_QR_CODE') {
-                    wahaStatus = 'awaiting_scan';
+                    // Dashboard UI expects `qr_ready` to show QR section.
+                    wahaStatus = 'qr_ready';
                 } else if (session.status === 'STARTING') {
                     wahaStatus = 'initializing';
                 } else {
