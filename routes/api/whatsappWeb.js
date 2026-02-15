@@ -7,6 +7,10 @@ const { dbClient } = require('../../services/config');
 const WAHA_URL = process.env.WAHA_URL || 'http://localhost:3001';
 const WAHA_API_KEY = process.env.WAHA_API_KEY || 'waha_salesmate_2024';
 
+// Keep last QR briefly so UI doesn't go blank between WAHA QR refreshes
+const qrCache = new Map();
+const QR_CACHE_TTL_MS = 90 * 1000;
+
 // Helper to make WAHA API calls
 async function wahaRequest(method, path, data = null, responseType = 'json') {
     const config = {
@@ -98,16 +102,28 @@ router.get('/qr/:tenantId', async (req, res) => {
         setNoCacheJson(res);
         const sessionName = req.query.sessionName || 'default';
 
+        const cacheKey = `${req.params.tenantId}:${String(sessionName)}`;
+
         // Get QR as base64 image
         const qrRes = await wahaRequest('GET', `/api/${sessionName}/auth/qr`, null, 'arraybuffer');
         const base64 = Buffer.from(qrRes.data).toString('base64');
         const qrCode = `data:image/png;base64,${base64}`;
+
+        qrCache.set(cacheKey, { qrCode, at: Date.now() });
 
         return res.json({ success: true, qrCode, status: 'awaiting_scan' });
 
     } catch (error) {
         // If no QR available, session might be connected or not started
         console.log('[WAHA_API] QR not available:', error.response?.status);
+
+        const sessionName = req.query.sessionName || 'default';
+        const cacheKey = `${req.params.tenantId}:${String(sessionName)}`;
+        const cached = qrCache.get(cacheKey);
+        if (cached?.qrCode && cached?.at && Date.now() - cached.at < QR_CACHE_TTL_MS) {
+            return res.json({ success: true, qrCode: cached.qrCode, status: 'awaiting_scan', cached: true });
+        }
+
         return res.json({ success: true, qrCode: null, status: 'no_qr' });
     }
 });
