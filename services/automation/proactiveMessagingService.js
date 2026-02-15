@@ -55,7 +55,8 @@ async function scheduleProactiveMessages(tenantId) {
     const customerProfilesTable = await _resolveCustomerProfilesTable();
     const { data: customers, error } = await dbClient
       .from(customerProfilesTable)
-      .select('id, first_name, last_name, phone, zoho_customer_id, last_order_date')
+      // Use '*' to support both customer_profiles and customer_profiles_new schemas
+      .select('*')
       .eq('tenant_id', tenantId)
       .not('zoho_customer_id', 'is', null)
       .order('last_order_date', { ascending: false });
@@ -122,7 +123,8 @@ async function scheduleProactiveMessages(tenantId) {
 
       if (scheduled) {
         stats.messagesScheduled++;
-        console.log(`[PROACTIVE] Scheduled message for ${customer.first_name}`);
+        const who = customer?.first_name || customer?.name || customer?.phone || 'customer';
+        console.log(`[PROACTIVE] Scheduled message for ${who}`);
       }
     }
 
@@ -228,7 +230,12 @@ async function shouldSendProactiveMessage(customer) {
  * Create a personalized reorder message
  */
 function createReorderMessage(customer, frequency, regularProducts) {
-  const firstName = customer.first_name || 'there';
+  const derived = customer?.first_name
+    || (customer?.name ? String(customer.name).trim().split(/\s+/)[0] : null)
+    || customer?.full_name
+    || customer?.customer_name
+    || null;
+  const firstName = derived || 'there';
   const daysSince = frequency.daysSinceLastOrder;
   
   // Get top 2-3 regular products
