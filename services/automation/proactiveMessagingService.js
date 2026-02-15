@@ -53,13 +53,21 @@ async function scheduleProactiveMessages(tenantId) {
 
     // Get all active customers for this tenant
     const customerProfilesTable = await _resolveCustomerProfilesTable();
-    const { data: customers, error } = await dbClient
+    let q = dbClient
       .from(customerProfilesTable)
       // Use '*' to support both customer_profiles and customer_profiles_new schemas
       .select('*')
-      .eq('tenant_id', tenantId)
-      .not('zoho_customer_id', 'is', null)
-      .order('last_order_date', { ascending: false });
+      .eq('tenant_id', tenantId);
+
+    // Legacy Zoho-based proactive messaging expects these fields.
+    if (customerProfilesTable === 'customer_profiles') {
+      q = q.not('zoho_customer_id', 'is', null).order('last_order_date', { ascending: false });
+    } else {
+      // customer_profiles_new schema does not include zoho_customer_id/last_order_date
+      q = q.order('updated_at', { ascending: false });
+    }
+
+    const { data: customers, error } = await q;
 
     if (error) {
       console.error('[PROACTIVE] Error fetching customers:', error);
@@ -232,6 +240,8 @@ async function shouldSendProactiveMessage(customer) {
 function createReorderMessage(customer, frequency, regularProducts) {
   const derived = customer?.first_name
     || (customer?.name ? String(customer.name).trim().split(/\s+/)[0] : null)
+    || (customer?.contact_person ? String(customer.contact_person).trim().split(/\s+/)[0] : null)
+    || (customer?.business_name ? String(customer.business_name).trim().split(/\s+/)[0] : null)
     || customer?.full_name
     || customer?.customer_name
     || null;
