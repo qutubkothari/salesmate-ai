@@ -267,12 +267,51 @@ router.post('/salesman/login', async (req, res) => {
             console.log('[FSM_SALESMAN_LOGIN] Password verified for user:', matchedUser.id);
 
             // Find salesman record
-            const { data: salesmen, error: salesmanError } = await dbClient
+            // NOTE: In some tenants, salesmen rows exist but `user_id` is null.
+            // In that case, we fall back to phone match and auto-link user_id.
+            const activeSalesmanClause = 'is_active.eq.1,is_active.eq.true';
+
+            let salesmen = null;
+            let salesmanError = null;
+
+            ({ data: salesmen, error: salesmanError } = await dbClient
                 .from('salesmen')
                 .select('*')
                 .eq('user_id', matchedUser.id)
                 .eq('tenant_id', matchedUser.tenant_id)
-                .eq('is_active', 1);
+                .or(activeSalesmanClause));
+
+            if (!salesmanError && (!salesmen || salesmen.length === 0)) {
+                const candidatePhones = Array.from(new Set([
+                    String(phoneDigits || ''),
+                    `${String(phoneDigits || '')}@c.us`,
+                    String(matchedUser.phone || ''),
+                    `${String(matchedUser.phone || '')}@c.us`
+                ].filter(Boolean)));
+
+                // Fast path: exact phone match within tenant
+                ({ data: salesmen, error: salesmanError } = await dbClient
+                    .from('salesmen')
+                    .select('*')
+                    .eq('tenant_id', matchedUser.tenant_id)
+                    .in('phone', candidatePhones)
+                    .or(activeSalesmanClause));
+
+                // Best-effort: link the salesman record to the matched user
+                const found = Array.isArray(salesmen) && salesmen.length ? salesmen[0] : null;
+                if (found && (!found.user_id || String(found.user_id) !== String(matchedUser.id))) {
+                    try {
+                        await dbClient
+                            .from('salesmen')
+                            .update({ user_id: matchedUser.id })
+                            .eq('id', found.id)
+                            .eq('tenant_id', matchedUser.tenant_id);
+                        found.user_id = matchedUser.id;
+                    } catch (_) {
+                        // Non-fatal; login can proceed even if link update fails
+                    }
+                }
+            }
 
             if (salesmanError) {
                 console.error('[FSM_SALESMAN_LOGIN] Supabase salesman query error:', salesmanError);
