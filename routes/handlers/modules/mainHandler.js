@@ -61,6 +61,52 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
     console.log('[MAIN_HANDLER][DEBUG] Conversation state:', conversation?.state);
     console.log('[MAIN_HANDLER][DEBUG] Conversation metadata:', JSON.stringify(conversation?.metadata));
 
+    // --- Personalization + onboarding (best-effort) ---
+    const customerProfileService = require('../../../services/customerProfileService');
+    const nowIso = new Date().toISOString();
+
+    let customerProfile = null;
+    try {
+        customerProfile = await customerProfileService.getCustomerProfile(tenant.id, from);
+    } catch (_) {
+        customerProfile = null;
+    }
+
+    const contactName = (customerProfile?.contact_person || customerProfile?.name || '').toString().trim();
+    const companyName = (customerProfile?.business_name || customerProfile?.company || '').toString().trim();
+    const displayName = (contactName || companyName || '').toString().trim();
+    const needsOnboardingDetails = !contactName && !companyName;
+
+    // If there's a big gap, start the next reply with a friendly personal greeting.
+    const gapMsDefault = 6 * 60 * 60 * 1000; // 6 hours
+    const gapMs = Number(process.env.REENGAGE_GREETING_GAP_MS || gapMsDefault);
+    const lastActivityTs = conversation?.last_message_at || conversation?.last_activity_at || conversation?.updated_at || conversation?.created_at || null;
+    const lastActivityMs = lastActivityTs ? new Date(lastActivityTs).getTime() : null;
+    const hasLongGap = !!(lastActivityMs && Number.isFinite(lastActivityMs) && (Date.now() - lastActivityMs) > gapMs);
+
+    const convCreatedMs = conversation?.created_at ? new Date(conversation.created_at).getTime() : null;
+    const isFreshConversation = !!(convCreatedMs && Number.isFinite(convCreatedMs) && (Date.now() - convCreatedMs) < (15 * 60 * 1000));
+
+    const personalGreetingPrefix = (hasLongGap && displayName)
+        ? `Hello ${displayName}! `
+        : '';
+    let personalGreetingUsed = false;
+
+    async function sendReply(messageBody, conversationId) {
+        let text = String(messageBody || '');
+        const trimmed = text.trim();
+
+        if (!personalGreetingUsed && personalGreetingPrefix && trimmed) {
+            // Avoid double greeting
+            if (!/^(hi|hello|hey|namaste)\b/i.test(trimmed)) {
+                text = `${personalGreetingPrefix}${text}`;
+            }
+            personalGreetingUsed = true;
+        }
+
+        return await sendAndSaveMessage(from, text, conversationId, tenant.id);
+    }
+
     try {
         // CRITICAL: Save incoming user message to database FIRST
         // This ensures every message is persisted regardless of processing outcome
@@ -414,14 +460,13 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
         // Avoid expensive AI for greetings and prevent generic/off-tone replies.
         if (String(finalIntent || '').toLowerCase() === 'greeting') {
             const businessName = (tenant.business_name || 'Salesmate').toString().trim();
-            const reply = `Hi! 👋 Welcome to ${businessName}.
+            const reply = needsOnboardingDetails
+                ? `Hi! 👋 Welcome to ${businessName}.
 
-How can I help you today?
-• Type "catalog" to see products
-• Ask "price of <product>" for rates
-• Or tell me what you need + quantity (e.g., "8x80 5 cartons")`;
+May I know your name and company name? You can also share a visiting card/business card photo.`
+                : `Hi${displayName ? ` ${displayName}` : ''}! 👋 How can I help you today?`;
 
-            await sendAndSaveMessage(from, reply, conversation?.id || null, tenant.id);
+            await sendReply(reply, conversation?.id || null);
             return res.status(200).json({ ok: true, type: 'greeting_fastpath' });
         }
 
@@ -624,9 +669,76 @@ How can I help you today?
                 ? smart
                 : (smart && typeof smart.response === 'string' ? smart.response : null);
 
+            const smartSource = (smart && typeof smart === 'object') ? String(smart.source || '') : '';
+            const looksLikeNotFound = !!(smartSource === 'ai_not_found' || /couldn\s*['’]?t\s*find\s+any/i.test(String(smartText || '')));
+
             if (smartText && smartText.trim()) {
                 console.log('[MAIN_HANDLER] Smart Router handled the query');
-                await sendAndSaveMessage(from, smartText, conversation?.id, tenant.id);
+
+                if (looksLikeNotFound) {
+                    const subtle = `Thanks — I’ll check this and get back to you shortly.`;
+                    await sendReply(subtle, conversation?.id || null);
+
+                    if (needsOnboardingDetails && isFreshConversation) {
+                        await sendReply(
+                            'Also, may I have your name and company name? You can share a visiting card/business card photo.',
+                            conversation?.id || null
+                        );
+                    }
+
+                    // Best-effort: flag + triage + alert
+                    try {
+                        const { getConversationId } = require('../../../services/historyService');
+                        const { upsertTriageForConversation } = require('../../../services/triageService');
+                        const { notifySalesTeam } = require('../../../services/humanHandoverService');
+
+                        const conversationId = conversation?.id || await getConversationId(tenant.id, from);
+                        if (conversationId) {
+                            try {
+                                await dbClient
+                                    .from('conversations_new')
+                                    .update({ requires_human_attention: true, updated_at: nowIso })
+                                    .eq('id', conversationId);
+                            } catch (_) {
+                                // ignore
+                            }
+
+                            try {
+                                await upsertTriageForConversation(dbClient, {
+                                    tenantId: tenant.id,
+                                    conversationId,
+                                    endUserPhone: from,
+                                    type: 'PRODUCT_NOT_FOUND',
+                                    messagePreview: `Customer asked: ${String(userQuery || '').substring(0, 160)}`,
+                                    metadata: { source: 'mainHandler', trigger: 'smart_router_not_found', smartSource }
+                                });
+                            } catch (_) {
+                                // ignore
+                            }
+                        }
+
+                        try {
+                            await notifySalesTeam(tenant, from, userQuery, {
+                                reason: 'product_not_found',
+                                smartSource: smartSource || null
+                            });
+                        } catch (_) {
+                            // ignore
+                        }
+                    } catch (_) {
+                        // ignore
+                    }
+
+                    return res.status(200).json({ ok: true, type: 'smart_response_not_found' });
+                }
+
+                const finalSmartText = (needsOnboardingDetails && isFreshConversation)
+                    ? `Quick one — may I have your name and company name? You can share a visiting card/business card photo.
+
+${smartText}`
+                    : smartText;
+
+                await sendReply(finalSmartText, conversation?.id || null);
                 return res.status(200).json({ ok: true, type: 'smart_response' });
             }
         } catch (e) {
@@ -648,7 +760,7 @@ How can I help you today?
             
             if (clarification && clarification.needsClarification) {
                 console.log('[PROACTIVE_CLARIFICATION] Sending clarifying question');
-                await sendAndSaveMessage(from, clarification.question, conversation?.id, tenant.id);
+                await sendReply(clarification.question, conversation?.id || null);
                 
                 // Save clarification context for next message
                 if (conversation?.id) {
@@ -674,7 +786,7 @@ How can I help you today?
         if (/(website|web site|site|link|url)\b/i.test(userQuery)) {
             const websiteUrl = tenant.business_website || 'https://hylite.co.in';
             const reply = `You can visit our website here: ${websiteUrl}`;
-            await sendAndSaveMessage(from, reply, conversation?.id, tenant.id);
+            await sendReply(reply, conversation?.id || null);
             return res.status(200).json({ ok: true, type: 'website_reply' });
         }
 
@@ -707,7 +819,12 @@ How can I help you today?
 
         const aiText = (aiResult && typeof aiResult.response === 'string') ? aiResult.response : String(aiResult || '');
         console.log('[MAIN_HANDLER] AI Response generated:', aiText ? 'SUCCESS' : 'FAILED', 'source:', aiResult?.source);
-        await sendAndSaveMessage(from, aiText, conversation?.id, tenant.id);
+        const finalAiText = (needsOnboardingDetails && isFreshConversation)
+            ? `Quick one — may I have your name and company name? You can share a visiting card/business card photo.
+
+${aiText}`
+            : aiText;
+        await sendReply(finalAiText, conversation?.id || null);
         return res.status(200).json({ ok: true, type: 'ai_response_v2' });
 
     } catch (error) {
@@ -739,7 +856,7 @@ How can I help you today?
             
             if (recovery && recovery.success) {
                 console.log('[ERROR_RECOVERY] Sending recovery message to user');
-                await sendAndSaveMessage(from, recovery.message, conversation?.id, tenant.id);
+                await sendReply(recovery.message, conversation?.id || null);
                 return res.status(200).json({ 
                     ok: true, 
                     type: 'error_recovered',
@@ -757,7 +874,7 @@ How can I help you today?
         });
         
         try {
-            await sendAndSaveMessage(from, errorResponse, conversation?.id, tenant.id);
+            await sendReply(errorResponse, conversation?.id || null);
         } catch (sendError) {
             console.error('[MAIN_HANDLER] Failed to send error message:', sendError);
         }

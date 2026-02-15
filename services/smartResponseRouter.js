@@ -18,7 +18,7 @@ async function autoLearnVerifiedAnswer({ tenantId, question, answer, sources = [
         const contextDependent = /^(hi|hello|hey|thanks|add|remove|cart|order|buy|checkout|yes|no|ok)\b/i.test(q);
         if (contextDependent) return;
         
-        const clippedAnswer = a.length > 1400 ? `${a.slice(0, 1400)}…` : a;
+        const clippedAnswer = a.length > 1400 ? `${a.slice(0, 1400)}ï¿½` : a;
         const sourcesText = Array.isArray(sources) && sources.length > 0 
             ? `\n\nSources: ${sources.slice(0, 5).join(', ')}` 
             : '';
@@ -416,7 +416,7 @@ const handleMultiProductPriceInquiry = async (query, tenantId, phoneNumber = nul
         }
         
         if (products.length === 0) {
-            return "Sorry, I couldn't find any of those products in our catalog.";
+            return "I couldn't find those items in our catalog right now. I'll check and get back to you shortly.";
         }
         
         // Check if this is a volume order (10k+ pieces)
@@ -1035,7 +1035,7 @@ const getSmartResponse = async (userQuery, tenantId, phoneNumber = null) => {
                     }
                     
                     return {
-                        response: `Sorry, I couldn't find any "${searchTerm}" products in our catalog or website.`,
+                        response: `I couldn't find "${searchTerm}" in our catalog or website right now. I'll check and get back to you shortly.`,
                         source: 'ai_not_found',
                         quotedProducts: []
                     };
