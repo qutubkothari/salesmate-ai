@@ -84,7 +84,7 @@ router.get('/qr/:tenantId', async (req, res) => {
 
     const b64 = String(qr.qrCode).split(',')[1];
     const fileName = `waweb_qr_${tenantId}_${sessionName}.png`;
-    const outPath = path.join(__dirname, '..', '..', '..', 'public', fileName);
+    const outPath = path.join(process.cwd(), 'public', fileName);
     fs.writeFileSync(outPath, Buffer.from(b64, 'base64'));
 
     return res.json({
