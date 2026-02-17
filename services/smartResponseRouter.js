@@ -2,6 +2,92 @@ const { dbClient } = require('./config');
 const { formatPersonalizedPriceDisplay, createPriceMessage } = require('./pricingDisplayService');
 const { searchWebsiteForQuery, isProductInfoQuery } = require('./websiteContentIntegration');
 
+function stripHtml(raw) {
+    const s = String(raw || '');
+    // Remove script/style blocks first
+    const noScripts = s
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ');
+    return noScripts.replace(/<[^>]+>/g, ' ');
+}
+
+function cleanWebsiteText(raw) {
+    let t = stripHtml(raw);
+    t = t
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&amp;/gi, '&')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, "'")
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    // Remove common boilerplate fragments
+    t = t
+        .replace(/\bskip to content\b/gi, '')
+        .replace(/\bprivacy policy\b/gi, '')
+        .replace(/\b(cookie policy|terms of service|terms & conditions)\b/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    // Drop tracking leftovers if they dominate
+    if (/googletagmanager|gtm-|ns\.html\?id=/i.test(t) && t.length < 300) {
+        return '';
+    }
+
+    return t;
+}
+
+function pickWebsiteItems(results, maxItems = 2) {
+    const rows = Array.isArray(results) ? results : [];
+    const seen = new Set();
+    const items = [];
+
+    for (const r of rows) {
+        const url = r?.url ? String(r.url).trim() : '';
+        const key = url || String(r?.pageTitle || '').trim();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+
+        const title = cleanWebsiteText(r?.pageTitle || '') || 'Website';
+        const snippet = cleanWebsiteText(r?.content || '')
+            .replace(/^home\s+/i, '')
+            .slice(0, 220)
+            .trim();
+
+        // Skip near-empty / junk snippets
+        if (!snippet || snippet.length < 40) continue;
+        if (/^\+?\d{2,}\s+\d{5,}/.test(snippet)) continue;
+
+        items.push({ title, snippet, url });
+        if (items.length >= maxItems) break;
+    }
+    return items;
+}
+
+function formatWebsiteItemsMessage({ topic, items, question }) {
+    const cleanTopic = String(topic || '').trim();
+    const lines = [];
+
+    if (cleanTopic) {
+        lines.push(`Here’s what I found on our website about "${cleanTopic}":`);
+    } else {
+        lines.push("Here’s what I found on our website:");
+    }
+    lines.push('');
+
+    items.forEach((it) => {
+        lines.push(`• ${it.title} — ${it.snippet}${it.snippet.endsWith('.') ? '' : '.'}`);
+        if (it.url) lines.push(it.url);
+    });
+
+    if (question) {
+        lines.push('');
+        lines.push(String(question));
+    }
+
+    return lines.join('\n');
+}
+
 /**
  * Auto-learn verified answer by storing it in tenant documents
  * This creates a knowledge base entry that can be retrieved later
@@ -1012,19 +1098,13 @@ const getSmartResponse = async (userQuery, tenantId, phoneNumber = null) => {
                     
                     if (websiteResults && websiteResults.length > 0) {
                         console.log('[AI_LAYER] ✅ Found category info in website content!');
-                        
-                        let websiteResponse = `📄 Found information about "${searchTerm}" on our website:\n\n`;
-                        
-                        websiteResults.forEach((result, index) => {
-                            websiteResponse += `${index + 1}. *${result.pageTitle}*\n`;
-                            websiteResponse += `${result.content.substring(0, 200)}...\n`;
-                            if (result.url) {
-                                websiteResponse += `🔗 ${result.url}\n`;
-                            }
-                            websiteResponse += '\n';
+
+                        const items = pickWebsiteItems(websiteResults, 2);
+                        const websiteResponse = formatWebsiteItemsMessage({
+                            topic: searchTerm,
+                            items,
+                            question: 'To confirm quickly, can you share the exact requirement (part/type) + quantity?' 
                         });
-                        
-                        websiteResponse += '\n💬 Would you like more details about any specific product?';
                         
                         return {
                             response: websiteResponse,
@@ -1077,20 +1157,13 @@ const getSmartResponse = async (userQuery, tenantId, phoneNumber = null) => {
                         
                         if (websiteResults && websiteResults.length > 0) {
                             console.log('[AI_LAYER] ✅ Found in website content!');
-                            
-                            // Format website results for customer
-                            let websiteResponse = `📄 Found information about "${searchTerm}" on our website:\n\n`;
-                            
-                            websiteResults.forEach((result, index) => {
-                                websiteResponse += `${index + 1}. *${result.pageTitle}*\n`;
-                                websiteResponse += `${result.content.substring(0, 200)}...\n`;
-                                if (result.url) {
-                                    websiteResponse += `🔗 ${result.url}\n`;
-                                }
-                                websiteResponse += '\n';
+
+                            const items = pickWebsiteItems(websiteResults, 2);
+                            const websiteResponse = formatWebsiteItemsMessage({
+                                topic: searchTerm,
+                                items,
+                                question: 'If you share quantity + location, I can confirm rate/availability faster.'
                             });
-                            
-                            websiteResponse += '\n💬 Would you like more details or to place an order?';
                             
                             return {
                                 response: websiteResponse,
@@ -1400,19 +1473,13 @@ Respond in JSON format:
             
             if (websiteResults && websiteResults.length > 0) {
                 console.log('[SMART_ROUTER] ✅ Found relevant info in website content!');
-                
-                let websiteResponse = `📄 Here's what I found:\n\n`;
-                
-                websiteResults.slice(0, 3).forEach((result, index) => {
-                    websiteResponse += `${index + 1}. *${result.pageTitle}*\n`;
-                    websiteResponse += `${result.content.substring(0, 250)}...\n`;
-                    if (result.url) {
-                        websiteResponse += `🔗 ${result.url}\n`;
-                    }
-                    websiteResponse += '\n';
+
+                const items = pickWebsiteItems(websiteResults, 2);
+                const websiteResponse = formatWebsiteItemsMessage({
+                    topic: '',
+                    items,
+                    question: 'Want me to connect you with our team, or can you share your exact requirement + quantity?'
                 });
-                
-                websiteResponse += '\n💬 Would you like more details or assistance with an order?';
                 
                 return {
                     response: websiteResponse,
@@ -1733,20 +1800,23 @@ Guidelines:
             
             if (websiteResults && websiteResults.found) {
                 console.log('[BUSINESS_QUERIES_AI] ✅ Found', websiteResults.count, 'results from website!');
-                
-                let websiteResponse = `📄 Here's information from our website:\n\n`;
-                
-                websiteResults.sources.forEach((source, index) => {
-                    const resultText = websiteResults.context.split('---')[index] || '';
-                    const content = resultText.replace(/\[Source \d+:.*?\]\n/g, '').trim();
-                    
-                    websiteResponse += `*${source.title}*\n`;
-                    websiteResponse += `${content.substring(0, 300)}${content.length > 300 ? '...' : ''}\n\n`;
-                    if (source.url) {
-                        websiteResponse += `🔗 ${source.url}\n\n`;
-                    }
+
+                const blocks = String(websiteResults.context || '').split('---');
+                const rawItems = (websiteResults.sources || []).map((s, idx) => {
+                    const title = cleanWebsiteText(s?.title || s?.pageTitle || 'Website');
+                    const url = s?.url ? String(s.url).trim() : '';
+                    const block = blocks[idx] || '';
+                    const content = cleanWebsiteText(String(block).replace(/\[Source \d+:.*?\]\n/g, '').trim());
+                    return { pageTitle: title, url, content };
                 });
-                
+
+                const items = pickWebsiteItems(rawItems, 2);
+                const websiteResponse = formatWebsiteItemsMessage({
+                    topic: query,
+                    items,
+                    question: 'Can you share the exact requirement (part/type) + quantity so we can confirm quickly?'
+                });
+
                 return websiteResponse;
             } else {
                 console.log('[BUSINESS_QUERIES_AI] No website content found');

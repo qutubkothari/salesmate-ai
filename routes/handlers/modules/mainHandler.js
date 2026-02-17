@@ -74,7 +74,17 @@ async function handleCustomerMessage(req, res, tenant, from, userQuery, conversa
 
     const contactName = (customerProfile?.contact_person || customerProfile?.name || '').toString().trim();
     const companyName = (customerProfile?.business_name || customerProfile?.company || '').toString().trim();
-    const displayName = (contactName || companyName || '').toString().trim();
+
+    function sanitizeDisplayName(name) {
+        let n = String(name || '').trim();
+        // Avoid cases where earlier parsing stored greetings as a "name".
+        n = n.replace(/^(hi|hello|hey|hlo|hii)\b\s*/i, '').trim();
+        n = n.replace(/\s+/g, ' ').trim();
+        if (n.length > 60) n = n.slice(0, 60).trim();
+        return n;
+    }
+
+    const displayName = sanitizeDisplayName(contactName || companyName || '');
     const needsOnboardingDetails = !contactName && !companyName;
 
     // If there's a big gap, start the next reply with a friendly personal greeting.
@@ -852,6 +862,23 @@ ${smartText}`
         }
 
         // STEP 3.6: Direct website request handling (avoid duplicate/ugly AI website replies)
+        // Direct address/location handling: do NOT route to website scraping for this.
+        if (/(\baddress\b|\blocation\b|\bwhere\s+are\s+you\b|\bmap\b|\bdirections\b)/i.test(userQuery)) {
+            const businessName = (tenant.business_name || 'our office').toString().trim();
+            const address = (tenant.business_address || '').toString().trim();
+            const websiteUrl = (tenant.business_website || '').toString().trim();
+
+            if (address) {
+                const reply = `${businessName} address:\n${address}${websiteUrl ? `\n\nWebsite: ${websiteUrl}` : ''}`;
+                await sendReply(reply, conversation?.id || null);
+                return res.status(200).json({ ok: true, type: 'address_reply' });
+            }
+
+            const fallback = `Sure — please share your city/area and I’ll send our exact address and directions.`;
+            await sendReply(fallback, conversation?.id || null);
+            return res.status(200).json({ ok: true, type: 'address_reply_missing' });
+        }
+
         if (/(website|web site|site|link|url)\b/i.test(userQuery)) {
             const websiteUrl = tenant.business_website || 'https://hylite.co.in';
             const reply = `You can visit our website here: ${websiteUrl}`;
